@@ -1,0 +1,66 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-anton415_os}
+      POSTGRES_USER: ${POSTGRES_USER:-anton415}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-anton415}
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-anton415} -d $${POSTGRES_DB:-anton415_os}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    image: golang:1.24-alpine
+    working_dir: /workspace
+    command: go run ./apps/api
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      APP_VERSION: ${APP_VERSION:-dev}
+      HTTP_ADDR: ":8080"
+      DATABASE_URL: postgres://${POSTGRES_USER:-anton415}:${POSTGRES_PASSWORD:-anton415}@postgres:5432/${POSTGRES_DB:-anton415_os}?sslmode=disable
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:5173}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      SHUTDOWN_TIMEOUT: ${SHUTDOWN_TIMEOUT:-10s}
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/workspace
+      - go_pkg_mod:/go/pkg/mod
+      - go_build_cache:/root/.cache/go-build
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    image: node:22
+    working_dir: /workspace/apps/web
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/workspace
+      - web_node_modules:/workspace/apps/web/node_modules
+    depends_on:
+      - api
+
+  migrate:
+    image: migrate/migrate:v4.18.3
+    volumes:
+      - ./migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  go_pkg_mod:
+  go_build_cache:
+  web_node_modules:

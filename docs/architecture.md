@@ -2,17 +2,37 @@
 
 ## Direction
 
-`anton415-os` should start as a Go modular monolith.
+`anton415-os` starts as a Go modular monolith.
 
-This keeps the system easy to run, reason about, test, and change while the product shape is still being discovered. The project can still be designed with strong internal module boundaries, but it should not pay the operational cost of microservices before there is a concrete reason.
+The product is for one user, so the early engineering priority is low-stress development, clear boundaries, and easy local operation. The repository should preserve future extraction options through package ownership and explicit interfaces, not by adding distributed-system machinery before it is needed.
 
-## Why modular monolith first
+## Current platform shape
 
-- The product is for one user.
-- The early risk is unclear product shape, not service scale.
-- A single process and repository make refactoring cheaper.
-- Strong package boundaries can preserve future extraction options.
-- Deployment should stay simple until there is useful product behavior to deploy.
+Step 2 establishes the platform skeleton:
+
+```text
+apps/
+  api/                 Go HTTP API process
+  web/                 Lightweight web shell
+internal/
+  platform/            Cross-cutting platform code
+  todo/                Todo boundary marker
+  finance/             Finance boundary marker
+  investments/         Investments boundary marker
+  fire/                FIRE boundary marker
+migrations/            Database migrations
+```
+
+The API is one process. Product modules are packages inside the same Go module. The frontend is one shell that exposes navigation placeholders and backend connectivity, not product workflows.
+
+## Platform responsibilities
+
+- `internal/platform/config`: environment-based configuration
+- `internal/platform/db`: PostgreSQL connection pool bootstrap
+- `internal/platform/http`: router, middleware, health check, and minimal platform endpoints
+- `internal/platform/logging`: structured logging setup
+
+Platform code should stay boring and cross-cutting. It must not accumulate domain rules for Todo, Finance, Investments, or FIRE.
 
 ## Planned module boundaries
 
@@ -21,36 +41,53 @@ This keeps the system easy to run, reason about, test, and change while the prod
 - `investments`: owns investment accounts, positions, performance tracking, and investment-specific rules.
 - `fire`: owns FIRE assumptions, projections, progress calculations, and long-term planning views.
 
-The exact package layout is intentionally postponed until implementation begins. Step 1 defines the intended boundaries, not the final directory tree.
+`fire` may later depend on explicit outputs from `finance` and `investments`, but it should not own their source data.
 
 ## Dependency rules
 
-- Modules should communicate through explicit interfaces or application-level orchestration, not by reaching into each other's internals.
-- Shared code must stay small and boring: primitives, common errors, time/money helpers, and cross-cutting utilities only when they are proven necessary.
 - Domain rules belong to the module that owns the domain.
-- The `fire` module may depend on explicit outputs from `finance` and `investments`, but it should not own their source data.
-- Do not introduce service boundaries, queues, RPC, or distributed deployment patterns until extraction is justified.
+- Modules should not reach into each other's internals.
+- Cross-module collaboration should happen through explicit application-level orchestration or narrow interfaces once real behavior exists.
+- Shared code must remain small and justified by repeated need.
+- Do not introduce queues, RPC, service discovery, distributed data ownership, or separate deployment units during the modular monolith stage.
 
-## Source-of-truth rules
+## Repository strategy
 
-- Active implementation decisions live in `anton415-os`.
-- Roadmap and architecture changes should update documentation in this repository.
-- Legacy repositories may inform decisions, but they do not define current behavior.
-- The portfolio site may describe progress publicly, but it does not replace repository documentation.
+`anton415-os` is the main engineering monorepo and source of truth. Modules live inside this repository by default.
+
+Monorepo remains the default while:
+
+- modules share one deployment unit
+- modules share one development lifecycle
+- cross-module changes are common
+- one-user operation favors simplicity over distribution
+- no strong operational boundaries exist yet
+
+Separate repositories may be considered only during controlled extraction, and only when there is real technical or operational justification. Strong trigger conditions include:
+
+- a module has its own deploy lifecycle
+- a module has its own operational or SLA needs
+- a module changes at a clearly different cadence from the rest of the system
+- a module already has a stable API boundary
+- cross-cutting changes in the monorepo become a real coordination bottleneck
+- extraction provides real product or portfolio value, not architecture theater
+
+Until those conditions exist, splitting repositories would add cost without improving the product.
 
 ## Microservice-ready seams
 
 Microservice-ready seams mean clear internal ownership, explicit interfaces, and limited coupling inside the monolith.
 
-They do not mean creating services, network APIs, deployment units, event buses, or distributed data ownership in advance. A module should only become a service later if there is a concrete reason such as independent scaling, deployment, reliability, or ownership pressure.
+They do not mean creating services, network APIs, deployment units, event buses, or distributed data ownership in advance. A module should only become a service later if controlled extraction is justified by real deployment, reliability, scaling, cadence, or portfolio needs.
 
 ## Postponed until later
 
-- Backend implementation
-- Frontend implementation
-- Database schema design
-- Yandex Cloud deployment scripts
-- CI/CD setup
+- Real Todo business logic
+- Real Finance business logic
+- Real Investments business logic
+- Real FIRE business logic
+- Complex auth
+- Yandex Cloud deployment
+- Message broker
+- Kubernetes
 - Microservices
-- Legacy code migration
-- Detailed package layout

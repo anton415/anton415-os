@@ -1,0 +1,16 @@
+.DS_Store
+.env
+
+# Go
+/bin/
+/tmp/
+/coverage.out
+
+# Frontend
+apps/web/dist/
+apps/web/node_modules/
+.playwright-cli/
+
+# Editor
+.idea/
+.vscode/

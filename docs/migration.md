@@ -15,6 +15,8 @@ Active implementation now happens only in `anton415-os`.
 
 Older repositories can be read, compared, and mined for lessons, but they should not continue as parallel active product centers. New architecture decisions, roadmap updates, and implementation work belong here.
 
+`anton415-os` remains the default monorepo during the modular monolith stage. Legacy repositories should not become active module repositories again unless a future controlled extraction is justified by real deployment, operational, cadence, API-boundary, coordination, or portfolio needs.
+
 ## What may be migrated
 
 - Product requirements that still match the new direction.
