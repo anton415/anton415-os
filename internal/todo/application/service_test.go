@@ -1,0 +1,289 @@
+package application
+
+import (
+	"context"
+	"errors"
+	"slices"
+	"testing"
+	"time"
+
+	"github.com/anton415/anton415-os/internal/todo/domain"
+)
+
+func TestServiceCreatesTaskAndRejectsEmptyTitle(t *testing.T) {
+	service := newTestService()
+
+	task, err := service.CreateTask(context.Background(), CreateTaskInput{Title: "  Write tests  "})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+	if task.Title != "Write tests" {
+		t.Fatalf("Title = %q, want Write tests", task.Title)
+	}
+
+	_, err = service.CreateTask(context.Background(), CreateTaskInput{Title: "   "})
+	if !errors.Is(err, domain.ErrInvalidTaskTitle) {
+		t.Fatalf("CreateTask() error = %v, want ErrInvalidTaskTitle", err)
+	}
+}
+
+func TestServiceStatusTransitions(t *testing.T) {
+	store := newMemoryStore()
+	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+	service := NewService(Dependencies{
+		Projects: store,
+		Tasks:    store,
+		Now:      func() time.Time { return now },
+		Location: time.UTC,
+	})
+
+	task, err := service.CreateTask(context.Background(), CreateTaskInput{Title: "Status task"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	now = now.Add(time.Hour)
+	task, err = service.UpdateTask(context.Background(), task.ID, UpdateTaskInput{
+		Status: OptionalTaskStatus{Set: true, Value: domain.TaskStatusDone},
+	})
+	if err != nil {
+		t.Fatalf("UpdateTask(done) error = %v", err)
+	}
+	if task.CompletedAt == nil || !task.CompletedAt.Equal(now) {
+		t.Fatalf("CompletedAt = %v, want %v", task.CompletedAt, now)
+	}
+
+	now = now.Add(time.Hour)
+	task, err = service.UpdateTask(context.Background(), task.ID, UpdateTaskInput{
+		Status: OptionalTaskStatus{Set: true, Value: domain.TaskStatusTodo},
+	})
+	if err != nil {
+		t.Fatalf("UpdateTask(todo) error = %v", err)
+	}
+	if task.CompletedAt != nil {
+		t.Fatalf("CompletedAt = %v, want nil", task.CompletedAt)
+	}
+}
+
+func TestServiceFiltersInboxAndToday(t *testing.T) {
+	store := newMemoryStore()
+	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+	service := NewService(Dependencies{
+		Projects: store,
+		Tasks:    store,
+		Now:      func() time.Time { return now },
+		Location: time.UTC,
+	})
+
+	project, err := service.CreateProject(context.Background(), CreateProjectInput{Name: "Work"})
+	if err != nil {
+		t.Fatalf("CreateProject() error = %v", err)
+	}
+
+	today := now
+	tomorrow := now.AddDate(0, 0, 1)
+	inbox, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Inbox"})
+	todayTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Today", DueDate: &today})
+	projectTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Project", ProjectID: &project.ID})
+	upcomingTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Upcoming", DueDate: &tomorrow})
+
+	inboxTasks, err := service.ListTasks(context.Background(), ListTasksInput{View: TaskViewInbox})
+	if err != nil {
+		t.Fatalf("ListTasks(inbox) error = %v", err)
+	}
+	if got := taskIDs(inboxTasks); !slices.Equal(got, []int64{inbox.ID, todayTask.ID, upcomingTask.ID}) {
+		t.Fatalf("inbox ids = %v, want [%d %d %d]", got, inbox.ID, todayTask.ID, upcomingTask.ID)
+	}
+
+	todayTasks, err := service.ListTasks(context.Background(), ListTasksInput{View: TaskViewToday})
+	if err != nil {
+		t.Fatalf("ListTasks(today) error = %v", err)
+	}
+	if got := taskIDs(todayTasks); !slices.Equal(got, []int64{todayTask.ID}) {
+		t.Fatalf("today ids = %v, want [%d]", got, todayTask.ID)
+	}
+
+	upcomingTasks, err := service.ListTasks(context.Background(), ListTasksInput{View: TaskViewUpcoming})
+	if err != nil {
+		t.Fatalf("ListTasks(upcoming) error = %v", err)
+	}
+	if got := taskIDs(upcomingTasks); !slices.Equal(got, []int64{upcomingTask.ID}) {
+		t.Fatalf("upcoming ids = %v, want [%d]", got, upcomingTask.ID)
+	}
+
+	projectTasks, err := service.ListTasks(context.Background(), ListTasksInput{ProjectID: &project.ID})
+	if err != nil {
+		t.Fatalf("ListTasks(project) error = %v", err)
+	}
+	if got := taskIDs(projectTasks); !slices.Equal(got, []int64{projectTask.ID}) {
+		t.Fatalf("project ids = %v, want [%d]", got, projectTask.ID)
+	}
+}
+
+func TestServiceProjectCRUDAndDeleteConflict(t *testing.T) {
+	service := newTestService()
+	ctx := context.Background()
+
+	project, err := service.CreateProject(ctx, CreateProjectInput{Name: "  Home  "})
+	if err != nil {
+		t.Fatalf("CreateProject() error = %v", err)
+	}
+	if project.Name != "Home" {
+		t.Fatalf("Name = %q, want Home", project.Name)
+	}
+
+	project, err = service.UpdateProject(ctx, project.ID, UpdateProjectInput{Name: "Personal"})
+	if err != nil {
+		t.Fatalf("UpdateProject() error = %v", err)
+	}
+	if project.Name != "Personal" {
+		t.Fatalf("Name = %q, want Personal", project.Name)
+	}
+
+	_, err = service.CreateTask(ctx, CreateTaskInput{Title: "Bound task", ProjectID: &project.ID})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	err = service.DeleteProject(ctx, project.ID)
+	if !errors.Is(err, ErrProjectHasTasks) {
+		t.Fatalf("DeleteProject() error = %v, want ErrProjectHasTasks", err)
+	}
+}
+
+func newTestService() *Service {
+	store := newMemoryStore()
+	return NewService(Dependencies{
+		Projects: store,
+		Tasks:    store,
+		Now: func() time.Time {
+			return time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+		},
+		Location: time.UTC,
+	})
+}
+
+type memoryStore struct {
+	nextProjectID int64
+	nextTaskID    int64
+	projects      map[int64]domain.Project
+	tasks         map[int64]domain.Task
+}
+
+func newMemoryStore() *memoryStore {
+	return &memoryStore{
+		nextProjectID: 1,
+		nextTaskID:    1,
+		projects:      map[int64]domain.Project{},
+		tasks:         map[int64]domain.Task{},
+	}
+}
+
+func (store *memoryStore) ListProjects(context.Context) ([]domain.Project, error) {
+	projects := make([]domain.Project, 0, len(store.projects))
+	for _, project := range store.projects {
+		projects = append(projects, project)
+	}
+	slices.SortFunc(projects, func(left, right domain.Project) int {
+		if left.Name < right.Name {
+			return -1
+		}
+		if left.Name > right.Name {
+			return 1
+		}
+		return 0
+	})
+	return projects, nil
+}
+
+func (store *memoryStore) GetProject(_ context.Context, id int64) (domain.Project, error) {
+	project, ok := store.projects[id]
+	if !ok {
+		return domain.Project{}, ErrNotFound
+	}
+	return project, nil
+}
+
+func (store *memoryStore) CreateProject(_ context.Context, project domain.Project) (domain.Project, error) {
+	project.ID = store.nextProjectID
+	store.nextProjectID++
+	store.projects[project.ID] = project
+	return project, nil
+}
+
+func (store *memoryStore) UpdateProject(_ context.Context, project domain.Project) (domain.Project, error) {
+	if _, ok := store.projects[project.ID]; !ok {
+		return domain.Project{}, ErrNotFound
+	}
+	store.projects[project.ID] = project
+	return project, nil
+}
+
+func (store *memoryStore) DeleteProject(_ context.Context, id int64) error {
+	if _, ok := store.projects[id]; !ok {
+		return ErrNotFound
+	}
+	for _, task := range store.tasks {
+		if task.ProjectID != nil && *task.ProjectID == id {
+			return ErrProjectHasTasks
+		}
+	}
+	delete(store.projects, id)
+	return nil
+}
+
+func (store *memoryStore) ListTasks(_ context.Context, filter TaskListFilter) ([]domain.Task, error) {
+	tasks := make([]domain.Task, 0, len(store.tasks))
+	for _, task := range store.tasks {
+		tasks = append(tasks, task)
+	}
+	slices.SortFunc(tasks, func(left, right domain.Task) int {
+		if left.ID < right.ID {
+			return -1
+		}
+		if left.ID > right.ID {
+			return 1
+		}
+		return 0
+	})
+	return ApplyTaskFilter(tasks, filter), nil
+}
+
+func (store *memoryStore) GetTask(_ context.Context, id int64) (domain.Task, error) {
+	task, ok := store.tasks[id]
+	if !ok {
+		return domain.Task{}, ErrNotFound
+	}
+	return task, nil
+}
+
+func (store *memoryStore) CreateTask(_ context.Context, task domain.Task) (domain.Task, error) {
+	task.ID = store.nextTaskID
+	store.nextTaskID++
+	store.tasks[task.ID] = task
+	return task, nil
+}
+
+func (store *memoryStore) UpdateTask(_ context.Context, task domain.Task) (domain.Task, error) {
+	if _, ok := store.tasks[task.ID]; !ok {
+		return domain.Task{}, ErrNotFound
+	}
+	store.tasks[task.ID] = task
+	return task, nil
+}
+
+func (store *memoryStore) DeleteTask(_ context.Context, id int64) error {
+	if _, ok := store.tasks[id]; !ok {
+		return ErrNotFound
+	}
+	delete(store.tasks, id)
+	return nil
+}
+
+func taskIDs(tasks []domain.Task) []int64 {
+	ids := make([]int64, 0, len(tasks))
+	for _, task := range tasks {
+		ids = append(ids, task.ID)
+	}
+	return ids
+}

@@ -16,9 +16,11 @@ make dev
 
 Open:
 
-- Web shell: `http://localhost:5173`
+- Web app: `http://localhost:5173`
+- Todo UI: `http://localhost:5173/todo`
 - API health: `http://localhost:8080/health`
 - API user stub: `http://localhost:8080/api/v1/me`
+- Todo API: `http://localhost:8080/api/v1/todo`
 
 `make migrate-up` starts PostgreSQL if needed and applies migrations from `migrations/`.
 
@@ -63,7 +65,12 @@ Local PostgreSQL runs in Docker Compose:
 - host port: `15432`
 - container port: `5432`
 
-The first migration creates only `platform_metadata`. Domain tables are intentionally deferred until a real vertical slice needs them.
+Migrations create `platform_metadata` plus Todo v1 tables:
+
+- `todo_projects`
+- `todo_tasks`
+
+Todo v1 stores task status as text with a database check constraint. Deleting a project with tasks is blocked; move or delete the tasks first. The Todo `today` and `upcoming` views use the API server's local timezone.
 
 ## Troubleshooting
 

@@ -7,7 +7,8 @@ export const productModules: ProductModule[] = [
     name: "Todo",
     path: "/todo",
     accent: "#2563eb",
-    summary: "Task and personal workflow boundary."
+    summary: "Projects, tasks, due dates, and simple execution views.",
+    state: "implemented"
   },
   {
     name: "Finance",

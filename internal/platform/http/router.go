@@ -12,6 +12,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/anton415/anton415-os/internal/platform/config"
+	todohttp "github.com/anton415/anton415-os/internal/todo/adapters/http"
+	todopostgres "github.com/anton415/anton415-os/internal/todo/adapters/postgres"
+	"github.com/anton415/anton415-os/internal/todo/application"
 )
 
 type Dependencies struct {
@@ -50,6 +53,14 @@ func NewRouter(deps Dependencies) http.Handler {
 	r.Get("/health", healthHandler(deps))
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/me", meHandler)
+
+		todoRepository := todopostgres.NewRepository(deps.DB)
+		todoService := application.NewService(application.Dependencies{
+			Projects: todoRepository,
+			Tasks:    todoRepository,
+			Location: time.Local,
+		})
+		r.Mount("/todo", todohttp.NewRouter(todoService))
 	})
 
 	return r

@@ -2,9 +2,9 @@
 
 `anton415-os` is the active flagship engineering repository and source of truth for the `anton415` personal software platform.
 
-Current status: Step 2 platform foundation. The repository now contains a small modular monolith skeleton with a Go API, a lightweight web shell, local PostgreSQL, migrations, Docker Compose runtime, Make targets, CI, and documentation.
+Current status: Step 3 Todo v1. The repository contains a small Go modular monolith with a usable Todo vertical slice, a lightweight web app, local PostgreSQL, migrations, Docker Compose runtime, Make targets, CI, and documentation.
 
-No real Todo, Finance, Investments, or FIRE business logic exists yet.
+Finance, Investments, and FIRE are still planned module boundaries without product behavior.
 
 ## Repository strategy
 
@@ -56,9 +56,11 @@ make dev
 
 Local URLs:
 
-- Web shell: `http://localhost:5173`
+- Web app: `http://localhost:5173`
+- Todo UI: `http://localhost:5173/todo`
 - API health: `http://localhost:8080/health`
 - API user stub: `http://localhost:8080/api/v1/me`
+- Todo API: `http://localhost:8080/api/v1/todo`
 - PostgreSQL: `localhost:15432`
 
 Useful commands:
@@ -125,7 +127,10 @@ internal/
     db/                PostgreSQL pool bootstrap
     http/              Router, health endpoint, middleware
     logging/           Structured logging setup
-  todo/                Todo bounded-context placeholder
+  todo/
+    domain/            Todo entities, validation, and status rules
+    application/       Todo use cases and filters
+    adapters/          Todo HTTP and PostgreSQL adapters
   finance/             Finance bounded-context placeholder
   investments/         Investments bounded-context placeholder
   fire/                FIRE bounded-context placeholder
@@ -145,9 +150,17 @@ Makefile               Developer commands
 - CI foundation for backend and frontend checks
 - Explicit modular monolith structure and repository strategy documentation
 
+## What Step 3 added
+
+- Todo projects and tasks with PostgreSQL persistence
+- Todo REST API under `/api/v1/todo`
+- Browser UI at `/todo` with Inbox, Today, Upcoming, project filters, task forms, project forms, status changes, and delete actions
+- Domain/application tests and HTTP handler coverage for core Todo behavior
+- Project deletion is intentionally conservative: a project with tasks cannot be deleted until those tasks are moved or deleted
+- `today` and `upcoming` views use the API server's local timezone for Todo v1
+
 ## What still does not exist
 
-- Todo application behavior
 - Finance domain behavior
 - Investment import, sync, or analysis
 - FIRE calculations
@@ -158,4 +171,4 @@ Makefile               Developer commands
 
 ## Roadmap pointer
 
-The staged roadmap lives in [docs/roadmap.md](docs/roadmap.md). Step 3 should be the first real domain vertical slice, most likely the Todo module.
+The staged roadmap lives in [docs/roadmap.md](docs/roadmap.md). The next major product step is Finance v1.

@@ -8,7 +8,7 @@ The product is for one user, so the early engineering priority is low-stress dev
 
 ## Current platform shape
 
-Step 2 establishes the platform skeleton:
+Step 3 keeps the same single-process platform shape and adds Todo as the first real product module:
 
 ```text
 apps/
@@ -16,14 +16,14 @@ apps/
   web/                 Lightweight web shell
 internal/
   platform/            Cross-cutting platform code
-  todo/                Todo boundary marker
+  todo/                Todo domain, use cases, HTTP, and persistence
   finance/             Finance boundary marker
   investments/         Investments boundary marker
   fire/                FIRE boundary marker
 migrations/            Database migrations
 ```
 
-The API is one process. Product modules are packages inside the same Go module. The frontend is one shell that exposes navigation placeholders and backend connectivity, not product workflows.
+The API is one process. Product modules are packages inside the same Go module. The frontend is one shell with a real Todo workflow and placeholders for Finance, Investments, and FIRE.
 
 ## Platform responsibilities
 
@@ -36,7 +36,7 @@ Platform code should stay boring and cross-cutting. It must not accumulate domai
 
 ## Planned module boundaries
 
-- `todo`: owns tasks, task workflow state, and personal execution workflows.
+- `todo`: owns projects, tasks, task workflow state, and personal execution workflows.
 - `finance`: owns personal financial records, categories, balances, and finance-specific rules.
 - `investments`: owns investment accounts, positions, performance tracking, and investment-specific rules.
 - `fire`: owns FIRE assumptions, projections, progress calculations, and long-term planning views.
@@ -74,6 +74,16 @@ Separate repositories may be considered only during controlled extraction, and o
 
 Until those conditions exist, splitting repositories would add cost without improving the product.
 
+## Todo v1 boundary
+
+Todo v1 is implemented under `internal/todo` with separate domain, application, and adapter packages.
+
+- Domain rules validate names and titles, own task statuses, and set or clear `completed_at` during status transitions.
+- Application use cases own project/task CRUD and list filter semantics.
+- HTTP and PostgreSQL adapters translate transport/database details without owning business rules.
+- Project deletion is restricted while tasks still reference the project.
+- Todo v1 treats the API server's local timezone as the source for `today` and `upcoming` views.
+
 ## Microservice-ready seams
 
 Microservice-ready seams mean clear internal ownership, explicit interfaces, and limited coupling inside the monolith.
@@ -82,7 +92,6 @@ They do not mean creating services, network APIs, deployment units, event buses,
 
 ## Postponed until later
 
-- Real Todo business logic
 - Real Finance business logic
 - Real Investments business logic
 - Real FIRE business logic

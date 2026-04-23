@@ -67,9 +67,9 @@ Done means:
 
 ### Step 3: First domain vertical slice
 
-Status: next.
+Status: complete.
 
-Likely module: `todo`.
+Module: `todo`.
 
 Purpose: build the first useful single-user workflow and validate the platform skeleton with real product behavior.
 
@@ -80,6 +80,10 @@ Done means:
 - module boundaries remain clear
 - frontend gains real Todo screens without turning other placeholders into fake products
 - patterns introduced here are simple enough for Finance, Investments, and FIRE to reuse later
+
+Todo v1 includes projects, inbox-style project-less tasks, task notes, statuses, optional due dates, Inbox/Today/Upcoming/project views, PostgreSQL migrations, REST endpoints, a browser UI, and focused tests.
+
+Todo v1 intentionally excludes subtasks, tags, drag and drop, reminders, calendar sync, collaboration, rich recurrence, search, background jobs, GraphQL, and service extraction.
 
 ### Finance v1
 
@@ -105,13 +109,12 @@ Done means:
 
 ## Current non-goals
 
-- No real Todo application logic in Step 2.
-- No real financial domain logic in Step 2.
-- No investment import or sync in Step 2.
-- No FIRE calculations in Step 2.
-- No complex auth in Step 2.
-- No Yandex Cloud deployment scripts in Step 2.
-- No message broker, Kubernetes, microservices, or separate repositories in Step 2.
+- No financial domain logic yet.
+- No investment import or sync yet.
+- No FIRE calculations yet.
+- No complex auth yet.
+- No Yandex Cloud deployment scripts yet.
+- No message broker, Kubernetes, microservices, or separate repositories during the modular monolith stage.
 
 ## High-level definition of done
 
