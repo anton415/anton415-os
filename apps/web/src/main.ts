@@ -8,7 +8,6 @@ import type {
   HealthState,
   TodoScope,
   TodoState,
-  TodoStatusFilter,
   TodoTaskPayload,
   TodoTaskQuery,
   TodoTaskStatus
@@ -30,8 +29,7 @@ let todoState: TodoState = {
   saving: false,
   projects: [],
   tasks: [],
-  scope: { kind: "view", view: "inbox" },
-  statusFilter: "all"
+  scope: { kind: "view", view: "inbox" }
 };
 
 function render() {
@@ -49,10 +47,6 @@ function render() {
     },
     onSelectTodoScope: (scope) => {
       todoState = { ...todoState, scope, editingTaskId: undefined };
-      void refreshTodo();
-    },
-    onSelectTodoStatusFilter: (statusFilter) => {
-      todoState = { ...todoState, statusFilter, editingTaskId: undefined };
       void refreshTodo();
     },
     onEditTask: (taskId) => {
@@ -147,6 +141,7 @@ async function deleteTask(taskId: number) {
   render();
   try {
     await todoApi.deleteTask(taskId);
+    todoState = { ...todoState, saving: false };
     await refreshTodo();
   } catch (error) {
     todoState = { ...todoState, saving: false, error: errorMessage(error) };
@@ -159,6 +154,7 @@ async function changeTaskStatus(taskId: number, status: TodoTaskStatus) {
   render();
   try {
     await todoApi.updateTask(taskId, { status });
+    todoState = { ...todoState, saving: false };
     await refreshTodo();
   } catch (error) {
     todoState = { ...todoState, saving: false, error: errorMessage(error) };
@@ -202,7 +198,9 @@ async function deleteProject(projectId: number) {
   try {
     await todoApi.deleteProject(projectId);
     if (todoState.scope.kind === "project" && todoState.scope.projectId === projectId) {
-      todoState = { ...todoState, scope: { kind: "view", view: "inbox" } };
+      todoState = { ...todoState, saving: false, scope: { kind: "view", view: "inbox" } };
+    } else {
+      todoState = { ...todoState, saving: false };
     }
     await refreshTodo();
   } catch (error) {
@@ -238,12 +236,20 @@ function routeFromPath(path: string): AppPath {
 function taskQuery(state: TodoState): TodoTaskQuery {
   const query: TodoTaskQuery = {};
   if (state.scope.kind === "view") {
-    query.view = state.scope.view;
+    switch (state.scope.view) {
+      case "inbox":
+      case "today":
+      case "upcoming":
+        query.view = state.scope.view;
+        break;
+      case "completed":
+        query.status = "done";
+        break;
+      case "all":
+        break;
+    }
   } else {
     query.project_id = state.scope.projectId;
-  }
-  if (state.statusFilter !== "all") {
-    query.status = state.statusFilter;
   }
   return query;
 }
@@ -252,13 +258,11 @@ function taskPayload(formData: FormData): TodoTaskPayload {
   const projectID = optionalNumber(formData.get("project_id"));
   const dueDate = optionalString(formData.get("due_date"));
   const notes = optionalString(formData.get("notes"));
-  const status = String(formData.get("status") ?? "todo") as TodoTaskStatus;
 
   return {
     project_id: projectID ?? null,
     title: String(formData.get("title") ?? ""),
     notes,
-    status,
     due_date: dueDate
   };
 }

@@ -21,8 +21,8 @@ export type ProductModule = {
 export type AppPath = "/" | "/todo";
 
 export type TodoTaskStatus = "todo" | "in_progress" | "done";
-export type TodoView = "inbox" | "today" | "upcoming";
-export type TodoStatusFilter = "all" | TodoTaskStatus;
+export type TodoView = "inbox" | "today" | "upcoming" | "all" | "completed";
+export type TodoServerView = Exclude<TodoView, "all" | "completed">;
 
 export type TodoProject = {
   id: number;
@@ -54,7 +54,6 @@ export type TodoState = {
   projects: TodoProject[];
   tasks: TodoTask[];
   scope: TodoScope;
-  statusFilter: TodoStatusFilter;
   editingTaskId?: number;
   editingProjectId?: number;
   taskFormError?: string;
@@ -65,7 +64,7 @@ export type TodoTaskPayload = {
   project_id: number | null;
   title: string;
   notes: string | null;
-  status: TodoTaskStatus;
+  status?: TodoTaskStatus;
   due_date: string | null;
 };
 
@@ -74,7 +73,7 @@ export type TodoProjectPayload = {
 };
 
 export type TodoTaskQuery = {
-  view?: TodoView;
+  view?: TodoServerView;
   status?: TodoTaskStatus;
   project_id?: number;
 };

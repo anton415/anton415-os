@@ -32,6 +32,46 @@ func TestNewTaskRejectsEmptyTitle(t *testing.T) {
 	}
 }
 
+func TestTaskOptionalFieldsNormalizeAndClear(t *testing.T) {
+	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+	projectID := int64(7)
+	notes := "  Bring oat milk  "
+	dueDate := time.Date(2026, 4, 24, 18, 30, 0, 0, time.FixedZone("test", 3*60*60))
+
+	task, err := NewTask(NewTaskInput{
+		ProjectID: &projectID,
+		Title:     "Buy milk",
+		Notes:     &notes,
+		DueDate:   &dueDate,
+	}, now)
+	if err != nil {
+		t.Fatalf("NewTask() error = %v", err)
+	}
+	if task.ProjectID == nil || *task.ProjectID != projectID {
+		t.Fatalf("ProjectID = %v, want %d", task.ProjectID, projectID)
+	}
+	if task.Notes == nil || *task.Notes != "Bring oat milk" {
+		t.Fatalf("Notes = %v, want trimmed notes", task.Notes)
+	}
+	if task.DueDate == nil || task.DueDate.Hour() != 0 || task.DueDate.Minute() != 0 {
+		t.Fatalf("DueDate = %v, want date-only value", task.DueDate)
+	}
+
+	task.SetProject(nil, now.Add(time.Minute))
+	task.SetNotes(nil, now.Add(2*time.Minute))
+	task.SetDueDate(nil, now.Add(3*time.Minute))
+
+	if task.ProjectID != nil {
+		t.Fatalf("ProjectID = %v, want nil", task.ProjectID)
+	}
+	if task.Notes != nil {
+		t.Fatalf("Notes = %v, want nil", task.Notes)
+	}
+	if task.DueDate != nil {
+		t.Fatalf("DueDate = %v, want nil", task.DueDate)
+	}
+}
+
 func TestApplyStatusDoneSetsCompletedAt(t *testing.T) {
 	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
 	task, err := NewTask(NewTaskInput{Title: "Ship todo"}, now)

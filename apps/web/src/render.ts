@@ -5,11 +5,16 @@ import type {
   TodoProject,
   TodoScope,
   TodoState,
-  TodoStatusFilter,
   TodoTask,
   TodoTaskStatus,
   TodoView
 } from "./types";
+
+type SmartList = {
+  view: TodoView;
+  label: string;
+  accent: string;
+};
 
 type RenderOptions = {
   apiBaseUrl: string;
@@ -20,7 +25,6 @@ type RenderOptions = {
   onRefreshHealth: () => void;
   onRefreshTodo: () => void;
   onSelectTodoScope: (scope: TodoScope) => void;
-  onSelectTodoStatusFilter: (statusFilter: TodoStatusFilter) => void;
   onEditTask: (taskId: number) => void;
   onCancelTaskEdit: () => void;
   onSaveTask: (form: HTMLFormElement) => void;
@@ -106,16 +110,20 @@ function renderTodoPage(options: RenderOptions): string {
 
     <section class="todo-layout">
       <aside class="todo-panel">
-        ${renderProjectForm(state)}
+        ${renderSmartLists(state)}
         ${renderProjectList(state)}
+        ${renderProjectForm(state)}
       </aside>
       <section class="todo-main">
-        ${renderTaskFilters(state)}
-        ${renderTaskForm(state)}
+        ${shouldRenderTaskForm(state) ? renderTaskForm(state) : ""}
         ${renderTaskList(state)}
       </section>
     </section>
   `;
+}
+
+function shouldRenderTaskForm(state: TodoState): boolean {
+  return state.editingTaskId !== undefined || state.scope.kind !== "view" || state.scope.view !== "completed";
 }
 
 function renderModuleNav(currentPath: AppPath): string {
@@ -148,38 +156,32 @@ function renderModuleCards(): string {
     .join("");
 }
 
-function renderTaskFilters(state: TodoState): string {
+const smartLists: SmartList[] = [
+  { view: "inbox", label: "Inbox", accent: "#2563eb" },
+  { view: "today", label: "Today", accent: "#ef4444" },
+  { view: "upcoming", label: "Upcoming", accent: "#f59e0b" },
+  { view: "all", label: "All", accent: "#64748b" },
+  { view: "completed", label: "Completed", accent: "#22c55e" }
+];
+
+function renderSmartLists(state: TodoState): string {
   return `
-    <div class="todo-toolbar">
-      <div class="segmented-control" aria-label="Task views">
-        ${renderViewButton(state, "inbox", "Inbox")}
-        ${renderViewButton(state, "today", "Today")}
-        ${renderViewButton(state, "upcoming", "Upcoming")}
+    <section class="smart-list-panel" aria-label="Smart lists">
+      <div class="smart-list-grid">
+        ${smartLists.map((list) => renderSmartListButton(state, list)).join("")}
       </div>
-      <label class="compact-field">
-        <span>Status</span>
-        <select id="todo-status-filter">
-          ${renderStatusFilterOption(state.statusFilter, "all", "All")}
-          ${renderStatusFilterOption(state.statusFilter, "todo", "Todo")}
-          ${renderStatusFilterOption(state.statusFilter, "in_progress", "In progress")}
-          ${renderStatusFilterOption(state.statusFilter, "done", "Done")}
-        </select>
-      </label>
-    </div>
+    </section>
   `;
 }
 
-function renderViewButton(state: TodoState, view: TodoView, label: string): string {
-  const active = state.scope.kind === "view" && state.scope.view === view;
+function renderSmartListButton(state: TodoState, list: SmartList): string {
+  const active = state.scope.kind === "view" && state.scope.view === list.view;
   return `
-    <button class="segment-button ${active ? "active" : ""}" type="button" data-todo-view="${view}" aria-pressed="${active}">
-      ${label}
+    <button class="smart-list-button ${active ? "active" : ""}" type="button" data-todo-view="${list.view}" aria-pressed="${active}">
+      <span class="smart-list-icon" style="background: ${list.accent}" aria-hidden="true"></span>
+      <span>${escapeHTML(list.label)}</span>
     </button>
   `;
-}
-
-function renderStatusFilterOption(current: TodoStatusFilter, value: TodoStatusFilter, label: string): string {
-  return `<option value="${value}" ${current === value ? "selected" : ""}>${label}</option>`;
 }
 
 function renderProjectForm(state: TodoState): string {
@@ -237,7 +239,7 @@ function renderTaskForm(state: TodoState): string {
   const task = state.tasks.find((item) => item.id === state.editingTaskId);
   const selectedProjectID =
     task?.project_id ?? (state.scope.kind === "project" ? state.scope.projectId : null);
-  const status = task?.status ?? "todo";
+  const dueDate = task?.due_date ?? defaultDueDateForScope(state.scope);
 
   return `
     <form class="todo-form task-form" id="task-form">
@@ -261,15 +263,7 @@ function renderTaskForm(state: TodoState): string {
         </label>
         <label>
           <span>Due date</span>
-          <input name="due_date" type="date" value="${escapeAttr(task?.due_date ?? "")}">
-        </label>
-        <label>
-          <span>Status</span>
-          <select name="status">
-            ${renderStatusOption(status, "todo", "Todo")}
-            ${renderStatusOption(status, "in_progress", "In progress")}
-            ${renderStatusOption(status, "done", "Done")}
-          </select>
+          <input name="due_date" type="date" value="${escapeAttr(dueDate)}">
         </label>
       </div>
       ${state.taskFormError ? `<p class="form-error">${escapeHTML(state.taskFormError)}</p>` : ""}
@@ -285,8 +279,18 @@ function renderProjectOption(project: TodoProject, selectedProjectID: number | n
   return `<option value="${project.id}" ${selectedProjectID === project.id ? "selected" : ""}>${escapeHTML(project.name)}</option>`;
 }
 
-function renderStatusOption(current: TodoTaskStatus, value: TodoTaskStatus, label: string): string {
-  return `<option value="${value}" ${current === value ? "selected" : ""}>${label}</option>`;
+function defaultDueDateForScope(scope: TodoScope): string {
+  if (scope.kind !== "view" || scope.view !== "today") {
+    return "";
+  }
+  return localDateInputValue(new Date());
+}
+
+function localDateInputValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function renderTaskList(state: TodoState): string {
@@ -307,16 +311,24 @@ function renderTaskList(state: TodoState): string {
 
 function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean): string {
   const project = projects.find((item) => item.id === task.project_id);
+  const done = task.status === "done";
+  const nextStatus: TodoTaskStatus = done ? "todo" : "done";
   return `
-    <article class="task-item ${task.status === "done" ? "done" : ""}">
+    <article class="task-item ${done ? "done" : ""}">
+      <button
+        class="complete-button"
+        type="button"
+        data-toggle-task-status-id="${task.id}"
+        data-next-status="${nextStatus}"
+        aria-label="${done ? `Reopen ${escapeAttr(task.title)}` : `Complete ${escapeAttr(task.title)}`}"
+        aria-pressed="${done}"
+        ${saving ? "disabled" : ""}
+      >
+        <span aria-hidden="true">${done ? "&#10003;" : ""}</span>
+      </button>
       <div class="task-main">
         <div class="task-title-row">
           <h2>${escapeHTML(task.title)}</h2>
-          <select class="task-status-select" data-task-status-id="${task.id}" ${saving ? "disabled" : ""}>
-            ${renderStatusOption(task.status, "todo", "Todo")}
-            ${renderStatusOption(task.status, "in_progress", "In progress")}
-            ${renderStatusOption(task.status, "done", "Done")}
-          </select>
         </div>
         ${task.notes ? `<p class="task-notes">${escapeHTML(task.notes)}</p>` : ""}
         <dl class="task-meta">
@@ -391,11 +403,6 @@ function bindTodoEvents(root: HTMLElement, options: RenderOptions) {
     });
   });
 
-  root.querySelector<HTMLSelectElement>("#todo-status-filter")?.addEventListener("change", (event) => {
-    const select = event.currentTarget as HTMLSelectElement;
-    options.onSelectTodoStatusFilter(select.value as TodoStatusFilter);
-  });
-
   root.querySelector<HTMLFormElement>("#task-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     options.onSaveTask(event.currentTarget as HTMLFormElement);
@@ -421,11 +428,11 @@ function bindTodoEvents(root: HTMLElement, options: RenderOptions) {
     });
   });
 
-  root.querySelectorAll<HTMLSelectElement>("[data-task-status-id]").forEach((select) => {
-    select.addEventListener("change", () => {
-      const taskId = numberFromDataset(select.dataset.taskStatusId);
+  root.querySelectorAll<HTMLButtonElement>("[data-toggle-task-status-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const taskId = numberFromDataset(button.dataset.toggleTaskStatusId);
       if (taskId) {
-        options.onChangeTaskStatus(taskId, select.value as TodoTaskStatus);
+        options.onChangeTaskStatus(taskId, button.dataset.nextStatus as TodoTaskStatus);
       }
     });
   });

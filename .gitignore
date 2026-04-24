@@ -9,6 +9,8 @@
 # Frontend
 apps/web/dist/
 apps/web/node_modules/
+apps/web/playwright-report/
+apps/web/test-results/
 .playwright-cli/
 
 # Editor

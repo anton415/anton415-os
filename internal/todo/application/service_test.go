@@ -65,6 +65,82 @@ func TestServiceStatusTransitions(t *testing.T) {
 	}
 }
 
+func TestServiceUpdatesNullableTaskFields(t *testing.T) {
+	service := newTestService()
+	ctx := context.Background()
+
+	project, err := service.CreateProject(ctx, CreateProjectInput{Name: "Work"})
+	if err != nil {
+		t.Fatalf("CreateProject() error = %v", err)
+	}
+	notes := "  Draft release notes  "
+	dueDate := time.Date(2026, 4, 24, 18, 30, 0, 0, time.UTC)
+	task, err := service.CreateTask(ctx, CreateTaskInput{
+		ProjectID: &project.ID,
+		Title:     "Release",
+		Notes:     &notes,
+		DueDate:   &dueDate,
+	})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	task, err = service.UpdateTask(ctx, task.ID, UpdateTaskInput{
+		ProjectID: OptionalInt64{Set: true, Value: nil},
+		Notes:     OptionalString{Set: true, Value: nil},
+		DueDate:   OptionalDate{Set: true, Value: nil},
+	})
+	if err != nil {
+		t.Fatalf("UpdateTask(clear nullable fields) error = %v", err)
+	}
+	if task.ProjectID != nil {
+		t.Fatalf("ProjectID = %v, want nil", task.ProjectID)
+	}
+	if task.Notes != nil {
+		t.Fatalf("Notes = %v, want nil", task.Notes)
+	}
+	if task.DueDate != nil {
+		t.Fatalf("DueDate = %v, want nil", task.DueDate)
+	}
+}
+
+func TestServiceRejectsInvalidTaskReferencesAndFilters(t *testing.T) {
+	service := newTestService()
+	ctx := context.Background()
+	missingProjectID := int64(999)
+	zeroProjectID := int64(0)
+
+	_, err := service.CreateTask(ctx, CreateTaskInput{Title: "Missing project", ProjectID: &missingProjectID})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("CreateTask(missing project) error = %v, want ErrNotFound", err)
+	}
+
+	task, err := service.CreateTask(ctx, CreateTaskInput{Title: "Existing"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+	_, err = service.UpdateTask(ctx, task.ID, UpdateTaskInput{
+		ProjectID: OptionalInt64{Set: true, Value: &zeroProjectID},
+	})
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("UpdateTask(zero project) error = %v, want ErrNotFound", err)
+	}
+
+	_, err = service.ListTasks(ctx, ListTasksInput{View: TaskView("blocked")})
+	if !errors.Is(err, ErrInvalidFilter) {
+		t.Fatalf("ListTasks(invalid view) error = %v, want ErrInvalidFilter", err)
+	}
+	blockedStatus := domain.TaskStatus("blocked")
+	_, err = service.ListTasks(ctx, ListTasksInput{Status: &blockedStatus})
+	if !errors.Is(err, domain.ErrInvalidTaskStatus) {
+		t.Fatalf("ListTasks(invalid status) error = %v, want ErrInvalidTaskStatus", err)
+	}
+	_, err = service.ListTasks(ctx, ListTasksInput{ProjectID: &zeroProjectID})
+	if !errors.Is(err, ErrInvalidFilter) {
+		t.Fatalf("ListTasks(zero project) error = %v, want ErrInvalidFilter", err)
+	}
+}
+
 func TestServiceFiltersInboxAndToday(t *testing.T) {
 	store := newMemoryStore()
 	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
@@ -86,6 +162,7 @@ func TestServiceFiltersInboxAndToday(t *testing.T) {
 	todayTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Today", DueDate: &today})
 	projectTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Project", ProjectID: &project.ID})
 	upcomingTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Upcoming", DueDate: &tomorrow})
+	doneTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Done", Status: domain.TaskStatusDone})
 
 	inboxTasks, err := service.ListTasks(context.Background(), ListTasksInput{View: TaskViewInbox})
 	if err != nil {
@@ -117,6 +194,23 @@ func TestServiceFiltersInboxAndToday(t *testing.T) {
 	}
 	if got := taskIDs(projectTasks); !slices.Equal(got, []int64{projectTask.ID}) {
 		t.Fatalf("project ids = %v, want [%d]", got, projectTask.ID)
+	}
+
+	allTasks, err := service.ListTasks(context.Background(), ListTasksInput{})
+	if err != nil {
+		t.Fatalf("ListTasks(all) error = %v", err)
+	}
+	if got := taskIDs(allTasks); !slices.Equal(got, []int64{inbox.ID, todayTask.ID, projectTask.ID, upcomingTask.ID, doneTask.ID}) {
+		t.Fatalf("all ids = %v, want all task ids", got)
+	}
+
+	doneStatus := domain.TaskStatusDone
+	doneTasks, err := service.ListTasks(context.Background(), ListTasksInput{Status: &doneStatus})
+	if err != nil {
+		t.Fatalf("ListTasks(done) error = %v", err)
+	}
+	if got := taskIDs(doneTasks); !slices.Equal(got, []int64{doneTask.ID}) {
+		t.Fatalf("done ids = %v, want [%d]", got, doneTask.ID)
 	}
 }
 
