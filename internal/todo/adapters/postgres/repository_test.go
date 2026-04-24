@@ -1,0 +1,84 @@
+package postgres
+
+import (
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/anton415/anton415-os/internal/todo/application"
+	"github.com/anton415/anton415-os/internal/todo/domain"
+)
+
+func TestListTasksQueryAllTasksUsesStableSort(t *testing.T) {
+	query, args := listTasksQuery(application.TaskListFilter{})
+
+	if strings.Contains(query, " WHERE ") {
+		t.Fatalf("query = %q, did not expect WHERE for all tasks", query)
+	}
+	if !strings.Contains(query, "CASE WHEN status = 'done' THEN 1 ELSE 0 END") {
+		t.Fatalf("query = %q, expected done tasks to sort last", query)
+	}
+	if !strings.Contains(query, "due_date NULLS LAST") {
+		t.Fatalf("query = %q, expected due date ordering", query)
+	}
+	if len(args) != 0 {
+		t.Fatalf("args = %v, want none", args)
+	}
+}
+
+func TestListTasksQueryTodayStatusAndProjectFilters(t *testing.T) {
+	doneStatus := domain.TaskStatusDone
+	projectID := int64(7)
+	today := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+
+	query, args := listTasksQuery(application.TaskListFilter{
+		View:      application.TaskViewToday,
+		Status:    &doneStatus,
+		ProjectID: &projectID,
+		Today:     today,
+	})
+
+	for _, expected := range []string{
+		"due_date = $1::date",
+		"status <> 'done'",
+		"status = $2",
+		"project_id = $3",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("query = %q, expected %q", query, expected)
+		}
+	}
+
+	wantArgs := []any{"2026-04-23", domain.TaskStatusDone, int64(7)}
+	if !reflect.DeepEqual(args, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", args, wantArgs)
+	}
+}
+
+func TestListTasksQueryUpcomingAndInboxFilters(t *testing.T) {
+	today := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+
+	upcomingQuery, upcomingArgs := listTasksQuery(application.TaskListFilter{
+		View:  application.TaskViewUpcoming,
+		Today: today,
+	})
+	for _, expected := range []string{"due_date > $1::date", "status <> 'done'"} {
+		if !strings.Contains(upcomingQuery, expected) {
+			t.Fatalf("upcoming query = %q, expected %q", upcomingQuery, expected)
+		}
+	}
+	if !reflect.DeepEqual(upcomingArgs, []any{"2026-04-23"}) {
+		t.Fatalf("upcoming args = %#v, want date arg", upcomingArgs)
+	}
+
+	inboxQuery, inboxArgs := listTasksQuery(application.TaskListFilter{View: application.TaskViewInbox})
+	for _, expected := range []string{"project_id IS NULL", "status <> 'done'"} {
+		if !strings.Contains(inboxQuery, expected) {
+			t.Fatalf("inbox query = %q, expected %q", inboxQuery, expected)
+		}
+	}
+	if len(inboxArgs) != 0 {
+		t.Fatalf("inbox args = %v, want none", inboxArgs)
+	}
+}

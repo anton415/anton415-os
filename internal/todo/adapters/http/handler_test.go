@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -66,6 +67,130 @@ func TestTaskNotFound(t *testing.T) {
 	}
 }
 
+func TestTaskListAllCompletedAndProjectFilters(t *testing.T) {
+	router := newTestRouter()
+
+	createProjectRecorder := performRequest(router, http.MethodPost, "/projects", `{"name":"Home"}`)
+	if createProjectRecorder.Code != http.StatusCreated {
+		t.Fatalf("create project status = %d, want %d", createProjectRecorder.Code, http.StatusCreated)
+	}
+	project := decodeData[projectResponse](t, createProjectRecorder)
+
+	inboxResponse := performRequest(router, http.MethodPost, "/tasks", `{"title":"Inbox"}`)
+	doneResponse := performRequest(router, http.MethodPost, "/tasks", `{"title":"Done","status":"done"}`)
+	projectTaskResponse := performRequest(router, http.MethodPost, "/tasks", fmt.Sprintf(`{"title":"Project","project_id":%d}`, project.ID))
+	for label, response := range map[string]*httptest.ResponseRecorder{
+		"inbox":   inboxResponse,
+		"done":    doneResponse,
+		"project": projectTaskResponse,
+	} {
+		if response.Code != http.StatusCreated {
+			t.Fatalf("create %s task status = %d, want %d", label, response.Code, http.StatusCreated)
+		}
+	}
+
+	inboxTask := decodeData[taskResponse](t, inboxResponse)
+	doneTask := decodeData[taskResponse](t, doneResponse)
+	projectTask := decodeData[taskResponse](t, projectTaskResponse)
+
+	allResponse := performRequest(router, http.MethodGet, "/tasks", "")
+	if allResponse.Code != http.StatusOK {
+		t.Fatalf("list all status = %d, want %d", allResponse.Code, http.StatusOK)
+	}
+	allTasks := decodeData[[]taskResponse](t, allResponse)
+	if got := responseTaskIDs(allTasks); !slices.Equal(got, []int64{inboxTask.ID, doneTask.ID, projectTask.ID}) {
+		t.Fatalf("all ids = %v, want [%d %d %d]", got, inboxTask.ID, doneTask.ID, projectTask.ID)
+	}
+
+	completedResponse := performRequest(router, http.MethodGet, "/tasks?status=done", "")
+	if completedResponse.Code != http.StatusOK {
+		t.Fatalf("list completed status = %d, want %d", completedResponse.Code, http.StatusOK)
+	}
+	completedTasks := decodeData[[]taskResponse](t, completedResponse)
+	if got := responseTaskIDs(completedTasks); !slices.Equal(got, []int64{doneTask.ID}) {
+		t.Fatalf("completed ids = %v, want [%d]", got, doneTask.ID)
+	}
+
+	projectListResponse := performRequest(router, http.MethodGet, fmt.Sprintf("/tasks?project_id=%d", project.ID), "")
+	if projectListResponse.Code != http.StatusOK {
+		t.Fatalf("list project status = %d, want %d", projectListResponse.Code, http.StatusOK)
+	}
+	projectTasks := decodeData[[]taskResponse](t, projectListResponse)
+	if got := responseTaskIDs(projectTasks); !slices.Equal(got, []int64{projectTask.ID}) {
+		t.Fatalf("project ids = %v, want [%d]", got, projectTask.ID)
+	}
+}
+
+func TestTaskUpdateClearsNullableFieldsAndRejectsBadInput(t *testing.T) {
+	router := newTestRouter()
+
+	createProjectResponse := performRequest(router, http.MethodPost, "/projects", `{"name":"Home"}`)
+	if createProjectResponse.Code != http.StatusCreated {
+		t.Fatalf("create project status = %d, want %d", createProjectResponse.Code, http.StatusCreated)
+	}
+	project := decodeData[projectResponse](t, createProjectResponse)
+
+	createTaskResponse := performRequest(
+		router,
+		http.MethodPost,
+		"/tasks",
+		fmt.Sprintf(`{"title":"Plan","project_id":%d,"notes":" Notes ","due_date":"2026-04-24"}`, project.ID),
+	)
+	if createTaskResponse.Code != http.StatusCreated {
+		t.Fatalf("create task status = %d, want %d", createTaskResponse.Code, http.StatusCreated)
+	}
+	task := decodeData[taskResponse](t, createTaskResponse)
+
+	clearResponse := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", task.ID), `{"project_id":null,"notes":null,"due_date":null}`)
+	if clearResponse.Code != http.StatusOK {
+		t.Fatalf("clear task status = %d, want %d; body=%s", clearResponse.Code, http.StatusOK, clearResponse.Body.String())
+	}
+	cleared := decodeData[taskResponse](t, clearResponse)
+	if cleared.ProjectID != nil {
+		t.Fatalf("ProjectID = %v, want nil", cleared.ProjectID)
+	}
+	if cleared.Notes != nil {
+		t.Fatalf("Notes = %v, want nil", cleared.Notes)
+	}
+	if cleared.DueDate != nil {
+		t.Fatalf("DueDate = %v, want nil", cleared.DueDate)
+	}
+
+	invalidRequests := map[string]string{
+		"bad json":           `{"title":`,
+		"unknown field":      `{"priority":1}`,
+		"invalid due date":   `{"due_date":"24-04-2026"}`,
+		"invalid status":     `{"status":"blocked"}`,
+		"invalid project id": `{"project_id":0}`,
+	}
+	for label, body := range invalidRequests {
+		response := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", task.ID), body)
+		if response.Code != http.StatusBadRequest {
+			t.Fatalf("%s status = %d, want %d; body=%s", label, response.Code, http.StatusBadRequest, response.Body.String())
+		}
+	}
+}
+
+func TestTaskDeleteStatusCodes(t *testing.T) {
+	router := newTestRouter()
+
+	createResponse := performRequest(router, http.MethodPost, "/tasks", `{"title":"Delete me"}`)
+	if createResponse.Code != http.StatusCreated {
+		t.Fatalf("create task status = %d, want %d", createResponse.Code, http.StatusCreated)
+	}
+	task := decodeData[taskResponse](t, createResponse)
+
+	deleteResponse := performRequest(router, http.MethodDelete, fmt.Sprintf("/tasks/%d", task.ID), "")
+	if deleteResponse.Code != http.StatusNoContent {
+		t.Fatalf("delete status = %d, want %d", deleteResponse.Code, http.StatusNoContent)
+	}
+
+	notFoundResponse := performRequest(router, http.MethodDelete, "/tasks/99", "")
+	if notFoundResponse.Code != http.StatusNotFound {
+		t.Fatalf("delete missing status = %d, want %d", notFoundResponse.Code, http.StatusNotFound)
+	}
+}
+
 func TestProjectCRUDAndDeleteConflict(t *testing.T) {
 	router := newTestRouter()
 
@@ -101,6 +226,38 @@ func TestProjectCRUDAndDeleteConflict(t *testing.T) {
 	}
 
 	_ = createdProject
+}
+
+func performRequest(router http.Handler, method string, target string, body string) *httptest.ResponseRecorder {
+	response := httptest.NewRecorder()
+	var requestBody *bytes.Buffer
+	if body == "" {
+		requestBody = bytes.NewBuffer(nil)
+	} else {
+		requestBody = bytes.NewBufferString(body)
+	}
+	router.ServeHTTP(response, httptest.NewRequest(method, target, requestBody))
+	return response
+}
+
+func decodeData[T any](t *testing.T, response *httptest.ResponseRecorder) T {
+	t.Helper()
+
+	var envelope struct {
+		Data T `json:"data"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&envelope); err != nil {
+		t.Fatalf("decode data response: %v", err)
+	}
+	return envelope.Data
+}
+
+func responseTaskIDs(tasks []taskResponse) []int64 {
+	ids := make([]int64, 0, len(tasks))
+	for _, task := range tasks {
+		ids = append(ids, task.ID)
+	}
+	return ids
 }
 
 func newTestRouter() http.Handler {

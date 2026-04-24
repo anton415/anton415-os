@@ -298,8 +298,8 @@ p {
 
 .todo-layout {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
-  gap: 20px;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
   align-items: start;
 }
 
@@ -310,8 +310,18 @@ p {
   min-width: 0;
 }
 
+.todo-panel {
+  align-content: start;
+  gap: 14px;
+  border: 1px solid #dce1e8;
+  border-radius: 8px;
+  padding: 12px;
+  background: #eef1f5;
+}
+
 .todo-form,
 .project-list,
+.smart-list-panel,
 .task-item,
 .todo-toolbar,
 .inline-error {
@@ -324,6 +334,11 @@ p {
   display: grid;
   gap: 12px;
   padding: 16px;
+}
+
+.todo-main .task-form {
+  border-color: #e5e7eb;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
 }
 
 .todo-form h2,
@@ -344,8 +359,7 @@ p {
 .todo-form input,
 .todo-form textarea,
 .todo-form select,
-.compact-field select,
-.task-status-select {
+.compact-field select {
   width: 100%;
   min-height: 40px;
   border: 1px solid #d0d5dd;
@@ -362,7 +376,7 @@ p {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -385,8 +399,7 @@ p {
   font-weight: 700;
 }
 
-.form-actions button:disabled,
-.task-status-select:disabled {
+.form-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -422,8 +435,53 @@ p {
   font-weight: 700;
 }
 
-.project-list {
-  padding: 16px;
+.todo-panel .smart-list-panel,
+.todo-panel .project-list,
+.todo-panel .todo-form {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.smart-list-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.smart-list-button {
+  display: flex;
+  min-height: 46px;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #344054;
+  background: rgb(255 255 255 / 0.6);
+  cursor: pointer;
+  font-weight: 800;
+  text-align: left;
+}
+
+.smart-list-button:hover {
+  background: #f2f4f7;
+}
+
+.smart-list-button.active {
+  border-color: rgb(37 99 235 / 0.18);
+  color: #1d4ed8;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(16 24 40 / 0.06);
+}
+
+.smart-list-icon {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border-radius: 999px;
 }
 
 .panel-header {
@@ -449,13 +507,13 @@ p {
 }
 
 .project-row > button {
-  min-height: 40px;
+  min-height: 36px;
   overflow: hidden;
   border: 1px solid transparent;
   border-radius: 8px;
-  padding: 8px 10px;
+  padding: 7px 10px;
   color: #344054;
-  background: #f8fafc;
+  background: rgb(255 255 255 / 0.55);
   cursor: pointer;
   text-align: left;
   text-overflow: ellipsis;
@@ -494,14 +552,30 @@ p {
 
 .task-list {
   display: grid;
-  gap: 12px;
+  gap: 0;
+}
+
+.task-list[aria-label="Tasks"] {
+  border: 1px solid #dce1e8;
+  border-radius: 8px;
+  padding: 2px 16px;
+  background: #ffffff;
 }
 
 .task-item {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
-  padding: 16px;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  border-bottom: 1px solid #eaecf0;
+  border-radius: 0;
+  padding: 12px 0;
+  background: transparent;
+}
+
+.task-item:last-child {
+  border-bottom: 0;
 }
 
 .task-item.done h2 {
@@ -513,19 +587,47 @@ p {
   min-width: 0;
 }
 
+.complete-button {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 2px solid #98a2b3;
+  border-radius: 999px;
+  color: #ffffff;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.complete-button:hover {
+  border-color: #2563eb;
+}
+
+.complete-button[aria-pressed="true"] {
+  border-color: #22c55e;
+  background: #22c55e;
+}
+
+.complete-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .task-title-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px;
-  gap: 12px;
-  align-items: start;
+  display: block;
 }
 
 .task-title-row h2 {
   overflow-wrap: anywhere;
+  font-size: 1rem;
+  line-height: 1.35;
 }
 
 .task-notes {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -533,15 +635,16 @@ p {
 .task-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 18px;
-  margin: 12px 0 0;
+  gap: 6px 14px;
+  margin: 8px 0 0;
 }
 
 .task-meta div {
-  min-width: 90px;
+  min-width: 0;
 }
 
 .task-meta dt {
+  display: none;
   color: #667085;
   font-size: 0.75rem;
   font-weight: 700;
@@ -550,13 +653,21 @@ p {
 
 .task-meta dd {
   margin: 0;
-  color: #344054;
-  font-weight: 700;
+  color: #667085;
+  font-size: 0.86rem;
+  font-weight: 600;
 }
 
 .task-actions {
   display: flex;
   gap: 6px;
+  opacity: 0.38;
+  transition: opacity 120ms ease;
+}
+
+.task-item:hover .task-actions,
+.task-item:focus-within .task-actions {
+  opacity: 1;
 }
 
 .empty-state {
@@ -602,8 +713,7 @@ p {
 
   .topbar,
   .status-panel,
-  .todo-toolbar,
-  .task-item {
+  .todo-toolbar {
     flex-direction: column;
   }
 
@@ -623,9 +733,16 @@ p {
   }
 
   .form-grid,
-  .task-title-row,
-  .task-item {
+  .task-title-row {
     grid-template-columns: 1fr;
+  }
+
+  .task-item {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .task-actions {
+    grid-column: 2;
   }
 
   .compact-field {
