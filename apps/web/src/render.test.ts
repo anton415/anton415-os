@@ -69,6 +69,30 @@ describe("renderApp todo", () => {
     expect(projectSelect?.value).toBe("2");
   });
 
+  it("hides the new task composer in Completed", () => {
+    renderApp(root, optionsForTodo({ todoState: todoState({ scope: { kind: "view", view: "completed" } }) }));
+
+    expect(root.querySelector("#task-form")).toBeNull();
+    expect(smartListButton("completed")?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("keeps task editing available in Completed", () => {
+    renderApp(
+      root,
+      optionsForTodo({
+        todoState: todoState({
+          scope: { kind: "view", view: "completed" },
+          editingTaskId: 2,
+          tasks: [task({ id: 2, title: "Paid bill", status: "done" })]
+        })
+      })
+    );
+
+    expect(root.querySelector("#task-form")).not.toBeNull();
+    expect(root.querySelector<HTMLInputElement>('input[name="title"]')?.value).toBe("Paid bill");
+    expect(root.querySelector('select[name="status"]')).toBeNull();
+  });
+
   it("toggles task completion from task rows", () => {
     const options = optionsForTodo({
       todoState: todoState({

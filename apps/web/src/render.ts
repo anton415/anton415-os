@@ -115,11 +115,15 @@ function renderTodoPage(options: RenderOptions): string {
         ${renderProjectForm(state)}
       </aside>
       <section class="todo-main">
-        ${renderTaskForm(state)}
+        ${shouldRenderTaskForm(state) ? renderTaskForm(state) : ""}
         ${renderTaskList(state)}
       </section>
     </section>
   `;
+}
+
+function shouldRenderTaskForm(state: TodoState): boolean {
+  return state.editingTaskId !== undefined || state.scope.kind !== "view" || state.scope.view !== "completed";
 }
 
 function renderModuleNav(currentPath: AppPath): string {

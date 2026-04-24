@@ -40,6 +40,7 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
 
   await page.getByRole("button", { name: "Completed" }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Create task" })).toHaveCount(0);
   await page.getByRole("button", { name: "Reopen Buy milk" }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toHaveCount(0);
 
