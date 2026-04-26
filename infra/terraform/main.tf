@@ -95,6 +95,7 @@ resource "yandex_mdb_postgresql_cluster" "main" {
       disk_type_id       = "network-ssd"
       disk_size          = var.postgres_disk_size
     }
+    backup_retain_period_days = var.postgres_backup_retain_period_days
     backup_window_start {
       hours   = 2
       minutes = 0
@@ -123,10 +124,6 @@ resource "yandex_mdb_postgresql_database" "app" {
 resource "yandex_storage_bucket" "backups" {
   bucket = var.backup_bucket_name
 
-  versioning {
-    enabled = true
-  }
-
   lifecycle_rule {
     id      = "daily-retention"
     enabled = true
@@ -136,7 +133,7 @@ resource "yandex_storage_bucket" "backups" {
     }
 
     expiration {
-      days = 30
+      days = var.backup_daily_retention_days
     }
   }
 
@@ -149,7 +146,7 @@ resource "yandex_storage_bucket" "backups" {
     }
 
     expiration {
-      days = 370
+      days = var.backup_monthly_retention_days
     }
   }
 }
