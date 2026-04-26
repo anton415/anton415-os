@@ -208,6 +208,10 @@ p {
   cursor: pointer;
 }
 
+.icon-button.todo-panel-toggle {
+  display: none;
+}
+
 .icon-button:hover {
   background: #f2f4f7;
 }
@@ -336,11 +340,6 @@ p {
   padding: 16px;
 }
 
-.todo-main .task-form {
-  border-color: #e5e7eb;
-  box-shadow: 0 1px 2px rgb(16 24 40 / 0.04);
-}
-
 .todo-form h2,
 .project-list h2,
 .task-item h2 {
@@ -430,6 +429,16 @@ p {
   font-weight: 700;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .inline-error {
   padding: 12px 14px;
   font-weight: 700;
@@ -506,7 +515,8 @@ p {
   align-items: center;
 }
 
-.project-row > button {
+.project-row > button,
+.project-name-field input {
   min-height: 36px;
   overflow: hidden;
   border: 1px solid transparent;
@@ -518,6 +528,46 @@ p {
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.project-name-field {
+  display: block;
+  min-width: 0;
+}
+
+.project-name-field input {
+  width: 100%;
+  font: inherit;
+}
+
+.project-name-field input::placeholder {
+  color: #667085;
+}
+
+.project-name-field input:focus {
+  border-color: #2563eb;
+  background: #ffffff;
+  outline: 2px solid rgb(37 99 235 / 0.16);
+  outline-offset: 0;
+}
+
+.project-form {
+  margin-top: 8px;
+}
+
+.project-form-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.project-form .form-error {
+  grid-column: 1 / -1;
+}
+
+.project-save-button:hover {
+  border-color: #a7f3d0;
+  color: #047857;
+  background: #ecfdf5;
 }
 
 .project-row.active > button,
@@ -665,9 +715,130 @@ p {
   transition: opacity 120ms ease;
 }
 
+.task-form {
+  min-height: 74px;
+}
+
+.task-form-marker {
+  cursor: default;
+  pointer-events: none;
+}
+
+.task-form .task-main {
+  display: grid;
+  gap: 6px;
+}
+
+.task-title-field {
+  display: block;
+}
+
+.task-title-field input,
+.task-notes-field textarea {
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  color: #172033;
+  background: transparent;
+  font: inherit;
+}
+
+.task-title-field input {
+  min-height: 28px;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.task-title-field input::placeholder {
+  color: #667085;
+}
+
+.task-notes-field {
+  display: block;
+}
+
+.task-notes-field textarea {
+  min-height: 26px;
+  padding: 1px 0;
+  color: #667085;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+.task-notes-field textarea::placeholder {
+  color: #98a2b3;
+}
+
+.task-title-field input:focus,
+.task-notes-field textarea:focus,
+.task-form-meta select:focus,
+.task-form-meta input:focus {
+  outline: 2px solid rgb(37 99 235 / 0.28);
+  outline-offset: 2px;
+}
+
+.task-form-meta {
+  align-items: center;
+  margin-top: 0;
+}
+
+.task-form-meta label {
+  display: block;
+}
+
+.task-form-meta select,
+.task-form-meta input {
+  min-height: 26px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 1px 5px;
+  color: #667085;
+  background: transparent;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.task-form-meta select {
+  max-width: 12rem;
+}
+
+.task-form-meta input[type="date"] {
+  width: 9.5rem;
+}
+
+.task-form-meta select:hover,
+.task-form-meta input:hover,
+.task-form-meta select:focus,
+.task-form-meta input:focus {
+  border-color: #d0d5dd;
+  background: #ffffff;
+}
+
+.task-form-actions {
+  opacity: 1;
+}
+
+.task-form-actions .task-form-submit:hover {
+  border-color: #a7f3d0;
+  color: #047857;
+  background: #ecfdf5;
+}
+
 .task-item:hover .task-actions,
 .task-item:focus-within .task-actions {
   opacity: 1;
+}
+
+.task-list[aria-label="Tasks"] > .empty-state {
+  border: 0;
+  border-radius: 0;
+  padding: 14px 0;
+  background: transparent;
 }
 
 .empty-state {
@@ -702,6 +873,14 @@ p {
 
   .todo-layout {
     grid-template-columns: 1fr;
+  }
+
+  .icon-button.todo-panel-toggle {
+    display: inline-grid;
+  }
+
+  .todo-panel.collapsed {
+    display: none;
   }
 }
 
@@ -741,8 +920,16 @@ p {
     grid-template-columns: 36px minmax(0, 1fr);
   }
 
+  .task-form {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+  }
+
   .task-actions {
     grid-column: 2;
+  }
+
+  .task-form .task-actions {
+    grid-column: auto;
   }
 
   .compact-field {

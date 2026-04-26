@@ -35,6 +35,7 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.getByRole("button", { name: "Create task" }).click();
 
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
+  await expect(page.getByText("2%")).toBeVisible();
   await page.getByRole("button", { name: "Complete Buy milk" }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toHaveCount(0);
 
@@ -108,6 +109,7 @@ async function mockTodoApi(page: Page) {
     if (request.method() === "POST") {
       const payload = (await request.postDataJSON()) as Partial<Task>;
       expect(payload.status).toBeUndefined();
+      expect(payload.notes).toBe("2%");
       const created: Task = {
         id: nextTaskID,
         project_id: payload.project_id ?? null,

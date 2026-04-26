@@ -69,6 +69,31 @@ describe("renderApp todo", () => {
     expect(projectSelect?.value).toBe("2");
   });
 
+  it("renders a compact project composer row", () => {
+    renderApp(root, optionsForTodo());
+
+    const form = root.querySelector<HTMLFormElement>("#project-form");
+
+    expect(form?.classList.contains("project-row")).toBe(true);
+    expect(form?.querySelector<HTMLInputElement>('input[name="name"]')?.placeholder).toBe("New project");
+    expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent?.trim()).toBe("+");
+  });
+
+  it("toggles the Todo panel", () => {
+    const options = optionsForTodo({
+      todoState: todoState({ todoPanelCollapsed: true })
+    });
+
+    renderApp(root, options);
+
+    expect(root.querySelector("#todo-panel")?.classList.contains("collapsed")).toBe(true);
+    expect(root.querySelector("#toggle-todo-panel")?.getAttribute("aria-expanded")).toBe("false");
+
+    root.querySelector<HTMLButtonElement>("#toggle-todo-panel")?.click();
+
+    expect(options.onToggleTodoPanel).toHaveBeenCalled();
+  });
+
   it("hides the new task composer in Completed", () => {
     renderApp(root, optionsForTodo({ todoState: todoState({ scope: { kind: "view", view: "completed" } }) }));
 
@@ -83,13 +108,14 @@ describe("renderApp todo", () => {
         todoState: todoState({
           scope: { kind: "view", view: "completed" },
           editingTaskId: 2,
-          tasks: [task({ id: 2, title: "Paid bill", status: "done" })]
+          tasks: [task({ id: 2, title: "Paid bill", notes: "Already paid", status: "done" })]
         })
       })
     );
 
     expect(root.querySelector("#task-form")).not.toBeNull();
     expect(root.querySelector<HTMLInputElement>('input[name="title"]')?.value).toBe("Paid bill");
+    expect(root.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')?.value).toBe("Already paid");
     expect(root.querySelector('select[name="status"]')).toBeNull();
   });
 
@@ -119,6 +145,7 @@ function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
     onNavigate: vi.fn(),
     onRefreshHealth: vi.fn(),
     onRefreshTodo: vi.fn(),
+    onToggleTodoPanel: vi.fn(),
     onSelectTodoScope: vi.fn(),
     onEditTask: vi.fn(),
     onCancelTaskEdit: vi.fn(),

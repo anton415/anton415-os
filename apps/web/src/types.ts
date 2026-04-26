@@ -56,6 +56,7 @@ export type TodoState = {
   scope: TodoScope;
   editingTaskId?: number;
   editingProjectId?: number;
+  todoPanelCollapsed?: boolean;
   taskFormError?: string;
   projectFormError?: string;
 };
