@@ -257,7 +257,6 @@ function renderTaskForm(state: TodoState): string {
     <form class="task-item task-form" id="task-form">
       <span class="complete-button task-form-marker" aria-hidden="true"></span>
       <input type="hidden" name="task_id" value="${task?.id ?? ""}">
-      <input type="hidden" name="notes" value="${escapeAttr(task?.notes ?? "")}">
       <div class="task-main">
         <div class="task-title-row">
           <label class="task-title-field">
@@ -265,6 +264,10 @@ function renderTaskForm(state: TodoState): string {
             <input name="title" type="text" value="${escapeAttr(task?.title ?? "")}" placeholder="${task ? "Task title" : "New task"}" autocomplete="off" required>
           </label>
         </div>
+        <label class="task-notes-field">
+          <span class="visually-hidden">Notes</span>
+          <textarea name="notes" rows="1" placeholder="Notes">${escapeHTML(task?.notes ?? "")}</textarea>
+        </label>
         <dl class="task-meta task-form-meta">
           <div>
             <dt>Project</dt>

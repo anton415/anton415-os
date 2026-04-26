@@ -733,15 +733,19 @@ p {
   display: block;
 }
 
-.task-title-field input {
+.task-title-field input,
+.task-notes-field textarea {
   width: 100%;
-  min-height: 28px;
   border: 0;
   border-radius: 6px;
-  padding: 0;
   color: #172033;
   background: transparent;
   font: inherit;
+}
+
+.task-title-field input {
+  min-height: 28px;
+  padding: 0;
   font-size: 1rem;
   font-weight: 800;
   line-height: 1.35;
@@ -751,7 +755,26 @@ p {
   color: #667085;
 }
 
+.task-notes-field {
+  display: block;
+}
+
+.task-notes-field textarea {
+  min-height: 26px;
+  padding: 1px 0;
+  color: #667085;
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.35;
+  resize: vertical;
+}
+
+.task-notes-field textarea::placeholder {
+  color: #98a2b3;
+}
+
 .task-title-field input:focus,
+.task-notes-field textarea:focus,
 .task-form-meta select:focus,
 .task-form-meta input:focus {
   outline: 2px solid rgb(37 99 235 / 0.28);

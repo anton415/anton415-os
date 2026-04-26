@@ -108,13 +108,14 @@ describe("renderApp todo", () => {
         todoState: todoState({
           scope: { kind: "view", view: "completed" },
           editingTaskId: 2,
-          tasks: [task({ id: 2, title: "Paid bill", status: "done" })]
+          tasks: [task({ id: 2, title: "Paid bill", notes: "Already paid", status: "done" })]
         })
       })
     );
 
     expect(root.querySelector("#task-form")).not.toBeNull();
     expect(root.querySelector<HTMLInputElement>('input[name="title"]')?.value).toBe("Paid bill");
+    expect(root.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')?.value).toBe("Already paid");
     expect(root.querySelector('select[name="status"]')).toBeNull();
   });
 
