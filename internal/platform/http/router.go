@@ -5,12 +5,19 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/anton415/anton415-os/internal/auth"
+	authhttp "github.com/anton415/anton415-os/internal/auth/adapters/http"
+	authpostgres "github.com/anton415/anton415-os/internal/auth/adapters/postgres"
 	"github.com/anton415/anton415-os/internal/platform/config"
 	todohttp "github.com/anton415/anton415-os/internal/todo/adapters/http"
 	todopostgres "github.com/anton415/anton415-os/internal/todo/adapters/postgres"
@@ -52,7 +59,17 @@ func NewRouter(deps Dependencies) http.Handler {
 
 	r.Get("/health", healthHandler(deps))
 	r.Route("/api/v1", func(r chi.Router) {
-		r.Get("/me", meHandler)
+		authService := newAuthService(deps.Config, deps.DB)
+		authConfig := authhttp.Config{
+			CookieName:      deps.Config.AuthSessionCookie,
+			CookieSecure:    deps.Config.AuthCookieSecure,
+			SuccessRedirect: deps.Config.AuthSuccessRedirect,
+			FailureRedirect: deps.Config.AuthFailureRedirect,
+		}
+
+		r.Use(authhttp.SessionMiddleware(authService, authConfig))
+		r.Get("/me", authhttp.MeHandler)
+		r.Mount("/auth", authhttp.NewRouter(authService, authConfig))
 
 		todoRepository := todopostgres.NewRepository(deps.DB)
 		todoService := application.NewService(application.Dependencies{
@@ -60,10 +77,73 @@ func NewRouter(deps Dependencies) http.Handler {
 			Tasks:    todoRepository,
 			Location: time.Local,
 		})
-		r.Mount("/todo", todohttp.NewRouter(todoService))
+		r.Group(func(r chi.Router) {
+			r.Use(authhttp.RequireAuthenticated)
+			r.Mount("/todo", todohttp.NewRouter(todoService))
+		})
 	})
 
+	if deps.Config.StaticDir != "" {
+		r.Handle("/*", spaHandler(deps.Config.StaticDir))
+	}
+
 	return r
+}
+
+func newAuthService(cfg config.Config, pool *pgxpool.Pool) *auth.Service {
+	var sender auth.MagicLinkSender
+	if cfg.SMTPHost != "" && cfg.EmailFrom != "" {
+		sender = auth.NewSMTPSender(auth.SMTPSenderConfig{
+			Host:     cfg.SMTPHost,
+			Port:     cfg.SMTPPort,
+			Username: cfg.SMTPUsername,
+			Password: cfg.SMTPPassword,
+			From:     cfg.EmailFrom,
+		})
+	}
+
+	return auth.NewService(authpostgres.NewRepository(pool), auth.Config{
+		AllowedEmails:   cfg.AuthAllowedEmails,
+		CallbackBaseURL: cfg.AuthCallbackBaseURL,
+		SessionTTL:      cfg.AuthSessionTTL,
+		TokenTTL:        cfg.AuthTokenTTL,
+		EmailSender:     sender,
+		OAuthProviders: []auth.OAuthProviderConfig{
+			{
+				ID:           "yandex",
+				Name:         "Yandex ID",
+				ClientID:     cfg.YandexOAuth.ClientID,
+				ClientSecret: cfg.YandexOAuth.ClientSecret,
+				AuthURL:      cfg.YandexOAuth.AuthURL,
+				TokenURL:     cfg.YandexOAuth.TokenURL,
+				UserInfoURL:  cfg.YandexOAuth.UserInfoURL,
+				Scopes:       []string{"login:email", "login:info"},
+				EmailTrusted: true,
+			},
+			{
+				ID:           "github",
+				Name:         "GitHub",
+				ClientID:     cfg.GitHubOAuth.ClientID,
+				ClientSecret: cfg.GitHubOAuth.ClientSecret,
+				AuthURL:      cfg.GitHubOAuth.AuthURL,
+				TokenURL:     cfg.GitHubOAuth.TokenURL,
+				UserInfoURL:  cfg.GitHubOAuth.UserInfoURL,
+				Scopes:       []string{"read:user", "user:email"},
+				EmailTrusted: true,
+			},
+			{
+				ID:           "vk",
+				Name:         "VK ID",
+				ClientID:     cfg.VKOAuth.ClientID,
+				ClientSecret: cfg.VKOAuth.ClientSecret,
+				AuthURL:      cfg.VKOAuth.AuthURL,
+				TokenURL:     cfg.VKOAuth.TokenURL,
+				UserInfoURL:  cfg.VKOAuth.UserInfoURL,
+				Scopes:       []string{"email"},
+				EmailTrusted: false,
+			},
+		},
+	})
 }
 
 func healthHandler(deps Dependencies) http.HandlerFunc {
@@ -106,20 +186,36 @@ func checkDatabase(parent context.Context, pool *pgxpool.Pool) healthCheck {
 	return healthCheck{Status: "ok", Latency: time.Since(startedAt).String()}
 }
 
-func meHandler(w http.ResponseWriter, _ *http.Request) {
-	// Это не авторизация. Endpoint фиксирует single-user режим до появления реального auth.
-	writeJSON(w, http.StatusOK, map[string]string{
-		"id":          "single-user",
-		"displayName": "Anton",
-		"mode":        "single-user",
-		"auth":        "not_configured",
-	})
-}
-
 func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(value); err != nil {
 		slog.Error("write json response", slog.String("error", err.Error()))
 	}
+}
+
+func spaHandler(staticDir string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assetPath := staticAssetPath(r.URL.Path)
+		if assetPath == "" {
+			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+			return
+		}
+
+		filePath := filepath.Join(staticDir, filepath.FromSlash(assetPath))
+		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
+			http.ServeFile(w, r, filePath)
+			return
+		}
+
+		http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+	})
+}
+
+func staticAssetPath(requestPath string) string {
+	cleaned := path.Clean("/" + requestPath)
+	if cleaned == "/" || cleaned == "." {
+		return ""
+	}
+	return strings.TrimPrefix(cleaned, "/")
 }

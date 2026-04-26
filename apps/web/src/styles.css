@@ -121,6 +121,7 @@ button {
 
 .topbar-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
@@ -184,6 +185,23 @@ p {
   background: #fef2f2;
 }
 
+.auth-chip {
+  display: inline-flex;
+  min-height: 36px;
+  max-width: 260px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #d0d5dd;
+  border-radius: 999px;
+  padding: 7px 12px;
+  color: #344054;
+  background: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .status-panel {
   display: flex;
   align-items: start;
@@ -193,6 +211,80 @@ p {
   border-radius: 8px;
   padding: 20px;
   background: #ffffff;
+}
+
+.login-panel {
+  display: grid;
+  max-width: 460px;
+  gap: 16px;
+  border: 1px solid #dce1e8;
+  border-radius: 8px;
+  padding: 20px;
+  background: #ffffff;
+}
+
+.login-form {
+  display: grid;
+  gap: 12px;
+}
+
+.login-form label {
+  display: grid;
+  gap: 6px;
+  color: #344054;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.login-form input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: #172033;
+  background: #ffffff;
+  font: inherit;
+}
+
+.login-form button,
+.oauth-button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #172033;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #ffffff;
+  background: #172033;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.oauth-list {
+  display: grid;
+  gap: 10px;
+}
+
+.oauth-button {
+  border-color: #d0d5dd;
+  color: #344054;
+  background: #ffffff;
+}
+
+.oauth-button:hover {
+  background: #f2f4f7;
+}
+
+.success-state {
+  margin: 0;
+  border: 1px solid #a7f3d0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #047857;
+  background: #ecfdf5;
+  font-weight: 700;
 }
 
 .icon-button {

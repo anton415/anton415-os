@@ -14,6 +14,10 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("LOG_LEVEL", "")
 	t.Setenv("SHUTDOWN_TIMEOUT", "")
 	t.Setenv("WEB_ORIGIN", "")
+	t.Setenv("AUTH_ALLOWED_EMAILS", "")
+	t.Setenv("AUTH_SESSION_TTL", "")
+	t.Setenv("AUTH_TOKEN_TTL", "")
+	t.Setenv("AUTH_COOKIE_SECURE", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -31,6 +35,12 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.ShutdownTimeout != 10*time.Second {
 		t.Fatalf("ShutdownTimeout = %s, want 10s", cfg.ShutdownTimeout)
+	}
+	if cfg.AuthCookieSecure {
+		t.Fatal("AuthCookieSecure = true, want false for development defaults")
+	}
+	if cfg.AuthSessionTTL != 30*24*time.Hour {
+		t.Fatalf("AuthSessionTTL = %s, want 720h", cfg.AuthSessionTTL)
 	}
 }
 
@@ -53,5 +63,31 @@ func TestLoadRejectsInvalidDuration(t *testing.T) {
 
 	if _, err := Load(); err == nil {
 		t.Fatal("Load() error = nil, want error")
+	}
+}
+
+func TestLoadParsesAuthSettings(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("AUTH_ALLOWED_EMAILS", " Anton@Example.com, alt@example.com ")
+	t.Setenv("AUTH_COOKIE_SECURE", "")
+	t.Setenv("AUTH_SESSION_TTL", "24h")
+	t.Setenv("AUTH_TOKEN_TTL", "5m")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !cfg.AuthCookieSecure {
+		t.Fatal("AuthCookieSecure = false, want true for production defaults")
+	}
+	if cfg.AuthSessionTTL != 24*time.Hour {
+		t.Fatalf("AuthSessionTTL = %s, want 24h", cfg.AuthSessionTTL)
+	}
+	if cfg.AuthTokenTTL != 5*time.Minute {
+		t.Fatalf("AuthTokenTTL = %s, want 5m", cfg.AuthTokenTTL)
+	}
+	if len(cfg.AuthAllowedEmails) != 2 || cfg.AuthAllowedEmails[0] != "anton@example.com" {
+		t.Fatalf("AuthAllowedEmails = %#v, want normalized emails", cfg.AuthAllowedEmails)
 	}
 }

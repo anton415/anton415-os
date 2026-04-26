@@ -1,6 +1,7 @@
 import { productModules } from "./modules";
 import type {
   AppPath,
+  AuthState,
   HealthState,
   TodoProject,
   TodoScope,
@@ -19,9 +20,12 @@ type SmartList = {
 type RenderOptions = {
   apiBaseUrl: string;
   currentPath: AppPath;
+  authState: AuthState;
   healthState: HealthState;
   todoState: TodoState;
   onNavigate: (path: string) => void;
+  onStartEmailLogin: (form: HTMLFormElement) => void;
+  onLogout: () => void;
   onRefreshHealth: () => void;
   onRefreshTodo: () => void;
   onToggleTodoPanel: () => void;
@@ -72,7 +76,10 @@ function renderHomePage(options: RenderOptions): string {
         <p class="eyebrow">Step 3 Todo v1</p>
         <h1>Platform shell</h1>
       </div>
-      ${renderHealthBadge(options.healthState)}
+      <div class="topbar-actions">
+        ${renderAuthBadge(options.authState)}
+        ${renderHealthBadge(options.healthState)}
+      </div>
     </header>
 
     <section class="status-panel" aria-live="polite">
@@ -93,6 +100,10 @@ function renderHomePage(options: RenderOptions): string {
 
 function renderTodoPage(options: RenderOptions): string {
   const state = options.todoState;
+  if (options.authState.kind !== "authenticated") {
+    return renderLoginPage(options);
+  }
+
   return `
     <header class="topbar">
       <div>
@@ -111,6 +122,10 @@ function renderTodoPage(options: RenderOptions): string {
         >
           &#9776;
         </button>
+        <span class="auth-chip">${escapeHTML(options.authState.user.email)}</span>
+        <button class="icon-button" type="button" id="logout" aria-label="Log out" title="Log out">
+          &#8617;
+        </button>
         ${renderHealthBadge(options.healthState)}
         <button class="icon-button" type="button" id="refresh-todo" aria-label="Refresh Todo" title="Refresh Todo">
           &#8635;
@@ -128,6 +143,69 @@ function renderTodoPage(options: RenderOptions): string {
       <section class="todo-main">
         ${renderTaskList(state)}
       </section>
+    </section>
+  `;
+}
+
+function renderLoginPage(options: RenderOptions): string {
+  const state = options.authState;
+  const providers = state.providers.filter((provider) => provider.kind === "oauth");
+  const emailEnabled = state.providers.some((provider) => provider.id === "email");
+  const message = state.kind === "unauthenticated" ? state.message : undefined;
+  const emailSent = state.kind === "unauthenticated" ? state.emailSent : false;
+
+  return `
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Private Todo</p>
+        <h1>Sign in</h1>
+      </div>
+      ${renderHealthBadge(options.healthState)}
+    </header>
+
+    <section class="login-panel" aria-label="Sign in">
+      ${
+        state.kind === "loading"
+          ? `<p class="empty-state">Checking session...</p>`
+          : `
+            ${message ? `<div class="inline-error" role="alert">${escapeHTML(message)}</div>` : ""}
+            ${
+              emailSent
+                ? `<p class="success-state">Magic link sent.</p>`
+                : ""
+            }
+            ${
+              emailEnabled
+                ? `
+                  <form class="login-form" id="email-login-form">
+                    <label>
+                      <span>Email</span>
+                      <input name="email" type="email" autocomplete="email" required>
+                    </label>
+                    <button type="submit">Send link</button>
+                  </form>
+                `
+                : ""
+            }
+            ${
+              providers.length > 0
+                ? `
+                  <div class="oauth-list">
+                    ${providers
+                      .map(
+                        (provider) => `
+                          <a class="oauth-button" href="${authStartHref(options.apiBaseUrl, provider.id)}">
+                            ${escapeHTML(provider.name)}
+                          </a>
+                        `
+                      )
+                      .join("")}
+                  </div>
+                `
+                : ""
+            }
+          `
+      }
     </section>
   `;
 }
@@ -395,6 +473,16 @@ function renderHealthBadge(state: HealthState): string {
   return `<span class="health-badge">Checking API</span>`;
 }
 
+function renderAuthBadge(state: AuthState): string {
+  if (state.kind === "authenticated") {
+    return `<span class="health-badge health-badge-ok">Signed in</span>`;
+  }
+  if (state.kind === "unauthenticated") {
+    return `<span class="health-badge health-badge-down">Signed out</span>`;
+  }
+  return `<span class="health-badge">Checking session</span>`;
+}
+
 function renderHealthDetails(state: HealthState, apiBaseUrl: string): string {
   if (state.kind === "loading") {
     return `<h2>Checking health...</h2><p>Calling ${escapeHTML(apiBaseUrl)}/health.</p>`;
@@ -424,6 +512,11 @@ function bindShellEvents(root: HTMLElement, options: RenderOptions) {
   });
 
   root.querySelector("#refresh-health")?.addEventListener("click", options.onRefreshHealth);
+  root.querySelector("#logout")?.addEventListener("click", options.onLogout);
+  root.querySelector<HTMLFormElement>("#email-login-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    options.onStartEmailLogin(event.currentTarget as HTMLFormElement);
+  });
 }
 
 function bindTodoEvents(root: HTMLElement, options: RenderOptions) {
@@ -524,4 +617,8 @@ function escapeHTML(value: string): string {
 
 function escapeAttr(value: string): string {
   return escapeHTML(value);
+}
+
+function authStartHref(apiBaseUrl: string, providerId: string): string {
+  return `${apiBaseUrl.replace(/\/$/, "")}/api/v1/auth/${encodeURIComponent(providerId)}/start?redirect=/todo`;
 }

@@ -86,6 +86,25 @@ async function mockTodoApi(page: Page) {
     });
   });
 
+  await page.route("http://localhost:8080/api/v1/me", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        data: {
+          authenticated: true,
+          user: { email: "anton@example.com", provider: "email" }
+        }
+      })
+    });
+  });
+
+  await page.route("http://localhost:8080/api/v1/auth/providers", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ data: [{ id: "email", name: "Email link", kind: "email" }] })
+    });
+  });
+
   await page.route("http://localhost:8080/api/v1/todo/projects", async (route) => {
     if (route.request().method() !== "GET") {
       await route.fulfill({ status: 405 });

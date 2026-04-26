@@ -1,0 +1,11 @@
+todo.anton415.ru {
+  encode gzip zstd
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "same-origin"
+  }
+
+  reverse_proxy app:8080
+}

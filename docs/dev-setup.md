@@ -32,9 +32,17 @@ Open:
 | `HTTP_ADDR` | `:8080` | API listen address. |
 | `DATABASE_URL` | local Postgres URL | API database connection string when running outside Compose. |
 | `WEB_ORIGIN` | `http://localhost:5173` | Allowed browser origin for the API. |
+| `STATIC_DIR` | empty | Optional built frontend directory served by the API in production. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error`. |
 | `SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown timeout. |
 | `VITE_API_BASE_URL` | `http://localhost:8080` | API base URL used by the web shell. |
+| `AUTH_ALLOWED_EMAILS` | empty | Comma-separated emails allowed to sign in. |
+| `AUTH_CALLBACK_BASE_URL` | `http://localhost:8080` | Public API base used for OAuth and email callbacks. |
+| `AUTH_SUCCESS_REDIRECT` | `WEB_ORIGIN/todo` | Redirect after successful login. |
+| `AUTH_FAILURE_REDIRECT` | `WEB_ORIGIN/` | Redirect after failed login. |
+| `AUTH_COOKIE_SECURE` | production only | Whether auth cookies require HTTPS. |
+| `EMAIL_FROM`, `SMTP_*` | empty | SMTP/Postbox settings for email magic links. |
+| `YANDEX_OAUTH_*`, `GITHUB_OAUTH_*`, `VK_OAUTH_*` | empty | OAuth client credentials. |
 
 Docker Compose sets the API database host to `postgres` internally. Local processes should use `localhost:15432`.
 
@@ -70,6 +78,18 @@ Migrations create `platform_metadata` plus Todo v1 tables:
 - `todo_tasks`
 
 Todo v1 stores task status as text with a database check constraint. Deleting a project with tasks is blocked; move or delete the tasks first. The Todo `today` and `upcoming` views use the API server's local timezone.
+
+Auth sessions, OAuth state, and email magic-link tokens are also stored in PostgreSQL. Todo tables remain single-user and do not include `user_id`.
+
+## Integration smoke
+
+To test the real local API + PostgreSQL path without configuring an OAuth provider:
+
+```sh
+AUTH_EMAIL=anton@example.com scripts/todo-integration-smoke.sh
+```
+
+The script starts local Postgres/API services, applies migrations, inserts a temporary session, creates a Todo task through HTTP, verifies it can be listed, and deletes it.
 
 ## Troubleshooting
 

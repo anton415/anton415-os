@@ -7,7 +7,7 @@ GO_FILES := $(shell find . -name "*.go" -not -path "./.git/*" -not -path "./apps
 MIGRATE_DATABASE_URL ?= postgres://anton415:anton415@postgres:5432/anton415_os?sslmode=disable
 WEB_DIR := apps/web
 
-.PHONY: dev api web db stop test test-e2e lint build migrate-up migrate-down docker-config go-mod-tidy
+.PHONY: dev api web db stop test test-e2e test-integration lint build docker-build migrate-up migrate-down docker-config go-mod-tidy
 
 dev:
 	$(COMPOSE) up postgres api web
@@ -31,6 +31,9 @@ test:
 test-e2e:
 	cd $(WEB_DIR) && npm install && npm run test:e2e
 
+test-integration:
+	./scripts/todo-integration-smoke.sh
+
 lint:
 	test -z "$$($(GOFMT) -l $(GO_FILES))"
 	$(GO) vet ./...
@@ -39,6 +42,9 @@ lint:
 build:
 	$(GO) build ./...
 	cd $(WEB_DIR) && npm install && npm run build
+
+docker-build:
+	docker build -t anton415-os:local .
 
 migrate-up: db
 	$(COMPOSE) run --rm migrate -path /migrations -database "$(MIGRATE_DATABASE_URL)" up

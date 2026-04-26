@@ -16,6 +16,7 @@ apps/
   web/                 Lightweight web shell
 internal/
   platform/            Cross-cutting platform code
+  auth/                Single-user auth, sessions, OAuth, and email magic links
   todo/                Todo domain, use cases, HTTP, and persistence
   finance/             Finance boundary marker
   investments/         Investments boundary marker
@@ -31,6 +32,15 @@ The API is one process. Product modules are packages inside the same Go module. 
 - `internal/platform/db`: PostgreSQL connection pool bootstrap
 - `internal/platform/http`: router, middleware, health check, and minimal platform endpoints
 - `internal/platform/logging`: structured logging setup
+
+## Auth boundary
+
+Step 4 adds `internal/auth` as a platform-adjacent bounded module for single-user access control.
+
+- Auth owns OAuth state, email magic-link tokens, server-side sessions, cookie issuance, and allowlist checks.
+- Todo routes are protected by auth middleware, but Todo data remains single-user and does not receive `user_id` in this stage.
+- Provider access tokens are used only during callback handling and are not stored.
+- VK ID is treated conservatively: if a reliable verified email is not available, the user must use email magic-link verification.
 
 Platform code should stay boring and cross-cutting. It must not accumulate domain rules for Todo, Finance, Investments, or FIRE.
 
@@ -95,8 +105,7 @@ They do not mean creating services, network APIs, deployment units, event buses,
 - Real Finance business logic
 - Real Investments business logic
 - Real FIRE business logic
-- Complex auth
-- Yandex Cloud deployment
+- Multi-user account modeling
 - Message broker
 - Kubernetes
 - Microservices
