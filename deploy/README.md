@@ -4,6 +4,8 @@
 - `caddy/Caddyfile` terminates HTTPS for `todo.anton415.ru`.
 - `backup/pg_dump_to_object_storage.sh` uploads logical PostgreSQL dumps to Yandex Object Storage.
 
+The default backup policy is budget-first: Terraform keeps independent monthly dumps for 90 days. The script writes archive names with a timestamp plus a unique temporary-directory suffix, so Object Storage versioning is intentionally not enabled.
+
 The production app image serves both API and frontend, so browser traffic uses one origin:
 
 ```text

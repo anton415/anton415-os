@@ -103,12 +103,14 @@ Managed PostgreSQL PITR is enabled by the managed service. Independent dumps are
 deploy/backup/pg_dump_to_object_storage.sh
 ```
 
-Retention target:
+Budget retention target:
 
-- 30 daily dumps
-- 12 monthly dumps
+- 7 days of Managed PostgreSQL automatic backups/PITR
+- monthly logical dumps retained for 90 days, usually about 3 copies
 
-Monthly restore drill:
+This is intentionally conservative on cost for v1. If Todo data becomes important enough to justify stronger recovery guarantees, increase `postgres_backup_retain_period_days` and `backup_monthly_retention_days`, or add daily logical dumps back in Terraform.
+
+Restore drill:
 
 1. Restore Managed PostgreSQL PITR into a staging cluster.
 2. Restore the latest logical dump into a disposable staging database:

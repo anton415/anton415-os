@@ -64,6 +64,28 @@ variable "postgres_disk_size" {
   default = 10
 }
 
+variable "postgres_backup_retain_period_days" {
+  type        = number
+  default     = 7
+  description = "Managed PostgreSQL automatic backup retention. Yandex allows 7 to 60 days; 7 is the budget baseline."
+
+  validation {
+    condition     = var.postgres_backup_retain_period_days >= 7 && var.postgres_backup_retain_period_days <= 60
+    error_message = "postgres_backup_retain_period_days must be between 7 and 60."
+  }
+}
+
+variable "backup_monthly_retention_days" {
+  type        = number
+  default     = 90
+  description = "Retention for independent monthly pg_dump archives in Object Storage."
+
+  validation {
+    condition     = var.backup_monthly_retention_days >= 7
+    error_message = "backup_monthly_retention_days must be at least 7."
+  }
+}
+
 variable "vm_platform_id" {
   type    = string
   default = "standard-v3"
