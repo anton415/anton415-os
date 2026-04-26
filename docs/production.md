@@ -8,29 +8,28 @@ Production runs as one Docker image:
 
 - Go API on `:8080`
 - Vite static bundle served by the Go API from `STATIC_DIR`
+- PostgreSQL 16 runs in Docker on the same VM with a persistent Docker volume
 - Caddy terminates HTTPS and proxies to the app container
-- Managed PostgreSQL owns Todo and auth data
+- Todo and auth data are on the VM disk for this budget-first v1
 
 Todo API routes require a valid `anton415_session` cookie. `/health`, `/api/v1/me`, and auth routes stay public.
 
 ## Required Secrets
 
-Store secrets in Yandex Lockbox and GitHub production secrets, not in the public repo:
+Store secret values in Yandex Lockbox and GitHub production secrets, not in the public repo:
 
-- `DATABASE_URL`
-- `AUTH_ALLOWED_EMAILS`
 - `YANDEX_OAUTH_CLIENT_ID`
 - `YANDEX_OAUTH_CLIENT_SECRET`
 - `GITHUB_OAUTH_CLIENT_ID`
 - `GITHUB_OAUTH_CLIENT_SECRET`
 - `VK_OAUTH_CLIENT_ID`
 - `VK_OAUTH_CLIENT_SECRET`
-- `EMAIL_FROM`
-- `SMTP_HOST`
-- `SMTP_PORT`
 - `SMTP_USERNAME`
 - `SMTP_PASSWORD`
-- Object Storage credentials for independent dumps
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+
+`DATABASE_URL`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `AUTH_ALLOWED_EMAILS`, `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, and `BACKUP_BUCKET` are generated into `/opt/anton415-os/app.env` from Terraform. Do not duplicate `DATABASE_URL` in Lockbox, or it will override the VM-local database URL.
 
 First production cutover enables Yandex ID and email magic links only. Leave GitHub and VK OAuth values empty until those providers are registered and tested.
 
@@ -88,7 +87,7 @@ Create Postbox sender `todo@anton415.ru` for domain `anton415.ru` with selector 
 1. Merge to `main`.
 2. GitHub Actions builds and pushes `cr.yandex/<registry>/anton415-os:<sha>`.
 3. Approve the `production` environment deployment.
-4. The VM pulls the image and restarts the `app` service.
+4. The VM pulls the image, extracts migrations from it, runs them against the local PostgreSQL container, and restarts the app/Caddy services.
 5. Check:
 
 ```sh
@@ -97,31 +96,31 @@ curl -fsS https://todo.anton415.ru/health
 
 ## Backups and Restore Drill
 
-Managed PostgreSQL PITR is enabled by the managed service. Independent dumps are uploaded to Object Storage by:
+There is no Managed PostgreSQL PITR in this budget-first v1. The first recovery line is the VM Docker volume; the independent fallback is a monthly logical dump uploaded to Object Storage by:
 
 ```sh
 deploy/backup/pg_dump_to_object_storage.sh
 ```
 
+When running it on the VM, export both `/opt/anton415-os/app.env` and `/opt/anton415-os/secrets.env` first so the script can read `DATABASE_URL`, `BACKUP_BUCKET`, and Object Storage credentials.
+
 Budget retention target:
 
-- 7 days of Managed PostgreSQL automatic backups/PITR
 - monthly logical dumps retained for 90 days, usually about 3 copies
 
-This is intentionally conservative on cost for v1. If Todo data becomes important enough to justify stronger recovery guarantees, increase `postgres_backup_retain_period_days` and `backup_monthly_retention_days`, or add daily logical dumps back in Terraform.
+This is intentionally conservative on cost for v1. If Todo data becomes important enough to justify stronger recovery guarantees, move PostgreSQL back to a managed service, increase `backup_monthly_retention_days`, or add daily logical dumps back in Terraform.
 
 Restore drill:
 
-1. Restore Managed PostgreSQL PITR into a staging cluster.
-2. Restore the latest logical dump into a disposable staging database:
+1. Restore the latest logical dump into a disposable staging database:
 
 ```sh
 gunzip -c latest.sql.gz | psql "$STAGING_DATABASE_URL"
 ```
 
-3. Insert a temporary auth session and call `/api/v1/todo/tasks`.
-4. Confirm recent Todo data exists.
-5. Delete the staging resources.
+2. Insert a temporary auth session and call `/api/v1/todo/tasks`.
+3. Confirm recent Todo data exists.
+4. Delete the staging resources.
 
 ## Local Integration Smoke
 

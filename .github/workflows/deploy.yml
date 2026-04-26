@@ -45,5 +45,13 @@ jobs:
             cd /opt/anton415-os
             sed -i.bak "s#cr.yandex/.*/anton415-os:.*#cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os:${{ github.sha }}#g" docker-compose.yml
             docker compose pull app
-            docker compose up -d app
+            container_id="$(docker create cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os:${{ github.sha }})"
+            trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
+            rm -rf migrations
+            docker cp "$container_id:/app/migrations" migrations
+            docker rm "$container_id"
+            trap - EXIT
+            docker compose up -d postgres
+            docker compose run --rm migrate
+            docker compose up -d app caddy
             docker image prune -f

@@ -10,10 +10,6 @@ output "lockbox_secret_id" {
   value = yandex_lockbox_secret.app.id
 }
 
-output "postgres_cluster_id" {
-  value = yandex_mdb_postgresql_cluster.main.id
-}
-
 output "backup_bucket" {
   value = yandex_storage_bucket.backups.bucket
 }

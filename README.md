@@ -164,7 +164,7 @@ Makefile               Developer commands
 - Yandex ID, GitHub OAuth, VK OAuth, and email magic-link auth surfaces gated by `AUTH_ALLOWED_EMAILS`
 - Protected Todo API routes and `/api/v1/me` session discovery
 - Production Docker image that serves the frontend and API from one origin
-- Terraform scaffolding for Yandex Cloud runtime, Managed PostgreSQL, Container Registry, Lockbox, Object Storage backups, and VM deployment
+- Terraform scaffolding for Yandex Cloud VM runtime, VM-local PostgreSQL, Container Registry, Lockbox, Object Storage backups, and VM deployment
 - Lockbox-to-VM runtime secret synchronization for OAuth and SMTP credentials
 - Production runbook in [docs/production.md](docs/production.md)
 

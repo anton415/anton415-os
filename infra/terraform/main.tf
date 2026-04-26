@@ -83,44 +83,6 @@ resource "yandex_lockbox_secret" "app" {
   description = "Runtime OAuth, SMTP/Postbox, cookie, and object storage secrets. Add versions outside Terraform."
 }
 
-resource "yandex_mdb_postgresql_cluster" "main" {
-  name        = "${local.app_name}-postgres"
-  environment = "PRODUCTION"
-  network_id  = yandex_vpc_network.main.id
-
-  config {
-    version = "16"
-    resources {
-      resource_preset_id = var.postgres_resource_preset_id
-      disk_type_id       = "network-ssd"
-      disk_size          = var.postgres_disk_size
-    }
-    backup_retain_period_days = var.postgres_backup_retain_period_days
-    backup_window_start {
-      hours   = 2
-      minutes = 0
-    }
-  }
-
-  host {
-    zone             = var.zone
-    subnet_id        = yandex_vpc_subnet.app.id
-    assign_public_ip = false
-  }
-}
-
-resource "yandex_mdb_postgresql_user" "app" {
-  cluster_id = yandex_mdb_postgresql_cluster.main.id
-  name       = local.database_user
-  password   = var.db_password
-}
-
-resource "yandex_mdb_postgresql_database" "app" {
-  cluster_id = yandex_mdb_postgresql_cluster.main.id
-  name       = local.database_name
-  owner      = yandex_mdb_postgresql_user.app.name
-}
-
 resource "yandex_storage_bucket" "backups" {
   bucket = var.backup_bucket_name
 
@@ -164,7 +126,7 @@ resource "yandex_compute_instance" "app" {
     initialize_params {
       image_id = data.yandex_compute_image.container_optimized.id
       type     = "network-hdd"
-      size     = 20
+      size     = var.vm_boot_disk_size
     }
   }
 
@@ -184,7 +146,10 @@ resource "yandex_compute_instance" "app" {
       registry_id       = yandex_container_registry.app.id
       image_tag         = var.image_tag
       domain_name       = var.domain_name
-      database_url      = "postgres://${local.database_user}:${urlencode(var.db_password)}@c-${yandex_mdb_postgresql_cluster.main.id}.rw.mdb.yandexcloud.net:6432/${local.database_name}?sslmode=require"
+      database_name     = local.database_name
+      database_user     = local.database_user
+      database_password = var.db_password
+      database_url      = "postgres://${local.database_user}:${urlencode(var.db_password)}@postgres:5432/${local.database_name}?sslmode=disable"
       allowed_emails    = var.allowed_emails
       backup_bucket     = var.backup_bucket_name
       lockbox_secret_id = yandex_lockbox_secret.app.id
