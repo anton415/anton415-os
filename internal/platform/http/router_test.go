@@ -34,7 +34,7 @@ func TestHealthReportsDegradedWithoutDatabase(t *testing.T) {
 	}
 }
 
-func TestMeEndpointIsSingleUserStub(t *testing.T) {
+func TestMeEndpointReportsUnauthenticatedSession(t *testing.T) {
 	router := NewRouter(Dependencies{Config: config.Config{AppVersion: "test"}})
 
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
@@ -46,15 +46,29 @@ func TestMeEndpointIsSingleUserStub(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body map[string]string
+	var body struct {
+		Data struct {
+			Authenticated bool `json:"authenticated"`
+		} `json:"data"`
+	}
 	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 
-	if body["id"] != "single-user" {
-		t.Fatalf("id = %q, want single-user", body["id"])
+	if body.Data.Authenticated {
+		t.Fatal("authenticated = true, want false")
 	}
-	if body["auth"] != "not_configured" {
-		t.Fatalf("auth = %q, want not_configured", body["auth"])
+}
+
+func TestTodoRequiresAuthentication(t *testing.T) {
+	router := NewRouter(Dependencies{Config: config.Config{AppVersion: "test"}})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/todo/tasks", nil)
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
 	}
 }

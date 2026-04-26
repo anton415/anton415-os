@@ -93,6 +93,7 @@ export class TodoApi {
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       ...init,
+      credentials: "include",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",

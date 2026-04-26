@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderApp } from "./render";
-import type { HealthState, TodoProject, TodoState, TodoTask } from "./types";
+import type { AuthState, HealthState, TodoProject, TodoState, TodoTask } from "./types";
 
 type RenderOptions = Parameters<typeof renderApp>[1];
 
@@ -134,15 +134,42 @@ describe("renderApp todo", () => {
     expect(options.onChangeTaskStatus).toHaveBeenNthCalledWith(1, 1, "done");
     expect(options.onChangeTaskStatus).toHaveBeenNthCalledWith(2, 2, "todo");
   });
+
+  it("renders login controls for unauthenticated Todo access", () => {
+    const options = optionsForTodo({
+      authState: {
+        kind: "unauthenticated",
+        providers: [
+          { id: "email", name: "Email link", kind: "email" },
+          { id: "github", name: "GitHub", kind: "oauth" }
+        ]
+      }
+    });
+
+    renderApp(root, options);
+
+    expect(root.querySelector("#task-form")).toBeNull();
+    expect(root.querySelector<HTMLInputElement>('input[name="email"]')).not.toBeNull();
+    expect(root.querySelector<HTMLAnchorElement>(".oauth-button")?.href).toBe(
+      "http://api.test/api/v1/auth/github/start?redirect=/todo"
+    );
+
+    root.querySelector<HTMLFormElement>("#email-login-form")?.dispatchEvent(new Event("submit", { bubbles: true }));
+
+    expect(options.onStartEmailLogin).toHaveBeenCalled();
+  });
 });
 
 function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
   return {
     apiBaseUrl: "http://api.test",
     currentPath: "/todo",
+    authState: authState(),
     healthState: { kind: "online", payload: healthPayload() },
     todoState: todoState(),
     onNavigate: vi.fn(),
+    onStartEmailLogin: vi.fn(),
+    onLogout: vi.fn(),
     onRefreshHealth: vi.fn(),
     onRefreshTodo: vi.fn(),
     onToggleTodoPanel: vi.fn(),
@@ -156,6 +183,15 @@ function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
     onCancelProjectEdit: vi.fn(),
     onSaveProject: vi.fn(),
     onDeleteProject: vi.fn(),
+    ...overrides
+  };
+}
+
+function authState(overrides: Partial<Extract<AuthState, { kind: "authenticated" }>> = {}): AuthState {
+  return {
+    kind: "authenticated",
+    providers: [],
+    user: { email: "anton@example.com", provider: "email" },
     ...overrides
   };
 }

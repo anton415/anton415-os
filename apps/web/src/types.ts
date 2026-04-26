@@ -10,6 +10,22 @@ export type HealthState =
   | { kind: "online"; payload: HealthPayload }
   | { kind: "offline"; message: string };
 
+export type AuthProvider = {
+  id: string;
+  name: string;
+  kind: "oauth" | "email" | string;
+};
+
+export type AuthUser = {
+  email: string;
+  provider: string;
+};
+
+export type AuthState =
+  | { kind: "loading"; providers: AuthProvider[] }
+  | { kind: "unauthenticated"; providers: AuthProvider[]; message?: string; emailSent?: boolean }
+  | { kind: "authenticated"; providers: AuthProvider[]; user: AuthUser };
+
 export type ProductModule = {
   name: string;
   path: string;

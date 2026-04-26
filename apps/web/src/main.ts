@@ -1,10 +1,12 @@
 import "./styles.css";
 
+import { AuthApi } from "./authApi";
 import { fetchHealth } from "./health";
 import { renderApp } from "./render";
 import { TodoApi } from "./todoApi";
 import type {
   AppPath,
+  AuthState,
   HealthState,
   TodoScope,
   TodoState,
@@ -21,8 +23,10 @@ if (!app) {
 }
 
 const root = app;
+const authApi = new AuthApi(apiBaseUrl);
 const todoApi = new TodoApi(apiBaseUrl);
 const compactTodoPanelQuery = window.matchMedia("(max-width: 980px)");
+let authState: AuthState = { kind: "loading", providers: [] };
 let healthState: HealthState = { kind: "loading" };
 let currentPath: AppPath = routeFromPath(window.location.pathname);
 let todoState: TodoState = {
@@ -37,9 +41,16 @@ function render() {
   renderApp(root, {
     apiBaseUrl,
     currentPath,
+    authState,
     healthState,
     todoState,
     onNavigate: navigate,
+    onStartEmailLogin: (form) => {
+      void startEmailLogin(form);
+    },
+    onLogout: () => {
+      void logout();
+    },
     onRefreshHealth: () => {
       void refreshHealth();
     },
@@ -100,8 +111,35 @@ async function refreshHealth() {
   render();
 }
 
+async function refreshAuth() {
+  const providers = authState.providers;
+  authState = { kind: "loading", providers };
+  render();
+
+  try {
+    const [nextProviders, me] = await Promise.all([authApi.providers(), authApi.me()]);
+    if (me.authenticated) {
+      authState = { kind: "authenticated", providers: nextProviders, user: me.user };
+    } else {
+      authState = {
+        kind: "unauthenticated",
+        providers: nextProviders,
+        message: authMessageFromLocation()
+      };
+    }
+  } catch (error) {
+    authState = { kind: "unauthenticated", providers, message: errorMessage(error) };
+  }
+  render();
+}
+
 async function refreshTodo() {
   if (currentPath !== "/todo") {
+    return;
+  }
+  if (authState.kind !== "authenticated") {
+    todoState = { ...todoState, loading: false, tasks: [], projects: [] };
+    render();
     return;
   }
 
@@ -115,8 +153,43 @@ async function refreshTodo() {
     ]);
     todoState = { ...todoState, loading: false, projects, tasks, error: undefined };
   } catch (error) {
+    if (isUnauthorized(error)) {
+      authState = {
+        kind: "unauthenticated",
+        providers: authState.providers,
+        message: "Session expired. Sign in again."
+      };
+    }
     todoState = { ...todoState, loading: false, error: errorMessage(error) };
   }
+  render();
+}
+
+async function startEmailLogin(form: HTMLFormElement) {
+  const formData = new FormData(form);
+  const email = String(formData.get("email") ?? "");
+
+  try {
+    await authApi.startEmail(email);
+    authState = {
+      kind: "unauthenticated",
+      providers: authState.providers,
+      emailSent: true
+    };
+  } catch (error) {
+    authState = {
+      kind: "unauthenticated",
+      providers: authState.providers,
+      message: errorMessage(error)
+    };
+  }
+  render();
+}
+
+async function logout() {
+  await authApi.logout().catch(() => undefined);
+  authState = { kind: "unauthenticated", providers: authState.providers };
+  todoState = { ...todoState, projects: [], tasks: [], editingTaskId: undefined };
   render();
 }
 
@@ -296,8 +369,33 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Unknown error";
 }
 
+function isUnauthorized(error: unknown): boolean {
+  return error instanceof Error && "code" in error && error.code === "unauthorized";
+}
+
+function authMessageFromLocation(): string | undefined {
+  const code = new URLSearchParams(window.location.search).get("auth_error");
+  switch (code) {
+    case "email_not_allowed":
+      return "This email is not allowed.";
+    case "email_verification_required":
+      return "Verify your email with a magic link.";
+    case "provider_unavailable":
+      return "This sign-in provider is not configured.";
+    case "auth_failed":
+      return "Sign-in failed.";
+    default:
+      return undefined;
+  }
+}
+
 render();
 void refreshHealth();
+void refreshAuth().then(() => {
+  if (currentPath === "/todo") {
+    void refreshTodo();
+  }
+});
 if (currentPath === "/todo") {
-  void refreshTodo();
+  render();
 }

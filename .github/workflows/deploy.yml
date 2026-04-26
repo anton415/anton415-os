@@ -1,0 +1,49 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-push-deploy:
+    name: Build, push, deploy
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_NAME: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Yandex Container Registry
+        env:
+          YC_SA_JSON_KEY: ${{ secrets.YC_SA_JSON_KEY }}
+        run: |
+          printf '%s' "$YC_SA_JSON_KEY" | docker login --username json_key --password-stdin cr.yandex
+
+      - name: Build image
+        run: docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" -t "${IMAGE_NAME}:main" .
+
+      - name: Push image
+        run: |
+          docker push "${IMAGE_NAME}:${IMAGE_TAG}"
+          docker push "${IMAGE_NAME}:main"
+
+      - name: Deploy on production VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PRODUCTION_SSH_HOST }}
+          username: ${{ secrets.PRODUCTION_SSH_USER }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            set -eu
+            cd /opt/anton415-os
+            sed -i.bak "s#cr.yandex/.*/anton415-os:.*#cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os:${{ github.sha }}#g" docker-compose.yml
+            docker compose pull app
+            docker compose up -d app
+            docker image prune -f

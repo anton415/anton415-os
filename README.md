@@ -2,7 +2,7 @@
 
 `anton415-os` is the active flagship engineering repository and source of truth for the `anton415` personal software platform.
 
-Current status: Step 3 Todo v1. The repository contains a small Go modular monolith with a usable Todo vertical slice, a lightweight web app, local PostgreSQL, migrations, Docker Compose runtime, Make targets, CI, and documentation.
+Current status: Step 4 production hardening in progress. The repository contains a small Go modular monolith with a usable Todo vertical slice, single-user auth, a lightweight web app, local PostgreSQL, migrations, Docker Compose runtime, Make targets, CI, production container scaffolding, Yandex Cloud Terraform scaffolding, and documentation.
 
 Finance, Investments, and FIRE are still planned module boundaries without product behavior.
 
@@ -58,9 +58,11 @@ Local URLs:
 - Web app: `http://localhost:5173`
 - Todo UI: `http://localhost:5173/todo`
 - API health: `http://localhost:8080/health`
-- API user stub: `http://localhost:8080/api/v1/me`
+- API session: `http://localhost:8080/api/v1/me`
 - Todo API: `http://localhost:8080/api/v1/todo`
 - PostgreSQL: `localhost:15432`
+
+Todo API routes require an auth session. For local API + PostgreSQL smoke testing, use `scripts/todo-integration-smoke.sh`, which inserts a temporary local session and exercises the real Todo API path.
 
 Useful commands:
 
@@ -72,6 +74,7 @@ make stop         # stop local Docker services
 make test         # run Go tests
 make lint         # run Go format/vet checks and frontend typecheck
 make build        # build API and frontend
+scripts/todo-integration-smoke.sh # local API + PostgreSQL Todo smoke
 make migrate-up   # apply database migrations
 make migrate-down # roll back one database migration
 make docker-config
@@ -155,13 +158,22 @@ Makefile               Developer commands
 - Project deletion is intentionally conservative: a project with tasks cannot be deleted until those tasks are moved or deleted
 - `today` and `upcoming` views use the API server's local timezone for Todo v1
 
+## What Step 4 production hardening adds
+
+- Server-side auth sessions in PostgreSQL with `HttpOnly`, `SameSite=Lax`, secure-in-production cookies
+- Yandex ID, GitHub OAuth, VK OAuth, and email magic-link auth surfaces gated by `AUTH_ALLOWED_EMAILS`
+- Protected Todo API routes and `/api/v1/me` session discovery
+- Production Docker image that serves the frontend and API from one origin
+- Terraform scaffolding for Yandex Cloud runtime, Managed PostgreSQL, Container Registry, Lockbox, Object Storage backups, and VM deployment
+- Lockbox-to-VM runtime secret synchronization for OAuth and SMTP credentials
+- Production runbook in [docs/production.md](docs/production.md)
+
 ## What still does not exist
 
 - Finance domain behavior
 - Investment import, sync, or analysis
 - FIRE calculations
-- Authentication or authorization
-- Cloud deployment
+- Fully applied cloud deployment
 - Message broker
 - Microservices
 

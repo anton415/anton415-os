@@ -21,6 +21,7 @@ describe("TodoApi", () => {
     await api.listProjects();
 
     expect(fetchMock).toHaveBeenCalledWith("http://api.test/api/v1/todo/projects", {
+      credentials: "include",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json"
@@ -37,6 +38,7 @@ describe("TodoApi", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "http://api.test/api/v1/todo/tasks?view=today&status=todo&project_id=7",
       {
+        credentials: "include",
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json"
@@ -52,6 +54,7 @@ describe("TodoApi", () => {
     await api.listTasks({});
 
     expect(fetchMock).toHaveBeenCalledWith("http://api.test/api/v1/todo/tasks", {
+      credentials: "include",
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json"
