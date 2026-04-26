@@ -18,6 +18,7 @@ Default sizing is intentionally modest for a private Todo app:
 
 - VM: `standard-v3`, 2 vCPU, 2 GB RAM, 20% core fraction, 20 GB network HDD boot disk
 - PostgreSQL: `c3-c2-m4`, 2 vCPU, 4 GB RAM, 10 GB network SSD
+- Budget backup profile: 7 days of Managed PostgreSQL automatic backups, 7 daily logical dumps, and about 3 monthly logical dumps
 
 ## Apply
 
@@ -66,5 +67,7 @@ Managed PostgreSQL PITR is the first recovery line. Nightly logical dumps are th
 ```sh
 deploy/backup/pg_dump_to_object_storage.sh
 ```
+
+The baseline keeps backup storage deliberately small: automatic PostgreSQL backups retain 7 days, Object Storage keeps daily dumps for 7 days and monthly dumps for 90 days. Increase `postgres_backup_retain_period_days`, `backup_daily_retention_days`, or `backup_monthly_retention_days` later if the data becomes more important.
 
 Before calling production safe, restore the latest dump into a staging database and verify `/api/v1/todo/tasks` returns expected data with an inserted test session.
