@@ -10,6 +10,36 @@ write_files:
     permissions: "0644"
     content: |
       services:
+        postgres:
+          image: postgres:16-alpine
+          restart: unless-stopped
+          env_file:
+            - /opt/anton415-os/app.env
+          volumes:
+            - postgres_data:/var/lib/postgresql/data
+          healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+            interval: 10s
+            timeout: 5s
+            retries: 12
+
+        migrate:
+          image: migrate/migrate:v4.18.3
+          restart: "no"
+          command:
+            [
+              "-path",
+              "/migrations",
+              "-database",
+              "${database_url}",
+              "up"
+            ]
+          volumes:
+            - /opt/anton415-os/migrations:/migrations:ro
+          depends_on:
+            postgres:
+              condition: service_healthy
+
         app:
           image: ${image_name}
           restart: unless-stopped
@@ -18,6 +48,9 @@ write_files:
             - /opt/anton415-os/secrets.env
           expose:
             - "8080"
+          depends_on:
+            postgres:
+              condition: service_healthy
           healthcheck:
             test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
             interval: 30s
@@ -38,6 +71,7 @@ write_files:
             - app
 
       volumes:
+        postgres_data:
         caddy_data:
         caddy_config:
 
@@ -62,6 +96,9 @@ write_files:
       HTTP_ADDR=:8080
       STATIC_DIR=/app/web
       DATABASE_URL=${database_url}
+      POSTGRES_DB=${database_name}
+      POSTGRES_USER=${database_user}
+      POSTGRES_PASSWORD=${database_password}
       WEB_ORIGIN=https://${domain_name}
       AUTH_ALLOWED_EMAILS=${allowed_emails}
       AUTH_CALLBACK_BASE_URL=https://${domain_name}
@@ -135,11 +172,20 @@ write_files:
       fi
 
 runcmd:
-  - mkdir -p /opt/anton415-os/caddy
+  - mkdir -p /opt/anton415-os/caddy /opt/anton415-os/migrations
   - /opt/anton415-os/sync-lockbox-env.sh
   - |
     TOKEN_JSON="$(curl -fsS -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token)"
     IAM_TOKEN="$(printf '%s' "$TOKEN_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
     printf '%s' "$IAM_TOKEN" | docker login --username iam --password-stdin cr.yandex
   - docker compose -f /opt/anton415-os/docker-compose.yml pull
-  - docker compose -f /opt/anton415-os/docker-compose.yml up -d
+  - |
+    CONTAINER_ID="$(docker create ${image_name})"
+    trap 'docker rm "$CONTAINER_ID" >/dev/null 2>&1 || true' EXIT
+    rm -rf /opt/anton415-os/migrations
+    docker cp "$CONTAINER_ID:/app/migrations" /opt/anton415-os/migrations
+    docker rm "$CONTAINER_ID"
+    trap - EXIT
+  - docker compose -f /opt/anton415-os/docker-compose.yml up -d postgres
+  - docker compose -f /opt/anton415-os/docker-compose.yml run --rm migrate
+  - docker compose -f /opt/anton415-os/docker-compose.yml up -d app caddy

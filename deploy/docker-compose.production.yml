@@ -1,11 +1,45 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - /opt/anton415-os/app.env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    image: migrate/migrate:v4.18.3
+    restart: "no"
+    command:
+      [
+        "-path",
+        "/migrations",
+        "-database",
+        "postgres://${POSTGRES_USER:-anton415_app}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-anton415_os}?sslmode=disable",
+        "up"
+      ]
+    volumes:
+      - /opt/anton415-os/migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
     image: cr.yandex/${YC_REGISTRY_ID}/anton415-os:${IMAGE_TAG}
     restart: unless-stopped
     env_file:
       - /opt/anton415-os/app.env
+      - /opt/anton415-os/secrets.env
     expose:
       - "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
       interval: 30s
@@ -26,5 +60,6 @@ services:
       - app
 
 volumes:
+  postgres_data:
   caddy_data:
   caddy_config:

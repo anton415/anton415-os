@@ -54,27 +54,6 @@ variable "backup_bucket_name" {
   description = "Object Storage bucket for independent pg_dump archives."
 }
 
-variable "postgres_resource_preset_id" {
-  type    = string
-  default = "c3-c2-m4"
-}
-
-variable "postgres_disk_size" {
-  type    = number
-  default = 10
-}
-
-variable "postgres_backup_retain_period_days" {
-  type        = number
-  default     = 7
-  description = "Managed PostgreSQL automatic backup retention. Yandex allows 7 to 60 days; 7 is the budget baseline."
-
-  validation {
-    condition     = var.postgres_backup_retain_period_days >= 7 && var.postgres_backup_retain_period_days <= 60
-    error_message = "postgres_backup_retain_period_days must be between 7 and 60."
-  }
-}
-
 variable "backup_monthly_retention_days" {
   type        = number
   default     = 90
@@ -99,6 +78,12 @@ variable "vm_cores" {
 variable "vm_memory" {
   type    = number
   default = 2
+}
+
+variable "vm_boot_disk_size" {
+  type        = number
+  default     = 30
+  description = "Boot disk size in GB. It also stores the Docker PostgreSQL volume for the budget v1 deployment."
 }
 
 variable "vm_core_fraction" {

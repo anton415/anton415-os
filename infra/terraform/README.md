@@ -7,18 +7,17 @@ It creates:
 - Yandex VPC, subnet, and security group
 - service account for the app VM
 - Yandex Container Registry
-- Managed PostgreSQL
 - Lockbox secret metadata for runtime secrets
 - Object Storage bucket for independent `pg_dump` archives
-- Container Optimized VM running the app behind Caddy HTTPS
+- Container Optimized VM running PostgreSQL, the app, and Caddy HTTPS
 - public Cloud DNS zone for `anton415.ru`
 - static public IP and `A` record for `todo.anton415.ru`
 
 Default sizing is intentionally modest for a private Todo app:
 
-- VM: `standard-v3`, 2 vCPU, 2 GB RAM, 20% core fraction, 20 GB network HDD boot disk
-- PostgreSQL: `c3-c2-m4`, 2 vCPU, 4 GB RAM, 10 GB network SSD
-- Budget backup profile: 7 days of Managed PostgreSQL automatic backups and about 3 monthly logical dumps
+- VM: `standard-v3`, 2 vCPU, 2 GB RAM, 20% core fraction, 30 GB network HDD boot disk
+- PostgreSQL: Docker `postgres:16-alpine` on the same VM, stored in a persistent Docker volume on the VM disk
+- Budget backup profile: about 3 monthly logical dumps in Object Storage
 
 ## Apply
 
@@ -62,12 +61,12 @@ ns2.yandexcloud.net.
 
 ## Backup Drill
 
-Managed PostgreSQL PITR is the first recovery line. Monthly logical dumps are the independent fallback:
+VM-local PostgreSQL is the first recovery line. Monthly logical dumps are the independent fallback:
 
 ```sh
 deploy/backup/pg_dump_to_object_storage.sh
 ```
 
-The baseline keeps backup storage deliberately small: automatic PostgreSQL backups retain 7 days, and Object Storage keeps monthly dumps for 90 days. Increase `postgres_backup_retain_period_days` and `backup_monthly_retention_days`, or add daily logical dumps later, if the data becomes more important.
+The baseline keeps backup storage deliberately small: Object Storage keeps monthly dumps for 90 days. Move back to Managed PostgreSQL, increase `backup_monthly_retention_days`, or add daily logical dumps later if the data becomes more important.
 
 Before calling production safe, restore the latest dump into a staging database and verify `/api/v1/todo/tasks` returns expected data with an inserted test session.
