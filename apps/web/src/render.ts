@@ -24,6 +24,7 @@ type RenderOptions = {
   onNavigate: (path: string) => void;
   onRefreshHealth: () => void;
   onRefreshTodo: () => void;
+  onToggleTodoPanel: () => void;
   onSelectTodoScope: (scope: TodoScope) => void;
   onEditTask: (taskId: number) => void;
   onCancelTaskEdit: () => void;
@@ -99,6 +100,17 @@ function renderTodoPage(options: RenderOptions): string {
         <h1>Todo</h1>
       </div>
       <div class="topbar-actions">
+        <button
+          class="icon-button todo-panel-toggle"
+          type="button"
+          id="toggle-todo-panel"
+          aria-controls="todo-panel"
+          aria-expanded="${state.todoPanelCollapsed ? "false" : "true"}"
+          aria-label="${state.todoPanelCollapsed ? "Show Todo panel" : "Hide Todo panel"}"
+          title="${state.todoPanelCollapsed ? "Show Todo panel" : "Hide Todo panel"}"
+        >
+          &#9776;
+        </button>
         ${renderHealthBadge(options.healthState)}
         <button class="icon-button" type="button" id="refresh-todo" aria-label="Refresh Todo" title="Refresh Todo">
           &#8635;
@@ -109,13 +121,11 @@ function renderTodoPage(options: RenderOptions): string {
     ${state.error ? `<div class="inline-error" role="alert">${escapeHTML(state.error)}</div>` : ""}
 
     <section class="todo-layout">
-      <aside class="todo-panel">
+      <aside class="todo-panel ${state.todoPanelCollapsed ? "collapsed" : ""}" id="todo-panel">
         ${renderSmartLists(state)}
         ${renderProjectList(state)}
-        ${renderProjectForm(state)}
       </aside>
       <section class="todo-main">
-        ${shouldRenderTaskForm(state) ? renderTaskForm(state) : ""}
         ${renderTaskList(state)}
       </section>
     </section>
@@ -187,18 +197,19 @@ function renderSmartListButton(state: TodoState, list: SmartList): string {
 function renderProjectForm(state: TodoState): string {
   const project = state.projects.find((item) => item.id === state.editingProjectId);
   return `
-    <form class="todo-form" id="project-form">
-      <h2>${project ? "Edit project" : "New project"}</h2>
+    <form class="project-row project-form" id="project-form">
       <input type="hidden" name="project_id" value="${project?.id ?? ""}">
-      <label>
-        <span>Name</span>
-        <input name="name" type="text" value="${escapeAttr(project?.name ?? "")}" placeholder="Project name" autocomplete="off" required>
+      <label class="project-name-field">
+        <span class="visually-hidden">Name</span>
+        <input name="name" type="text" value="${escapeAttr(project?.name ?? "")}" placeholder="${project ? "Project name" : "New project"}" autocomplete="off" required>
       </label>
+      <span class="project-form-actions">
+        <button class="icon-button small project-save-button" type="submit" ${state.saving ? "disabled" : ""} aria-label="${project ? "Save project" : "Create project"}" title="${project ? "Save project" : "Create project"}">
+          ${project ? "&#10003;" : "+"}
+        </button>
+        ${project ? `<button class="icon-button small" type="button" id="cancel-project-edit" aria-label="Cancel project edit" title="Cancel edit">&#215;</button>` : ""}
+      </span>
       ${state.projectFormError ? `<p class="form-error">${escapeHTML(state.projectFormError)}</p>` : ""}
-      <div class="form-actions">
-        <button type="submit" ${state.saving ? "disabled" : ""}>${project ? "Save project" : "Create project"}</button>
-        ${project ? `<button class="secondary-button" type="button" id="cancel-project-edit">Cancel</button>` : ""}
-      </div>
     </form>
   `;
 }
@@ -231,6 +242,7 @@ function renderProjectList(state: TodoState): string {
           ? `<p class="empty-state">No projects yet.</p>`
           : `<ul>${projects}</ul>`
       }
+      ${renderProjectForm(state)}
     </section>
   `;
 }
@@ -242,34 +254,47 @@ function renderTaskForm(state: TodoState): string {
   const dueDate = task?.due_date ?? defaultDueDateForScope(state.scope);
 
   return `
-    <form class="todo-form task-form" id="task-form">
-      <h2>${task ? "Edit task" : "New task"}</h2>
+    <form class="task-item task-form" id="task-form">
+      <span class="complete-button task-form-marker" aria-hidden="true"></span>
       <input type="hidden" name="task_id" value="${task?.id ?? ""}">
-      <label>
-        <span>Title</span>
-        <input name="title" type="text" value="${escapeAttr(task?.title ?? "")}" placeholder="Task title" autocomplete="off" required>
-      </label>
-      <label>
-        <span>Notes</span>
-        <textarea name="notes" rows="3" placeholder="Notes">${escapeHTML(task?.notes ?? "")}</textarea>
-      </label>
-      <div class="form-grid">
-        <label>
-          <span>Project</span>
-          <select name="project_id">
-            <option value="" ${selectedProjectID === null ? "selected" : ""}>Inbox</option>
-            ${state.projects.map((project) => renderProjectOption(project, selectedProjectID)).join("")}
-          </select>
-        </label>
-        <label>
-          <span>Due date</span>
-          <input name="due_date" type="date" value="${escapeAttr(dueDate)}">
-        </label>
+      <input type="hidden" name="notes" value="${escapeAttr(task?.notes ?? "")}">
+      <div class="task-main">
+        <div class="task-title-row">
+          <label class="task-title-field">
+            <span class="visually-hidden">Title</span>
+            <input name="title" type="text" value="${escapeAttr(task?.title ?? "")}" placeholder="${task ? "Task title" : "New task"}" autocomplete="off" required>
+          </label>
+        </div>
+        <dl class="task-meta task-form-meta">
+          <div>
+            <dt>Project</dt>
+            <dd>
+              <label>
+                <span class="visually-hidden">Project</span>
+                <select name="project_id">
+                  <option value="" ${selectedProjectID === null ? "selected" : ""}>Inbox</option>
+                  ${state.projects.map((project) => renderProjectOption(project, selectedProjectID)).join("")}
+                </select>
+              </label>
+            </dd>
+          </div>
+          <div>
+            <dt>Due</dt>
+            <dd>
+              <label>
+                <span class="visually-hidden">Due date</span>
+                <input name="due_date" type="date" value="${escapeAttr(dueDate)}">
+              </label>
+            </dd>
+          </div>
+        </dl>
+        ${state.taskFormError ? `<p class="form-error">${escapeHTML(state.taskFormError)}</p>` : ""}
       </div>
-      ${state.taskFormError ? `<p class="form-error">${escapeHTML(state.taskFormError)}</p>` : ""}
-      <div class="form-actions">
-        <button type="submit" ${state.saving ? "disabled" : ""}>${task ? "Save task" : "Create task"}</button>
-        ${task ? `<button class="secondary-button" type="button" id="cancel-task-edit">Cancel</button>` : ""}
+      <div class="task-actions task-form-actions">
+        <button class="icon-button small task-form-submit" type="submit" aria-label="${task ? "Save task" : "Create task"}" title="${task ? "Save task" : "Create task"}" ${state.saving ? "disabled" : ""}>
+          ${task ? "&#10003;" : "+"}
+        </button>
+        ${task ? `<button class="icon-button small" type="button" id="cancel-task-edit" aria-label="Cancel task edit" title="Cancel edit">&#215;</button>` : ""}
       </div>
     </form>
   `;
@@ -294,16 +319,29 @@ function localDateInputValue(date: Date): string {
 }
 
 function renderTaskList(state: TodoState): string {
+  const taskForm = shouldRenderTaskForm(state) ? renderTaskForm(state) : "";
+
   if (state.loading) {
-    return `<section class="task-list"><p class="empty-state">Loading tasks...</p></section>`;
+    return `
+      <section class="task-list" aria-label="Tasks">
+        ${taskForm}
+        <p class="empty-state">Loading tasks...</p>
+      </section>
+    `;
   }
 
   if (state.tasks.length === 0) {
-    return `<section class="task-list"><p class="empty-state">No tasks in this view.</p></section>`;
+    return `
+      <section class="task-list" aria-label="Tasks">
+        ${taskForm}
+        <p class="empty-state">No tasks in this view.</p>
+      </section>
+    `;
   }
 
   return `
     <section class="task-list" aria-label="Tasks">
+      ${taskForm}
       ${state.tasks.map((task) => renderTaskItem(task, state.projects, state.saving)).join("")}
     </section>
   `;
@@ -387,6 +425,7 @@ function bindShellEvents(root: HTMLElement, options: RenderOptions) {
 
 function bindTodoEvents(root: HTMLElement, options: RenderOptions) {
   root.querySelector("#refresh-todo")?.addEventListener("click", options.onRefreshTodo);
+  root.querySelector("#toggle-todo-panel")?.addEventListener("click", options.onToggleTodoPanel);
 
   root.querySelectorAll<HTMLButtonElement>("[data-todo-view]").forEach((button) => {
     button.addEventListener("click", () => {

@@ -50,7 +50,6 @@ Prerequisite: Docker Compose. Local Go is optional; Make uses local Go when avai
 
 ```sh
 cp .env.example .env
-make migrate-up
 make dev
 ```
 
@@ -66,7 +65,7 @@ Local URLs:
 Useful commands:
 
 ```sh
-make dev          # start Postgres, API, and web shell
+make dev          # start Postgres, apply migrations, API, and web shell
 make api          # start Postgres and API
 make web          # start the web shell locally with npm
 make stop         # stop local Docker services
@@ -92,13 +91,10 @@ make lint
 make test
 make build
 
-# 3. Если менялись миграции, применил их.
-make migrate-up
-
-# 4. Запустил приложение локально.
+# 3. Запустил приложение локально. make dev применит миграции перед стартом API.
 make dev
 
-# 5. Остановил приложение.
+# 4. Остановил приложение.
 # Если make dev запущен в текущем терминале, сначала нажми Ctrl+C.
 make stop
 ```

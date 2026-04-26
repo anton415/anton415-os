@@ -10,7 +10,6 @@
 
 ```sh
 cp .env.example .env
-make migrate-up
 make dev
 ```
 
@@ -22,7 +21,7 @@ Open:
 - API user stub: `http://localhost:8080/api/v1/me`
 - Todo API: `http://localhost:8080/api/v1/todo`
 
-`make migrate-up` starts PostgreSQL if needed and applies migrations from `migrations/`.
+`make dev` starts PostgreSQL, applies migrations from `migrations/`, and then starts the API and web shell.
 
 ## Environment variables
 
@@ -42,7 +41,7 @@ Docker Compose sets the API database host to `postgres` internally. Local proces
 ## Common commands
 
 ```sh
-make dev          # Postgres, API, and web shell
+make dev          # Postgres, migrations, API, and web shell
 make api          # Postgres and API only
 make web          # web shell through local npm
 make db           # Postgres only

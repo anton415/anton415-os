@@ -36,6 +36,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   web:
     image: node:22
@@ -53,6 +55,14 @@ services:
 
   migrate:
     image: migrate/migrate:v4.18.3
+    command:
+      [
+        "-path",
+        "/migrations",
+        "-database",
+        "postgres://${POSTGRES_USER:-anton415}:${POSTGRES_PASSWORD:-anton415}@postgres:5432/${POSTGRES_DB:-anton415_os}?sslmode=disable",
+        "up"
+      ]
     volumes:
       - ./migrations:/migrations:ro
     depends_on:

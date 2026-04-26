@@ -22,6 +22,7 @@ if (!app) {
 
 const root = app;
 const todoApi = new TodoApi(apiBaseUrl);
+const compactTodoPanelQuery = window.matchMedia("(max-width: 980px)");
 let healthState: HealthState = { kind: "loading" };
 let currentPath: AppPath = routeFromPath(window.location.pathname);
 let todoState: TodoState = {
@@ -45,8 +46,17 @@ function render() {
     onRefreshTodo: () => {
       void refreshTodo();
     },
+    onToggleTodoPanel: () => {
+      todoState = { ...todoState, todoPanelCollapsed: !todoState.todoPanelCollapsed };
+      render();
+    },
     onSelectTodoScope: (scope) => {
-      todoState = { ...todoState, scope, editingTaskId: undefined };
+      todoState = {
+        ...todoState,
+        scope,
+        editingTaskId: undefined,
+        todoPanelCollapsed: compactTodoPanelQuery.matches ? true : todoState.todoPanelCollapsed
+      };
       void refreshTodo();
     },
     onEditTask: (taskId) => {
