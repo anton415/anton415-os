@@ -84,6 +84,7 @@ func TestUnallowedEmailDoesNotSendMagicLink(t *testing.T) {
 func TestProvidersOnlyExposeConfiguredOAuth(t *testing.T) {
 	service := NewService(newMemoryRepository(), Config{
 		AllowedEmails: []string{"anton@example.com"},
+		EmailSender:   &captureSender{},
 		OAuthProviders: []OAuthProviderConfig{
 			{
 				ID:           "github",
@@ -103,6 +104,30 @@ func TestProvidersOnlyExposeConfiguredOAuth(t *testing.T) {
 	}
 	if providers[0].ID != "email" || providers[1].ID != "github" {
 		t.Fatalf("providers = %#v, want email then github", providers)
+	}
+}
+
+func TestProvidersHideEmailWhenDeliveryIsDisabled(t *testing.T) {
+	service := NewService(newMemoryRepository(), Config{
+		AllowedEmails: []string{"anton@example.com"},
+		OAuthProviders: []OAuthProviderConfig{
+			{
+				ID:           "github",
+				Name:         "GitHub",
+				ClientID:     "client",
+				ClientSecret: "secret",
+				AuthURL:      "https://github.test/authorize",
+				TokenURL:     "https://github.test/token",
+			},
+		},
+	})
+
+	providers := service.Providers()
+	if len(providers) != 1 {
+		t.Fatalf("providers = %#v, want github only", providers)
+	}
+	if providers[0].ID != "github" {
+		t.Fatalf("providers = %#v, want github only", providers)
 	}
 }
 

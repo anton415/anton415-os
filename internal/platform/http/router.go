@@ -6,7 +6,9 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -193,20 +195,27 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 }
 
 func spaHandler(staticDir string) http.Handler {
-	fileServer := http.FileServer(http.Dir(staticDir))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := filepath.Clean(r.URL.Path)
-		if path == "." || path == "/" {
+		assetPath := staticAssetPath(r.URL.Path)
+		if assetPath == "" {
 			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
 			return
 		}
 
-		filePath := filepath.Join(staticDir, path)
+		filePath := filepath.Join(staticDir, filepath.FromSlash(assetPath))
 		if info, err := os.Stat(filePath); err == nil && !info.IsDir() {
-			fileServer.ServeHTTP(w, r)
+			http.ServeFile(w, r, filePath)
 			return
 		}
 
 		http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
 	})
+}
+
+func staticAssetPath(requestPath string) string {
+	cleaned := path.Clean("/" + requestPath)
+	if cleaned == "/" || cleaned == "." {
+		return ""
+	}
+	return strings.TrimPrefix(cleaned, "/")
 }

@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/anton415/anton415-os/internal/platform/config"
@@ -70,5 +72,49 @@ func TestTodoRequiresAuthentication(t *testing.T) {
 
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
+	}
+}
+
+func TestSPAHandlerServesExistingAssetFromStaticDir(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<!doctype html>index"), 0o644); err != nil {
+		t.Fatalf("write index.html: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(staticDir, "assets"), 0o755); err != nil {
+		t.Fatalf("mkdir assets: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staticDir, "assets", "app.js"), []byte("console.log('asset')"), 0o644); err != nil {
+		t.Fatalf("write app.js: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
+	response := httptest.NewRecorder()
+
+	spaHandler(staticDir).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if body := response.Body.String(); body != "console.log('asset')" {
+		t.Fatalf("body = %q, want asset body", body)
+	}
+}
+
+func TestSPAHandlerFallsBackToIndexForClientRoute(t *testing.T) {
+	staticDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("<!doctype html>index"), 0o644); err != nil {
+		t.Fatalf("write index.html: %v", err)
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "/todo/today", nil)
+	response := httptest.NewRecorder()
+
+	spaHandler(staticDir).ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+	if body := response.Body.String(); body != "<!doctype html>index" {
+		t.Fatalf("body = %q, want index body", body)
 	}
 }

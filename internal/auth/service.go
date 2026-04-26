@@ -164,7 +164,7 @@ func NewService(repository Repository, cfg Config) *Service {
 
 func (service *Service) Providers() []ProviderSummary {
 	providers := []ProviderSummary{}
-	if len(service.allowedEmails) > 0 {
+	if len(service.allowedEmails) > 0 && service.emailSender != nil {
 		providers = append(providers, ProviderSummary{ID: "email", Name: "Email link", Kind: "email"})
 	}
 
