@@ -106,10 +106,9 @@ deploy/backup/pg_dump_to_object_storage.sh
 Budget retention target:
 
 - 7 days of Managed PostgreSQL automatic backups/PITR
-- 7 daily logical dumps
 - monthly logical dumps retained for 90 days, usually about 3 copies
 
-This is intentionally conservative on cost for v1. If Todo data becomes important enough to justify stronger recovery guarantees, increase `postgres_backup_retain_period_days`, `backup_daily_retention_days`, and `backup_monthly_retention_days` in Terraform.
+This is intentionally conservative on cost for v1. If Todo data becomes important enough to justify stronger recovery guarantees, increase `postgres_backup_retain_period_days` and `backup_monthly_retention_days`, or add daily logical dumps back in Terraform.
 
 Restore drill:
 

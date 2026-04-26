@@ -8,7 +8,7 @@ This is a pre-apply estimate for `todo.anton415.ru` in the Russia region, RUB pr
 
 - VM: `standard-v3`, 2 vCPU, 2 GB RAM, 20% core fraction, 20 GB network HDD boot disk.
 - Managed PostgreSQL: `c3-c2-m4`, 2 vCPU, 4 GB RAM, 10 GB network SSD.
-- Budget backup profile: 7 days of Managed PostgreSQL automatic backups/PITR, 7 daily logical dumps, and monthly logical dumps retained for 90 days.
+- Budget backup profile: 7 days of Managed PostgreSQL automatic backups/PITR and monthly logical dumps retained for 90 days.
 - One active static public IP, one Cloud DNS zone, one Lockbox secret version, and roughly 1 GB of Container Registry storage.
 
 ## Monthly Baseline
@@ -31,7 +31,7 @@ This is a pre-apply estimate for `todo.anton415.ru` in the Russia region, RUB pr
 - Managed PostgreSQL backups: the budget baseline uses the minimum 7-day retention. Backup storage is not charged while the database plus backup volume stays below the selected cluster storage; excess backup storage is billed separately.
 - Cloud DNS authoritative requests: billed per million requests; personal Todo traffic should be tiny.
 - Lockbox operations: billed per 10,000 operations; app boot and occasional secret rotation should be tiny.
-- Object Storage logical dumps: the budget baseline keeps 7 daily dumps and about 3 monthly dumps, so this should be negligible at Todo scale. Monitor the billing dashboard after enabling them.
+- Object Storage logical dumps: the budget baseline keeps about 3 monthly dumps, so this should be negligible at Todo scale. Monitor the billing dashboard after enabling them.
 - Postbox email is expected to be negligible at this scale, but monitor the billing dashboard after enabling it.
 
 ## Cost Controls

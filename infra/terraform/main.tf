@@ -125,19 +125,6 @@ resource "yandex_storage_bucket" "backups" {
   bucket = var.backup_bucket_name
 
   lifecycle_rule {
-    id      = "daily-retention"
-    enabled = true
-
-    filter {
-      prefix = "postgres/daily/"
-    }
-
-    expiration {
-      days = var.backup_daily_retention_days
-    }
-  }
-
-  lifecycle_rule {
     id      = "monthly-retention"
     enabled = true
 

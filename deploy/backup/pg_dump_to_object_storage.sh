@@ -19,9 +19,4 @@ cleanup() {
 trap cleanup EXIT
 
 pg_dump "${DATABASE_URL}" | gzip -9 > "${ARCHIVE}"
-aws --endpoint-url "${S3_ENDPOINT}" s3 cp "${ARCHIVE}" "s3://${BACKUP_BUCKET}/${BACKUP_PREFIX}/daily/anton415-os-${RUN_ID}.sql.gz"
-
-DAY_OF_MONTH="$(date -u +%d)"
-if [ "${DAY_OF_MONTH}" = "01" ]; then
-  aws --endpoint-url "${S3_ENDPOINT}" s3 cp "${ARCHIVE}" "s3://${BACKUP_BUCKET}/${BACKUP_PREFIX}/monthly/anton415-os-${RUN_ID}.sql.gz"
-fi
+aws --endpoint-url "${S3_ENDPOINT}" s3 cp "${ARCHIVE}" "s3://${BACKUP_BUCKET}/${BACKUP_PREFIX}/monthly/anton415-os-${RUN_ID}.sql.gz"

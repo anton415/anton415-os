@@ -75,17 +75,6 @@ variable "postgres_backup_retain_period_days" {
   }
 }
 
-variable "backup_daily_retention_days" {
-  type        = number
-  default     = 7
-  description = "Retention for independent daily pg_dump archives in Object Storage."
-
-  validation {
-    condition     = var.backup_daily_retention_days >= 1
-    error_message = "backup_daily_retention_days must be at least 1."
-  }
-}
-
 variable "backup_monthly_retention_days" {
   type        = number
   default     = 90
