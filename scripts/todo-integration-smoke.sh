@@ -5,7 +5,7 @@ COMPOSE="${COMPOSE:-docker compose}"
 API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
 POSTGRES_DB="${POSTGRES_DB:-anton415_os}"
 POSTGRES_USER="${POSTGRES_USER:-anton415}"
-AUTH_EMAIL="${AUTH_EMAIL:-anton@example.com}"
+AUTH_EMAIL="${AUTH_EMAIL:-}"
 SESSION_COOKIE="${AUTH_SESSION_COOKIE:-anton415_session}"
 SESSION_TOKEN="${AUTH_TEST_TOKEN:-local-smoke-session}"
 SESSION_HASH="$(printf '%s' "${SESSION_TOKEN}" | shasum -a 256 | awk '{print $1}')"
@@ -14,11 +14,34 @@ ${COMPOSE} up -d postgres
 ${COMPOSE} run --rm migrate -path /migrations -database "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD:-anton415}@postgres:5432/${POSTGRES_DB}?sslmode=disable" up
 ${COMPOSE} up -d api
 
+attempts=0
+until curl -fsS "${API_BASE_URL}/health" > /dev/null 2>&1; do
+  attempts=$((attempts + 1))
+  if [ "${attempts}" -ge 30 ]; then
+    printf 'API did not become healthy at %s\n' "${API_BASE_URL}/health" >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+if [ -z "${AUTH_EMAIL}" ]; then
+  allowed_emails="$(${COMPOSE} exec -T api printenv AUTH_ALLOWED_EMAILS 2>/dev/null || true)"
+  AUTH_EMAIL="$(
+    printf '%s' "${allowed_emails:-anton@example.com}" |
+      awk -F, '{gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1}'
+  )"
+fi
+
 ${COMPOSE} exec -T postgres psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" <<SQL
 INSERT INTO auth_sessions (token_hash, email, provider, created_at, expires_at, last_seen_at)
 VALUES ('${SESSION_HASH}', '${AUTH_EMAIL}', 'smoke', now(), now() + interval '1 hour', now())
 ON CONFLICT (token_hash)
-DO UPDATE SET expires_at = now() + interval '1 hour', revoked_at = NULL, last_seen_at = now();
+DO UPDATE SET
+  email = EXCLUDED.email,
+  provider = EXCLUDED.provider,
+  expires_at = now() + interval '1 hour',
+  revoked_at = NULL,
+  last_seen_at = now();
 SQL
 
 create_response="$(mktemp)"

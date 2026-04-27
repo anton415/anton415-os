@@ -3,7 +3,7 @@
 [![CI](https://github.com/anton415/anton415-os/actions/workflows/ci.yml/badge.svg)](https://github.com/anton415/anton415-os/actions/workflows/ci.yml)
 [![Deploy Production](https://github.com/anton415/anton415-os/actions/workflows/deploy.yml/badge.svg)](https://github.com/anton415/anton415-os/actions/workflows/deploy.yml)
 [![Release](https://img.shields.io/github/v/release/anton415/anton415-os?display_name=tag&sort=semver)](https://github.com/anton415/anton415-os/releases)
-[![Go 1.24](https://img.shields.io/badge/Go-1.24-00ADD8)](https://go.dev/)
+[![Go 1.25](https://img.shields.io/badge/Go-1.25-00ADD8)](https://go.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)](https://www.typescriptlang.org/)
 
 `anton415-os` is a personal operating-system monorepo: a modular Go and TypeScript application for private productivity, finance, investments, and FIRE planning.
@@ -68,7 +68,7 @@ docs/                  Architecture, production, roadmap, and operations notes
 Prerequisites:
 
 - Docker Compose
-- Go 1.24, or Docker fallback through `Makefile`
+- Go 1.25, or Docker fallback through `Makefile`
 - Node.js 22 for frontend work
 
 ```sh
@@ -145,6 +145,6 @@ Important operating rules:
 
 ## Release
 
-Current release target: `v0.1.0`, the first private production Todo release.
+Current release target: `v0.1.1`, a maintenance patch for the production Todo release.
 
 Release notes are tracked in [CHANGELOG.md](CHANGELOG.md), and GitHub Releases trigger the production deployment workflow after environment approval.

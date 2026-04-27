@@ -1,5 +1,5 @@
 COMPOSE ?= docker compose
-GO_IMAGE ?= golang:1.24-alpine
+GO_IMAGE ?= golang:1.25-alpine
 GO_DOCKER = docker run --rm -v "$(CURDIR)":/workspace -w /workspace $(GO_IMAGE)
 GO ?= $(if $(shell command -v go 2>/dev/null),go,$(GO_DOCKER) go)
 GOFMT ?= $(if $(shell command -v gofmt 2>/dev/null),gofmt,$(GO_DOCKER) gofmt)

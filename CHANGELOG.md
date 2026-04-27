@@ -2,6 +2,14 @@
 
 All notable changes to `anton415-os` are summarized here. Releases follow the shape of the product rather than a public API compatibility contract.
 
+## v0.1.1 - 2026-04-27
+
+### Maintenance
+
+- Raised the backend Go toolchain target from 1.24 to 1.25.
+- Updated `github.com/jackc/pgx/v5` from 5.7.6 to 5.9.2 for the Dependabot security advisory covering placeholder parsing in simple-protocol queries.
+- Updated `github.com/go-chi/chi/v5` from 5.2.3 to 5.2.5 as a narrow router maintenance refresh.
+
 ## v0.1.0 - 2026-04-27
 
 ### Production
