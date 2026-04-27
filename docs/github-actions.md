@@ -25,6 +25,6 @@ Do not commit service-account JSON keys, SSH private keys, Terraform variables, 
 2. Publish a GitHub Release, or run `Deploy Production` manually.
 3. Approve the `production` environment deployment.
 4. Actions builds a `linux/amd64` Docker image and pushes it to Yandex Container Registry.
-5. Actions connects to the VM over SSH, syncs Lockbox secrets, extracts migrations from the image, runs migrations, recreates the app/Caddy containers, and checks `/health`.
+5. Actions connects to the VM over SSH, syncs Lockbox secrets, updates `APP_VERSION`, extracts migrations from the image, runs migrations, recreates the app/Caddy containers, and checks `/health`.
 
 The deployment workflow always pushes the deployed tag and also refreshes the `main` image tag for convenience.

@@ -89,6 +89,7 @@ jobs:
             cd /opt/anton415-os
             image="${{ steps.image.outputs.image }}"
             sudo ./sync-lockbox-env.sh
+            sudo sed -i.bak -E "s#^APP_VERSION=.*#APP_VERSION=${{ steps.image.outputs.tag }}#g" app.env
             sudo sed -i.bak -E "s#image: cr.yandex/.*/anton415-os:.*#image: ${image}#g" docker-compose.yml
             sudo docker pull "$image"
             container_id="$(sudo docker create "$image")"
@@ -99,6 +100,7 @@ jobs:
             trap - EXIT
             sudo docker compose up -d postgres
             sudo docker compose run --rm migrate
-            sudo docker compose up -d --force-recreate app caddy
+            sudo docker compose up -d --no-deps --force-recreate app
+            sudo docker compose up -d --no-deps --force-recreate caddy
             sudo docker compose exec -T app wget -qO- http://127.0.0.1:8080/health
             sudo docker image prune -f
