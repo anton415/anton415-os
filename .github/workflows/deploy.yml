@@ -31,7 +31,7 @@ jobs:
       IMAGE_NAME: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref }}
 
