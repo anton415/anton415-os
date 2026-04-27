@@ -62,6 +62,11 @@ resource "yandex_iam_service_account" "app" {
   description = "Runs the personal Todo production VM."
 }
 
+resource "yandex_iam_service_account" "deploy" {
+  name        = "${local.app_name}-deploy"
+  description = "Pushes production images from GitHub Actions."
+}
+
 resource "yandex_resourcemanager_folder_iam_member" "app_registry_puller" {
   folder_id = var.folder_id
   role      = "container-registry.images.puller"
@@ -72,6 +77,12 @@ resource "yandex_resourcemanager_folder_iam_member" "app_lockbox_viewer" {
   folder_id = var.folder_id
   role      = "lockbox.payloadViewer"
   member    = "serviceAccount:${yandex_iam_service_account.app.id}"
+}
+
+resource "yandex_resourcemanager_folder_iam_member" "deploy_registry_pusher" {
+  folder_id = var.folder_id
+  role      = "container-registry.images.pusher"
+  member    = "serviceAccount:${yandex_iam_service_account.deploy.id}"
 }
 
 resource "yandex_container_registry" "app" {

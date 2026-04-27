@@ -1,52 +1,75 @@
 # anton415-os
 
-`anton415-os` is the active flagship engineering repository and source of truth for the `anton415` personal software platform.
+[![CI](https://github.com/anton415/anton415-os/actions/workflows/ci.yml/badge.svg)](https://github.com/anton415/anton415-os/actions/workflows/ci.yml)
+[![Deploy Production](https://github.com/anton415/anton415-os/actions/workflows/deploy.yml/badge.svg)](https://github.com/anton415/anton415-os/actions/workflows/deploy.yml)
+[![Release](https://img.shields.io/github/v/release/anton415/anton415-os?display_name=tag&sort=semver)](https://github.com/anton415/anton415-os/releases)
+[![Go 1.24](https://img.shields.io/badge/Go-1.24-00ADD8)](https://go.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)](https://www.typescriptlang.org/)
 
-Current status: Step 4 production hardening in progress. The repository contains a small Go modular monolith with a usable Todo vertical slice, single-user auth, a lightweight web app, local PostgreSQL, migrations, Docker Compose runtime, Make targets, CI, production container scaffolding, Yandex Cloud Terraform scaffolding, and documentation.
+`anton415-os` is a personal operating-system monorepo: a modular Go and TypeScript application for private productivity, finance, investments, and FIRE planning.
 
-Finance, Investments, and FIRE are still planned module boundaries without product behavior.
+The first production slice is live: a private Todo app at [todo.anton415.ru](https://todo.anton415.ru), protected by Yandex ID and a single-email allowlist.
 
-## Repository strategy
+## Production Status
 
-`anton415-os` is the main engineering monorepo and source of truth.
-By default, all product modules live inside this repository.
-Separate repositories are not introduced during the modular monolith stage.
+| Area | Status |
+| --- | --- |
+| Runtime | Go API and Vite frontend in one Docker image |
+| Hosting | Yandex Cloud VM, Caddy HTTPS, Cloud DNS |
+| Database | PostgreSQL 16 in Docker on the VM |
+| Auth | Yandex ID, server-side sessions, `HttpOnly` secure cookies |
+| Data model | Single-user Todo data, no `user_id` split yet |
+| Backups | Budget-first monthly `pg_dump` path to Object Storage |
+| Email login | Planned later; Postbox is intentionally deferred |
 
-### When monorepo remains the default
+## Product Modules
 
-Monorepo remains the default while:
+| Module | Current scope |
+| --- | --- |
+| `todo` | Production Todo projects/tasks with browser UI and authenticated REST API |
+| `finance` | Planned personal finance boundary |
+| `investments` | Planned investment tracking and analysis boundary |
+| `fire` | Planned FIRE progress and long-term planning boundary |
 
-- modules share one deployment unit
-- modules share one development lifecycle
-- cross-module changes are common
-- one-user operation favors simplicity over distribution
-- no strong operational boundaries exist yet
+The repository is intentionally a modular monolith. Separate services or repositories are introduced only when an operational boundary becomes real.
 
-### When separate repositories may be justified
+## Architecture
 
-Splitting into separate repositories is considered only during controlled extraction, and only if one or more strong reasons exist, such as:
+```text
+Browser
+  |
+  | HTTPS
+  v
+Caddy
+  |
+  v
+Go API + static web bundle
+  |
+  v
+PostgreSQL 16 in Docker
+```
 
-- an independently deployable module
-- different operational requirements or SLA
-- a stable API boundary
-- clearly different change cadence
-- monorepo coordination becoming a real bottleneck
-- meaningful product or portfolio value from extraction
+Core paths:
 
-Separation should never happen only for cosmetic microservices practice.
+```text
+apps/api/              Go API entrypoint
+apps/web/              Vite TypeScript frontend
+internal/auth/         OAuth, email token, allowlist, session logic
+internal/todo/         Todo domain, use cases, HTTP and PostgreSQL adapters
+internal/platform/     Config, database, router, logging
+migrations/            SQL migrations
+infra/terraform/       Yandex Cloud production infrastructure
+deploy/                VM compose, Caddy, backup, and Lockbox helpers
+docs/                  Architecture, production, roadmap, and operations notes
+```
 
-## Planned modules
+## Local Development
 
-- `todo`: task and personal workflow management
-- `finance`: personal finance tracking
-- `investments`: investment tracking and analysis
-- `fire`: FIRE progress tracking and long-term planning
+Prerequisites:
 
-These are bounded contexts inside one modular monolith. They are not separate deployable services at this stage.
-
-## Local development
-
-Prerequisite: Docker Compose. Local Go is optional; Make uses local Go when available and otherwise falls back to the Go Docker image.
+- Docker Compose
+- Go 1.24, or Docker fallback through `Makefile`
+- Node.js 22 for frontend work
 
 ```sh
 cp .env.example .env
@@ -55,128 +78,72 @@ make dev
 
 Local URLs:
 
-- Web app: `http://localhost:5173`
-- Todo UI: `http://localhost:5173/todo`
-- API health: `http://localhost:8080/health`
-- API session: `http://localhost:8080/api/v1/me`
-- Todo API: `http://localhost:8080/api/v1/todo`
-- PostgreSQL: `localhost:15432`
-
-Todo API routes require an auth session. For local API + PostgreSQL smoke testing, use `scripts/todo-integration-smoke.sh`, which inserts a temporary local session and exercises the real Todo API path.
+| Surface | URL |
+| --- | --- |
+| Web app | `http://localhost:5173` |
+| Todo UI | `http://localhost:5173/todo` |
+| API health | `http://localhost:8080/health` |
+| Session check | `http://localhost:8080/api/v1/me` |
+| PostgreSQL | `localhost:15432` |
 
 Useful commands:
 
 ```sh
-make dev          # start Postgres, apply migrations, API, and web shell
+make dev          # start Postgres, migrations, API, and web shell
 make api          # start Postgres and API
-make web          # start the web shell locally with npm
+make web          # start the Vite web shell
 make stop         # stop local Docker services
-make test         # run Go tests
-make lint         # run Go format/vet checks and frontend typecheck
-make build        # build API and frontend
-scripts/todo-integration-smoke.sh # local API + PostgreSQL Todo smoke
-make migrate-up   # apply database migrations
-make migrate-down # roll back one database migration
-make docker-config
+make lint         # Go format/vet and frontend typecheck
+make test         # Go and frontend unit tests
+make build        # backend and frontend production build
+make docker-build # local production container build
 ```
 
-More setup detail lives in [docs/dev-setup.md](docs/dev-setup.md).
-
-## Simple development cycle
-
-Простой цикл обновления приложения во время разработки:
+Real local API + PostgreSQL smoke:
 
 ```sh
-# 1. Написал или изменил код.
-
-# 2. Проверил, что проект собирается и тесты проходят.
-make lint
-make test
-make build
-
-# 3. Запустил приложение локально. make dev применит миграции перед стартом API.
-make dev
-
-# 4. Остановил приложение.
-# Если make dev запущен в текущем терминале, сначала нажми Ctrl+C.
-make stop
+scripts/todo-integration-smoke.sh
 ```
 
-Если нужно быстро проверить только backend:
+## CI/CD
+
+Pull requests and `main` run:
+
+- Go formatting, vet, tests, and build
+- Frontend typecheck, unit tests, build, and Playwright smoke
+- Production Docker image build for `linux/amd64`
+
+Production deploys run through [Deploy Production](https://github.com/anton415/anton415-os/actions/workflows/deploy.yml), either manually or from a published GitHub Release. The workflow builds and pushes a `linux/amd64` image to Yandex Container Registry, runs migrations on the VM, recreates the app/Caddy containers, and checks `/health`.
+
+Deployment requires GitHub environment approval and repository secrets. Details live in [docs/github-actions.md](docs/github-actions.md).
+
+## Production Operations
+
+The production runbook is [docs/production.md](docs/production.md). The short version:
 
 ```sh
-make api
+curl -fsS https://todo.anton415.ru/health
 ```
 
-Если нужно быстро проверить только frontend shell:
+Important operating rules:
 
-```sh
-make web
-```
+- Do not commit `.env`, `*.tfvars`, service-account keys, SSH private keys, or Lockbox payload files.
+- Review Terraform plans before applying anything that creates or changes paid Yandex resources.
+- Keep Postbox disabled until email magic-link login is worth the extra setup and cost.
+- Treat the VM disk as the first recovery line and Object Storage dumps as the independent fallback.
 
-## Current structure
+## Documentation
 
-```text
-apps/
-  api/                 Go API entrypoint
-  web/                 Vite TypeScript web shell
-internal/
-  platform/
-    config/            Environment-based configuration
-    db/                PostgreSQL pool bootstrap
-    http/              Router, health endpoint, middleware
-    logging/           Structured logging setup
-  todo/
-    domain/            Todo entities, validation, and status rules
-    application/       Todo use cases and filters
-    adapters/          Todo HTTP and PostgreSQL adapters
-  finance/             Finance bounded-context placeholder
-  investments/         Investments bounded-context placeholder
-  fire/                FIRE bounded-context placeholder
-migrations/            Database migrations
-docs/                  Architecture, roadmap, setup, migration policy
-.github/workflows/    CI foundation
-docker-compose.yml     Local runtime
-Makefile               Developer commands
-```
+- [Architecture](docs/architecture.md)
+- [Development setup](docs/dev-setup.md)
+- [GitHub Actions](docs/github-actions.md)
+- [Production runbook](docs/production.md)
+- [Roadmap](docs/roadmap.md)
+- [Yandex cost estimate](docs/yandex-cost-estimate.md)
+- [Changelog](CHANGELOG.md)
 
-## What Step 2 established
+## Release
 
-- Go backend skeleton with `chi`, `pgx`, `slog`, graceful shutdown, config via env, CORS, request logging, `/health`, and `/api/v1/me`
-- PostgreSQL local runtime and initial platform-only migration
-- Frontend shell with module placeholders and backend health indicator
-- Docker Compose and Make targets for day-to-day development
-- CI foundation for backend and frontend checks
-- Explicit modular monolith structure and repository strategy documentation
+Current release target: `v0.1.0`, the first private production Todo release.
 
-## What Step 3 added
-
-- Todo projects and tasks with PostgreSQL persistence
-- Todo REST API under `/api/v1/todo`
-- Browser UI at `/todo` with Inbox, Today, Upcoming, project filters, task forms, project forms, status changes, and delete actions
-- Domain/application tests and HTTP handler coverage for core Todo behavior
-- Project deletion is intentionally conservative: a project with tasks cannot be deleted until those tasks are moved or deleted
-- `today` and `upcoming` views use the API server's local timezone for Todo v1
-
-## What Step 4 production hardening adds
-
-- Server-side auth sessions in PostgreSQL with `HttpOnly`, `SameSite=Lax`, secure-in-production cookies
-- Yandex ID, GitHub OAuth, VK OAuth, and email magic-link auth surfaces gated by `AUTH_ALLOWED_EMAILS`
-- Protected Todo API routes and `/api/v1/me` session discovery
-- Production Docker image that serves the frontend and API from one origin
-- Terraform scaffolding for Yandex Cloud VM runtime, VM-local PostgreSQL, Container Registry, Lockbox, Object Storage backups, and VM deployment
-- Lockbox-to-VM runtime secret synchronization for OAuth and SMTP credentials
-- Production runbook in [docs/production.md](docs/production.md)
-
-## What still does not exist
-
-- Finance domain behavior
-- Investment import, sync, or analysis
-- FIRE calculations
-- Fully applied cloud deployment
-- Message broker
-- Microservices
-
-## Roadmap pointer
-
-The staged roadmap lives in [docs/roadmap.md](docs/roadmap.md). The next major product step is Finance v1.
+Release notes are tracked in [CHANGELOG.md](CHANGELOG.md), and GitHub Releases trigger the production deployment workflow after environment approval.

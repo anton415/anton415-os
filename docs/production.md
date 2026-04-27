@@ -24,14 +24,12 @@ Store secret values in Yandex Lockbox and GitHub production secrets, not in the 
 - `GITHUB_OAUTH_CLIENT_SECRET`
 - `VK_OAUTH_CLIENT_ID`
 - `VK_OAUTH_CLIENT_SECRET`
-- `SMTP_USERNAME`
-- `SMTP_PASSWORD`
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
 
 `DATABASE_URL`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `AUTH_ALLOWED_EMAILS`, `EMAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, and `BACKUP_BUCKET` are generated into `/opt/anton415-os/app.env` from Terraform. Do not duplicate `DATABASE_URL` in Lockbox, or it will override the VM-local database URL.
 
-First production cutover enables Yandex ID and email magic links only. Leave GitHub and VK OAuth values empty until those providers are registered and tested.
+First production cutover enables Yandex ID only. Email magic links are supported by the code but Postbox is intentionally deferred to minimize the initial monthly cost. Leave SMTP, GitHub OAuth, and VK OAuth values empty until those providers are registered and tested.
 
 Production auth defaults:
 
@@ -55,10 +53,9 @@ The VM stores base non-secret runtime configuration in `/opt/anton415-os/app.env
 
 ## OAuth Callbacks
 
-Register these callback URLs:
+Register this callback URL:
 
 - `https://todo.anton415.ru/api/v1/auth/yandex/callback`
-- `http://localhost:8080/api/v1/auth/yandex/callback`
 
 Scopes: `login:email` and `login:info`. The allowed login email is `anton415460@yandex.ru`.
 
@@ -80,15 +77,16 @@ ns1.yandexcloud.net.
 ns2.yandexcloud.net.
 ```
 
-Create Postbox sender `todo@anton415.ru` for domain `anton415.ru` with selector `postbox`, add the generated DKIM TXT record to Cloud DNS, and put the API key ID/secret into Lockbox as `SMTP_USERNAME` and `SMTP_PASSWORD`.
+Postbox can be added later. When it is worth enabling email magic links, create sender `todo@anton415.ru` for domain `anton415.ru` with selector `postbox`, add the generated DKIM TXT record to Cloud DNS, and put the API key ID/secret into Lockbox as `SMTP_USERNAME` and `SMTP_PASSWORD`.
 
 ## Deployment
 
 1. Merge to `main`.
-2. GitHub Actions builds and pushes `cr.yandex/<registry>/anton415-os:<sha>`.
+2. Publish a GitHub Release or run the `Deploy Production` workflow manually.
 3. Approve the `production` environment deployment.
-4. The VM pulls the image, extracts migrations from it, runs them against the local PostgreSQL container, and restarts the app/Caddy services.
-5. Check:
+4. GitHub Actions builds and pushes `cr.yandex/<registry>/anton415-os:<tag>` for `linux/amd64`.
+5. The VM pulls the image, extracts migrations from it, runs them against the local PostgreSQL container, restarts the app/Caddy services, and checks `/health`.
+6. Check:
 
 ```sh
 curl -fsS https://todo.anton415.ru/health
