@@ -5,7 +5,7 @@ RUN npm ci
 COPY apps/web ./
 RUN npm run build
 
-FROM golang:1.24-alpine AS api-builder
+FROM golang:1.26-alpine AS api-builder
 WORKDIR /workspace
 COPY go.mod go.sum ./
 RUN go mod download
