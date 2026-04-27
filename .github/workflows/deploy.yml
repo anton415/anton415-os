@@ -79,7 +79,7 @@ jobs:
             org.opencontainers.image.version=${{ steps.image.outputs.tag }}
 
       - name: Deploy on production VM
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.PRODUCTION_SSH_HOST }}
           username: ${{ secrets.PRODUCTION_SSH_USER }}
