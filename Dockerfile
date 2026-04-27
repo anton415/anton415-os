@@ -13,7 +13,7 @@ COPY apps ./apps
 COPY internal ./internal
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/anton415-os ./apps/api
 
-FROM alpine:3.21
+FROM alpine:3.23
 RUN addgroup -S app && adduser -S app -G app && apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=api-builder /out/anton415-os /app/anton415-os
