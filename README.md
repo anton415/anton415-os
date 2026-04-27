@@ -137,6 +137,7 @@ Important operating rules:
 - [Architecture](docs/architecture.md)
 - [Development setup](docs/dev-setup.md)
 - [GitHub Actions](docs/github-actions.md)
+- [Dependency updates](docs/dependency-updates.md)
 - [Production runbook](docs/production.md)
 - [Roadmap](docs/roadmap.md)
 - [Yandex cost estimate](docs/yandex-cost-estimate.md)

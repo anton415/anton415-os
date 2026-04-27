@@ -1,25 +1,32 @@
 version: 2
+
+# Routine dependency version PRs are intentionally disabled.
+#
+# This is a small private production app, so dependency upgrades are handled as
+# an explicit release-prep task instead of a stream of long-lived PRs. GitHub
+# Dependabot security updates stay enabled in repository settings and should be
+# reviewed immediately when GitHub reports a vulnerability.
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
 
   - package-ecosystem: gomod
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
 
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
 
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 0
