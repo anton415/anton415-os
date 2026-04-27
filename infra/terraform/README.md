@@ -6,6 +6,7 @@ It creates:
 
 - Yandex VPC, subnet, and security group
 - service account for the app VM
+- service account for GitHub Actions image pushes
 - Yandex Container Registry
 - Lockbox secret metadata for runtime secrets
 - Object Storage bucket for independent `pg_dump` archives
@@ -51,6 +52,14 @@ YC_BIN="$HOME/yandex-cloud/bin/yc" \
 ```
 
 The VM reads Lockbox into `/opt/anton415-os/secrets.env` with `/opt/anton415-os/sync-lockbox-env.sh`. To rotate secrets later, add a new Lockbox version and run that script on the VM before restarting Compose.
+
+Create a JSON key for the deploy service account outside Terraform and store it as the GitHub Actions secret `YC_SA_JSON_KEY`. The service account ID is available from:
+
+```sh
+terraform output -raw deploy_service_account_id
+```
+
+Do not commit the JSON key or store it in Terraform state.
 
 Delegate `anton415.ru` at the registrar to the nameservers from `terraform output domain_nameservers`:
 

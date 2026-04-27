@@ -1,24 +1,62 @@
 name: Deploy Production
 
 on:
-  push:
-    branches:
-      - main
+  release:
+    types:
+      - published
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref, branch, tag, or SHA to deploy
+        required: true
+        default: main
+      image_tag:
+        description: Optional image tag. Defaults to the short commit SHA.
+        required: false
+        default: ""
 
 jobs:
-  build-push-deploy:
+  deploy:
     name: Build, push, deploy
     runs-on: ubuntu-latest
-    environment: production
+    environment:
+      name: production
+      url: https://todo.anton415.ru
+    concurrency:
+      group: production
+      cancel-in-progress: false
     permissions:
       contents: read
     env:
-      IMAGE_TAG: ${{ github.sha }}
       IMAGE_NAME: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref }}
+
+      - name: Prepare image metadata
+        id: image
+        shell: bash
+        run: |
+          set -euo pipefail
+          short_sha="$(git rev-parse --short=12 HEAD)"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            version="${{ github.event.release.tag_name }}"
+          else
+            version="${{ inputs.image_tag }}"
+          fi
+          if [ -z "$version" ]; then
+            version="$short_sha"
+          fi
+          {
+            echo "tag=$version"
+            echo "short_sha=$short_sha"
+            echo "image=${IMAGE_NAME}:${version}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to Yandex Container Registry
         env:
@@ -26,13 +64,19 @@ jobs:
         run: |
           printf '%s' "$YC_SA_JSON_KEY" | docker login --username json_key --password-stdin cr.yandex
 
-      - name: Build image
-        run: docker build -t "${IMAGE_NAME}:${IMAGE_TAG}" -t "${IMAGE_NAME}:main" .
-
-      - name: Push image
-        run: |
-          docker push "${IMAGE_NAME}:${IMAGE_TAG}"
-          docker push "${IMAGE_NAME}:main"
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.image }}
+            ${{ env.IMAGE_NAME }}:main
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.image.outputs.tag }}
 
       - name: Deploy on production VM
         uses: appleboy/ssh-action@v1.2.0
@@ -41,17 +85,20 @@ jobs:
           username: ${{ secrets.PRODUCTION_SSH_USER }}
           key: ${{ secrets.PRODUCTION_SSH_KEY }}
           script: |
-            set -eu
+            set -euo pipefail
             cd /opt/anton415-os
-            sed -i.bak "s#cr.yandex/.*/anton415-os:.*#cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os:${{ github.sha }}#g" docker-compose.yml
-            docker compose pull app
-            container_id="$(docker create cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os:${{ github.sha }})"
-            trap 'docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
-            rm -rf migrations
-            docker cp "$container_id:/app/migrations" migrations
-            docker rm "$container_id"
+            image="${{ steps.image.outputs.image }}"
+            sudo ./sync-lockbox-env.sh
+            sudo sed -i.bak -E "s#image: cr.yandex/.*/anton415-os:.*#image: ${image}#g" docker-compose.yml
+            sudo docker pull "$image"
+            container_id="$(sudo docker create "$image")"
+            trap 'sudo docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
+            sudo rm -rf migrations
+            sudo docker cp "$container_id:/app/migrations" migrations
+            sudo docker rm "$container_id"
             trap - EXIT
-            docker compose up -d postgres
-            docker compose run --rm migrate
-            docker compose up -d app caddy
-            docker image prune -f
+            sudo docker compose up -d postgres
+            sudo docker compose run --rm migrate
+            sudo docker compose up -d --force-recreate app caddy
+            sudo docker compose exec -T app wget -qO- http://127.0.0.1:8080/health
+            sudo docker image prune -f

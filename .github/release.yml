@@ -1,0 +1,22 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: Production
+      labels:
+        - deploy
+        - infrastructure
+        - production
+    - title: Todo
+      labels:
+        - todo
+        - feature
+    - title: Maintenance
+      labels:
+        - ci
+        - dependencies
+        - documentation
+    - title: Other Changes
+      labels:
+        - "*"
