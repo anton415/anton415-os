@@ -84,7 +84,8 @@ resource "yandex_lockbox_secret" "app" {
 }
 
 resource "yandex_storage_bucket" "backups" {
-  bucket = var.backup_bucket_name
+  bucket    = var.backup_bucket_name
+  folder_id = var.folder_id
 
   lifecycle_rule {
     id      = "monthly-retention"

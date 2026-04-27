@@ -15,7 +15,8 @@ import type {
   TodoTaskStatus
 } from "./types";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.DEV ? "http://localhost:8080" : "");
 const app = document.querySelector<HTMLDivElement>("#app");
 
 if (!app) {
