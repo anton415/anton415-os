@@ -65,6 +65,8 @@ func NewRouter(deps Dependencies) http.Handler {
 			CookieSecure:    deps.Config.AuthCookieSecure,
 			SuccessRedirect: deps.Config.AuthSuccessRedirect,
 			FailureRedirect: deps.Config.AuthFailureRedirect,
+			DevBypass:       deps.Config.AuthDevBypass,
+			DevEmail:        deps.Config.AuthDevEmail,
 		}
 
 		r.Use(authhttp.SessionMiddleware(authService, authConfig))

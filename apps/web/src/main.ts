@@ -12,6 +12,7 @@ import type {
   TodoState,
   TodoTaskPayload,
   TodoTaskQuery,
+  TodoTaskPriority,
   TodoTaskStatus
 } from "./types";
 
@@ -27,6 +28,7 @@ const root = app;
 const authApi = new AuthApi(apiBaseUrl);
 const todoApi = new TodoApi(apiBaseUrl);
 const compactTodoPanelQuery = window.matchMedia("(max-width: 980px)");
+let sidebarCollapsed = compactTodoPanelQuery.matches;
 let authState: AuthState = { kind: "loading", providers: [] };
 let healthState: HealthState = { kind: "loading" };
 let currentPath: AppPath = routeFromPath(window.location.pathname);
@@ -35,13 +37,18 @@ let todoState: TodoState = {
   saving: false,
   projects: [],
   tasks: [],
-  scope: { kind: "view", view: "inbox" }
+  scope: { kind: "view", view: "inbox" },
+  todoPanelCollapsed: compactTodoPanelQuery.matches,
+  sort: "smart",
+  direction: "asc",
+  search: ""
 };
 
 function render() {
   renderApp(root, {
     apiBaseUrl,
     currentPath,
+    sidebarCollapsed,
     authState,
     healthState,
     todoState,
@@ -54,6 +61,10 @@ function render() {
     },
     onRefreshHealth: () => {
       void refreshHealth();
+    },
+    onToggleSidebar: () => {
+      sidebarCollapsed = !sidebarCollapsed;
+      render();
     },
     onRefreshTodo: () => {
       void refreshTodo();
@@ -69,6 +80,10 @@ function render() {
         editingTaskId: undefined,
         todoPanelCollapsed: compactTodoPanelQuery.matches ? true : todoState.todoPanelCollapsed
       };
+      void refreshTodo();
+    },
+    onChangeTodoQuery: (search, sort, direction) => {
+      todoState = { ...todoState, search, sort, direction, editingTaskId: undefined };
       void refreshTodo();
     },
     onEditTask: (taskId) => {
@@ -225,7 +240,11 @@ async function deleteTask(taskId: number) {
   render();
   try {
     await todoApi.deleteTask(taskId);
-    todoState = { ...todoState, saving: false };
+    todoState = {
+      ...todoState,
+      saving: false,
+      editingTaskId: todoState.editingTaskId === taskId ? undefined : todoState.editingTaskId
+    };
     await refreshTodo();
   } catch (error) {
     todoState = { ...todoState, saving: false, error: errorMessage(error) };
@@ -249,15 +268,15 @@ async function changeTaskStatus(taskId: number, status: TodoTaskStatus) {
 async function saveProject(form: HTMLFormElement) {
   const formData = new FormData(form);
   const projectId = optionalNumber(formData.get("project_id"));
-  const name = String(formData.get("name") ?? "");
+  const payload = projectPayload(formData);
 
   todoState = { ...todoState, saving: true, projectFormError: undefined };
   render();
   try {
     if (projectId) {
-      await todoApi.updateProject(projectId, { name });
+      await todoApi.updateProject(projectId, payload);
     } else {
-      await todoApi.createProject({ name });
+      await todoApi.createProject(payload);
     }
     todoState = {
       ...todoState,
@@ -318,12 +337,19 @@ function routeFromPath(path: string): AppPath {
 }
 
 function taskQuery(state: TodoState): TodoTaskQuery {
-  const query: TodoTaskQuery = {};
+  const query: TodoTaskQuery = {
+    sort: state.sort,
+    direction: state.direction,
+    q: state.search.trim() === "" ? undefined : state.search.trim()
+  };
   if (state.scope.kind === "view") {
     switch (state.scope.view) {
       case "inbox":
       case "today":
+      case "overdue":
       case "upcoming":
+      case "scheduled":
+      case "flagged":
         query.view = state.scope.view;
         break;
       case "completed":
@@ -341,13 +367,31 @@ function taskQuery(state: TodoState): TodoTaskQuery {
 function taskPayload(formData: FormData): TodoTaskPayload {
   const projectID = optionalNumber(formData.get("project_id"));
   const dueDate = optionalString(formData.get("due_date"));
+  const dueTime = optionalString(formData.get("due_time"));
   const notes = optionalString(formData.get("notes"));
+  const repeatFrequency = repeatFrequencyValue(formData.get("repeat_frequency"));
+  const repeatInterval = optionalNumber(formData.get("repeat_interval")) ?? 1;
+  const repeatUntil = optionalString(formData.get("repeat_until"));
 
   return {
     project_id: projectID ?? null,
     title: String(formData.get("title") ?? ""),
     notes,
-    due_date: dueDate
+    due_date: dueDate,
+    due_time: dueTime,
+    repeat_frequency: repeatFrequency,
+    repeat_interval: repeatInterval,
+    repeat_until: repeatUntil,
+    flagged: formData.get("flagged") === "on",
+    priority: priorityValue(formData.get("priority"))
+  };
+}
+
+function projectPayload(formData: FormData) {
+  return {
+    name: String(formData.get("name") ?? ""),
+    start_date: optionalString(formData.get("start_date")),
+    end_date: optionalString(formData.get("end_date"))
   };
 }
 
@@ -364,6 +408,29 @@ function optionalNumber(value: FormDataEntryValue | null): number | undefined {
 
   const number = Number(text);
   return Number.isFinite(number) && number > 0 ? number : undefined;
+}
+
+function repeatFrequencyValue(value: FormDataEntryValue | null): TodoTaskPayload["repeat_frequency"] {
+  switch (String(value ?? "none")) {
+    case "daily":
+    case "weekly":
+    case "monthly":
+    case "yearly":
+      return String(value) as TodoTaskPayload["repeat_frequency"];
+    default:
+      return "none";
+  }
+}
+
+function priorityValue(value: FormDataEntryValue | null): TodoTaskPriority {
+  switch (String(value ?? "none")) {
+    case "low":
+    case "medium":
+    case "high":
+      return String(value) as TodoTaskPriority;
+    default:
+      return "none";
+  }
 }
 
 function errorMessage(error: unknown): string {

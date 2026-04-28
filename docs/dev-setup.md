@@ -41,10 +41,14 @@ Open:
 | `AUTH_SUCCESS_REDIRECT` | `WEB_ORIGIN/todo` | Redirect after successful login. |
 | `AUTH_FAILURE_REDIRECT` | `WEB_ORIGIN/` | Redirect after failed login. |
 | `AUTH_COOKIE_SECURE` | production only | Whether auth cookies require HTTPS. |
+| `AUTH_DEV_BYPASS` | `false` | Local-only auth bypass; ignored when `APP_ENV=production`. |
+| `AUTH_DEV_EMAIL` | `dev@localhost` | Email shown by `/api/v1/me` when the dev bypass is enabled. |
 | `EMAIL_FROM`, `SMTP_*` | empty | SMTP/Postbox settings for email magic links. |
 | `YANDEX_OAUTH_*`, `GITHUB_OAUTH_*`, `VK_OAUTH_*` | empty | OAuth client credentials. |
 
 Docker Compose sets the API database host to `postgres` internally. Local processes should use `localhost:15432`.
+
+For local browser testing without configuring OAuth or magic-link email, set `AUTH_DEV_BYPASS=true` in `.env` and restart the API. The bypass is disabled automatically in production.
 
 ## Common commands
 

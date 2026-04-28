@@ -168,7 +168,7 @@ func TestServiceFiltersInboxAndToday(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTasks(inbox) error = %v", err)
 	}
-	if got := taskIDs(inboxTasks); !slices.Equal(got, []int64{inbox.ID, todayTask.ID, upcomingTask.ID}) {
+	if got := taskIDs(inboxTasks); !slices.Equal(got, []int64{todayTask.ID, upcomingTask.ID, inbox.ID}) {
 		t.Fatalf("inbox ids = %v, want [%d %d %d]", got, inbox.ID, todayTask.ID, upcomingTask.ID)
 	}
 
@@ -200,7 +200,7 @@ func TestServiceFiltersInboxAndToday(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTasks(all) error = %v", err)
 	}
-	if got := taskIDs(allTasks); !slices.Equal(got, []int64{inbox.ID, todayTask.ID, projectTask.ID, upcomingTask.ID, doneTask.ID}) {
+	if got := taskIDs(allTasks); !slices.Equal(got, []int64{todayTask.ID, upcomingTask.ID, inbox.ID, projectTask.ID, doneTask.ID}) {
 		t.Fatalf("all ids = %v, want all task ids", got)
 	}
 
@@ -212,6 +212,63 @@ func TestServiceFiltersInboxAndToday(t *testing.T) {
 	if got := taskIDs(doneTasks); !slices.Equal(got, []int64{doneTask.ID}) {
 		t.Fatalf("done ids = %v, want [%d]", got, doneTask.ID)
 	}
+}
+
+func TestServiceFiltersOverdueFlaggedSearchAndSort(t *testing.T) {
+	store := newMemoryStore()
+	now := time.Date(2026, 4, 23, 10, 30, 0, 0, time.UTC)
+	service := NewService(Dependencies{
+		Projects: store,
+		Tasks:    store,
+		Now:      func() time.Time { return now },
+		Location: time.UTC,
+	})
+
+	yesterday := now.AddDate(0, 0, -1)
+	today := now
+	tomorrow := now.AddDate(0, 0, 1)
+	pastTime := "09:00"
+	futureTime := "12:00"
+	low := domain.TaskPriorityLow
+	high := domain.TaskPriorityHigh
+	overdueDateTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Alpha old", DueDate: &yesterday})
+	overdueTimeTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Milk today", DueDate: &today, DueTime: &pastTime, Flagged: true, Priority: high})
+	futureTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Beta later", DueDate: &today, DueTime: &futureTime, Priority: low})
+	tomorrowTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Gamma tomorrow", DueDate: &tomorrow})
+
+	overdueTasks, err := service.ListTasks(context.Background(), ListTasksInput{View: TaskViewOverdue})
+	if err != nil {
+		t.Fatalf("ListTasks(overdue) error = %v", err)
+	}
+	if got := taskIDs(overdueTasks); !slices.Equal(got, []int64{overdueDateTask.ID, overdueTimeTask.ID}) {
+		t.Fatalf("overdue ids = %v, want overdue date and time tasks", got)
+	}
+
+	flaggedTasks, err := service.ListTasks(context.Background(), ListTasksInput{View: TaskViewFlagged})
+	if err != nil {
+		t.Fatalf("ListTasks(flagged) error = %v", err)
+	}
+	if got := taskIDs(flaggedTasks); !slices.Equal(got, []int64{overdueTimeTask.ID}) {
+		t.Fatalf("flagged ids = %v, want [%d]", got, overdueTimeTask.ID)
+	}
+
+	searchTasks, err := service.ListTasks(context.Background(), ListTasksInput{Query: "milk"})
+	if err != nil {
+		t.Fatalf("ListTasks(search) error = %v", err)
+	}
+	if got := taskIDs(searchTasks); !slices.Equal(got, []int64{overdueTimeTask.ID}) {
+		t.Fatalf("search ids = %v, want [%d]", got, overdueTimeTask.ID)
+	}
+
+	priorityTasks, err := service.ListTasks(context.Background(), ListTasksInput{Sort: TaskSortPriority, Direction: SortDirectionDesc})
+	if err != nil {
+		t.Fatalf("ListTasks(priority sort) error = %v", err)
+	}
+	if got := taskIDs(priorityTasks); !slices.Equal(got[:2], []int64{overdueTimeTask.ID, futureTask.ID}) {
+		t.Fatalf("priority ids = %v, want high then low first", got)
+	}
+
+	_ = tomorrowTask
 }
 
 func TestServiceProjectCRUDAndDeleteConflict(t *testing.T) {

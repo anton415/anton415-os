@@ -67,6 +67,15 @@ export class TodoApi {
     if (query.project_id) {
       params.set("project_id", String(query.project_id));
     }
+    if (query.sort) {
+      params.set("sort", query.sort);
+    }
+    if (query.direction) {
+      params.set("direction", query.direction);
+    }
+    if (query.q) {
+      params.set("q", query.q);
+    }
 
     const suffix = params.size > 0 ? `?${params.toString()}` : "";
     return this.request<TodoTask[]>(`/api/v1/todo/tasks${suffix}`);

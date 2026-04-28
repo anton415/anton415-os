@@ -22,6 +22,9 @@ func TestListTasksQueryAllTasksUsesStableSort(t *testing.T) {
 	if !strings.Contains(query, "due_date NULLS LAST") {
 		t.Fatalf("query = %q, expected due date ordering", query)
 	}
+	if !strings.Contains(query, "due_time NULLS LAST") {
+		t.Fatalf("query = %q, expected due time ordering", query)
+	}
 	if len(args) != 0 {
 		t.Fatalf("args = %v, want none", args)
 	}
@@ -40,7 +43,7 @@ func TestListTasksQueryTodayStatusAndProjectFilters(t *testing.T) {
 	})
 
 	for _, expected := range []string{
-		"due_date = $1::date",
+		"due_date <= $1::date",
 		"status <> 'done'",
 		"status = $2",
 		"project_id = $3",
@@ -51,6 +54,36 @@ func TestListTasksQueryTodayStatusAndProjectFilters(t *testing.T) {
 	}
 
 	wantArgs := []any{"2026-04-23", domain.TaskStatusDone, int64(7)}
+	if !reflect.DeepEqual(args, wantArgs) {
+		t.Fatalf("args = %#v, want %#v", args, wantArgs)
+	}
+}
+
+func TestListTasksQueryOverdueSearchAndSort(t *testing.T) {
+	today := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+
+	query, args := listTasksQuery(application.TaskListFilter{
+		View:      application.TaskViewOverdue,
+		Today:     today,
+		Now:       today,
+		Query:     "milk",
+		Sort:      application.TaskSortPriority,
+		Direction: application.SortDirectionDesc,
+	})
+
+	for _, expected := range []string{
+		"due_date < $1::date",
+		"due_time IS NOT NULL AND due_time < $2::time",
+		"lower(title) LIKE $3",
+		"lower(coalesce(notes, '')) LIKE $3",
+		"CASE priority WHEN 'high' THEN 3",
+		"DESC",
+	} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("query = %q, expected %q", query, expected)
+		}
+	}
+	wantArgs := []any{"2026-04-23", "10:00", "%milk%"}
 	if !reflect.DeepEqual(args, wantArgs) {
 		t.Fatalf("args = %#v, want %#v", args, wantArgs)
 	}

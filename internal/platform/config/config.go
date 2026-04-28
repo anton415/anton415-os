@@ -28,6 +28,8 @@ type Config struct {
 	AuthSessionTTL      time.Duration
 	AuthTokenTTL        time.Duration
 	AuthCookieSecure    bool
+	AuthDevBypass       bool
+	AuthDevEmail        string
 	EmailFrom           string
 	SMTPHost            string
 	SMTPPort            string
@@ -81,6 +83,8 @@ func Load() (Config, error) {
 		AuthSessionTTL:      sessionTTL,
 		AuthTokenTTL:        tokenTTL,
 		AuthCookieSecure:    boolFromEnv("AUTH_COOKIE_SECURE", appEnv == "production"),
+		AuthDevBypass:       appEnv != "production" && boolFromEnv("AUTH_DEV_BYPASS", false),
+		AuthDevEmail:        stringFromEnv("AUTH_DEV_EMAIL", "dev@localhost"),
 		EmailFrom:           stringFromEnv("EMAIL_FROM", ""),
 		SMTPHost:            stringFromEnv("SMTP_HOST", ""),
 		SMTPPort:            stringFromEnv("SMTP_PORT", "587"),

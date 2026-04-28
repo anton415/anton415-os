@@ -72,6 +72,94 @@ func TestTaskOptionalFieldsNormalizeAndClear(t *testing.T) {
 	}
 }
 
+func TestTaskScheduleValidationAndRepeatNextDate(t *testing.T) {
+	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+	dueDate := time.Date(2026, 4, 24, 18, 30, 0, 0, time.UTC)
+	dueTime := "9:05"
+	repeatUntil := time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC)
+
+	task, err := NewTask(NewTaskInput{
+		Title:           "Repeat bill",
+		DueDate:         &dueDate,
+		DueTime:         &dueTime,
+		RepeatFrequency: RepeatFrequencyWeekly,
+		RepeatInterval:  2,
+		RepeatUntil:     &repeatUntil,
+		Flagged:         true,
+		Priority:        TaskPriorityHigh,
+	}, now)
+	if err != nil {
+		t.Fatalf("NewTask() error = %v", err)
+	}
+	if task.DueTime == nil || *task.DueTime != "09:05" {
+		t.Fatalf("DueTime = %v, want 09:05", task.DueTime)
+	}
+	if task.RepeatUntil == nil || !task.RepeatUntil.Equal(time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("RepeatUntil = %v, want normalized date", task.RepeatUntil)
+	}
+	next := task.NextRepeatDate()
+	if next == nil || !next.Equal(time.Date(2026, 5, 8, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("NextRepeatDate = %v, want 2026-05-08", next)
+	}
+	if !task.Flagged || task.Priority != TaskPriorityHigh {
+		t.Fatalf("Flagged/Priority = %v/%s, want true/high", task.Flagged, task.Priority)
+	}
+}
+
+func TestTaskScheduleValidationRejectsInvalidCombinations(t *testing.T) {
+	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+	dueTime := "10:00"
+	_, err := NewTask(NewTaskInput{Title: "Timed", DueTime: &dueTime}, now)
+	if !errors.Is(err, ErrInvalidTaskSchedule) {
+		t.Fatalf("NewTask(time without date) error = %v, want ErrInvalidTaskSchedule", err)
+	}
+
+	dueDate := time.Date(2026, 4, 24, 0, 0, 0, 0, time.UTC)
+	repeatUntil := time.Date(2026, 4, 23, 0, 0, 0, 0, time.UTC)
+	_, err = NewTask(NewTaskInput{
+		Title:           "Bad repeat",
+		DueDate:         &dueDate,
+		RepeatFrequency: RepeatFrequencyDaily,
+		RepeatInterval:  1,
+		RepeatUntil:     &repeatUntil,
+	}, now)
+	if !errors.Is(err, ErrInvalidTaskRepeat) {
+		t.Fatalf("NewTask(repeat until before due) error = %v, want ErrInvalidTaskRepeat", err)
+	}
+}
+
+func TestCompleteOrAdvanceRepeat(t *testing.T) {
+	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+	dueDate := time.Date(2026, 4, 23, 0, 0, 0, 0, time.UTC)
+	repeatUntil := time.Date(2026, 4, 24, 0, 0, 0, 0, time.UTC)
+	task, err := NewTask(NewTaskInput{
+		Title:           "Daily habit",
+		DueDate:         &dueDate,
+		RepeatFrequency: RepeatFrequencyDaily,
+		RepeatUntil:     &repeatUntil,
+	}, now)
+	if err != nil {
+		t.Fatalf("NewTask() error = %v", err)
+	}
+
+	if err := task.CompleteOrAdvanceRepeat(now.Add(time.Hour)); err != nil {
+		t.Fatalf("CompleteOrAdvanceRepeat() error = %v", err)
+	}
+	if task.Status != TaskStatusTodo || task.CompletedAt != nil {
+		t.Fatalf("Status/CompletedAt = %s/%v, want todo/nil", task.Status, task.CompletedAt)
+	}
+	if task.DueDate == nil || !task.DueDate.Equal(repeatUntil) {
+		t.Fatalf("DueDate = %v, want repeat until date", task.DueDate)
+	}
+
+	if err := task.CompleteOrAdvanceRepeat(now.Add(2 * time.Hour)); err != nil {
+		t.Fatalf("CompleteOrAdvanceRepeat(final) error = %v", err)
+	}
+	if task.Status != TaskStatusDone || task.CompletedAt == nil {
+		t.Fatalf("Status/CompletedAt = %s/%v, want done/set", task.Status, task.CompletedAt)
+	}
+}
+
 func TestApplyStatusDoneSetsCompletedAt(t *testing.T) {
 	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
 	task, err := NewTask(NewTaskInput{Title: "Ship todo"}, now)

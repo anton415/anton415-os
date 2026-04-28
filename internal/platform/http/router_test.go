@@ -62,6 +62,43 @@ func TestMeEndpointReportsUnauthenticatedSession(t *testing.T) {
 	}
 }
 
+func TestMeEndpointReportsDevBypassSession(t *testing.T) {
+	router := NewRouter(Dependencies{Config: config.Config{
+		AppVersion:    "test",
+		AuthDevBypass: true,
+		AuthDevEmail:  "local@example.com",
+	}})
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body struct {
+		Data struct {
+			Authenticated bool `json:"authenticated"`
+			User          struct {
+				Email    string `json:"email"`
+				Provider string `json:"provider"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+
+	if !body.Data.Authenticated {
+		t.Fatal("authenticated = false, want true")
+	}
+	if body.Data.User.Email != "local@example.com" || body.Data.User.Provider != "dev" {
+		t.Fatalf("user = %+v, want local dev user", body.Data.User)
+	}
+}
+
 func TestTodoRequiresAuthentication(t *testing.T) {
 	router := NewRouter(Dependencies{Config: config.Config{AppVersion: "test"}})
 
