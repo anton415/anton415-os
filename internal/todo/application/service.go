@@ -57,11 +57,15 @@ func NewService(deps Dependencies) *Service {
 }
 
 type CreateProjectInput struct {
-	Name string
+	Name      string
+	StartDate *time.Time
+	EndDate   *time.Time
 }
 
 type UpdateProjectInput struct {
-	Name string
+	Name      string
+	StartDate *time.Time
+	EndDate   *time.Time
 }
 
 func (service *Service) ListProjects(ctx context.Context) ([]domain.Project, error) {
@@ -69,7 +73,7 @@ func (service *Service) ListProjects(ctx context.Context) ([]domain.Project, err
 }
 
 func (service *Service) CreateProject(ctx context.Context, input CreateProjectInput) (domain.Project, error) {
-	project, err := domain.NewProject(input.Name, service.now())
+	project, err := domain.NewProject(input.Name, input.StartDate, input.EndDate, service.now())
 	if err != nil {
 		return domain.Project{}, err
 	}
@@ -82,7 +86,7 @@ func (service *Service) UpdateProject(ctx context.Context, id int64, input Updat
 		return domain.Project{}, err
 	}
 
-	project, err = domain.RenameProject(project, input.Name, service.now())
+	project, err = domain.UpdateProject(project, input.Name, input.StartDate, input.EndDate, service.now())
 	if err != nil {
 		return domain.Project{}, err
 	}
@@ -95,11 +99,17 @@ func (service *Service) DeleteProject(ctx context.Context, id int64) error {
 }
 
 type CreateTaskInput struct {
-	ProjectID *int64
-	Title     string
-	Notes     *string
-	Status    domain.TaskStatus
-	DueDate   *time.Time
+	ProjectID       *int64
+	Title           string
+	Notes           *string
+	Status          domain.TaskStatus
+	DueDate         *time.Time
+	DueTime         *string
+	RepeatFrequency domain.RepeatFrequency
+	RepeatInterval  int
+	RepeatUntil     *time.Time
+	Flagged         bool
+	Priority        domain.TaskPriority
 }
 
 type OptionalInt64 struct {
@@ -117,17 +127,43 @@ type OptionalDate struct {
 	Value *time.Time
 }
 
+type OptionalBool struct {
+	Set   bool
+	Value bool
+}
+
+type OptionalInt struct {
+	Set   bool
+	Value int
+}
+
 type OptionalTaskStatus struct {
 	Set   bool
 	Value domain.TaskStatus
 }
 
+type OptionalRepeatFrequency struct {
+	Set   bool
+	Value domain.RepeatFrequency
+}
+
+type OptionalTaskPriority struct {
+	Set   bool
+	Value domain.TaskPriority
+}
+
 type UpdateTaskInput struct {
-	ProjectID OptionalInt64
-	Title     OptionalString
-	Notes     OptionalString
-	Status    OptionalTaskStatus
-	DueDate   OptionalDate
+	ProjectID       OptionalInt64
+	Title           OptionalString
+	Notes           OptionalString
+	Status          OptionalTaskStatus
+	DueDate         OptionalDate
+	DueTime         OptionalString
+	RepeatFrequency OptionalRepeatFrequency
+	RepeatInterval  OptionalInt
+	RepeatUntil     OptionalDate
+	Flagged         OptionalBool
+	Priority        OptionalTaskPriority
 }
 
 func (service *Service) ListTasks(ctx context.Context, input ListTasksInput) ([]domain.Task, error) {
@@ -144,11 +180,17 @@ func (service *Service) CreateTask(ctx context.Context, input CreateTaskInput) (
 	}
 
 	task, err := domain.NewTask(domain.NewTaskInput{
-		ProjectID: input.ProjectID,
-		Title:     input.Title,
-		Notes:     input.Notes,
-		Status:    input.Status,
-		DueDate:   input.DueDate,
+		ProjectID:       input.ProjectID,
+		Title:           input.Title,
+		Notes:           input.Notes,
+		Status:          input.Status,
+		DueDate:         input.DueDate,
+		DueTime:         input.DueTime,
+		RepeatFrequency: input.RepeatFrequency,
+		RepeatInterval:  input.RepeatInterval,
+		RepeatUntil:     input.RepeatUntil,
+		Flagged:         input.Flagged,
+		Priority:        input.Priority,
 	}, service.now())
 	if err != nil {
 		return domain.Task{}, err
@@ -184,8 +226,45 @@ func (service *Service) UpdateTask(ctx context.Context, id int64, input UpdateTa
 	if input.DueDate.Set {
 		task.SetDueDate(input.DueDate.Value, now)
 	}
+	if input.DueTime.Set {
+		if err := task.SetDueTime(input.DueTime.Value, now); err != nil {
+			return domain.Task{}, err
+		}
+	}
+	if input.RepeatFrequency.Set || input.RepeatInterval.Set || input.RepeatUntil.Set {
+		frequency := task.RepeatFrequency
+		interval := task.RepeatInterval
+		repeatUntil := task.RepeatUntil
+		if input.RepeatFrequency.Set {
+			frequency = input.RepeatFrequency.Value
+		}
+		if input.RepeatInterval.Set {
+			interval = input.RepeatInterval.Value
+		}
+		if input.RepeatUntil.Set {
+			repeatUntil = input.RepeatUntil.Value
+		}
+		if err := task.SetRepeat(frequency, interval, repeatUntil, now); err != nil {
+			return domain.Task{}, err
+		}
+	}
+	if input.Flagged.Set {
+		task.SetFlagged(input.Flagged.Value, now)
+	}
+	if input.Priority.Set {
+		if err := task.SetPriority(input.Priority.Value, now); err != nil {
+			return domain.Task{}, err
+		}
+	}
+	if err := task.ValidateSchedule(); err != nil {
+		return domain.Task{}, err
+	}
 	if input.Status.Set {
-		if err := task.ApplyStatus(input.Status.Value, now); err != nil {
+		if input.Status.Value == domain.TaskStatusDone {
+			if err := task.CompleteOrAdvanceRepeat(now); err != nil {
+				return domain.Task{}, err
+			}
+		} else if err := task.ApplyStatus(input.Status.Value, now); err != nil {
 			return domain.Task{}, err
 		}
 	}
@@ -219,12 +298,19 @@ func (service *Service) taskListFilter(input ListTasksInput) (TaskListFilter, er
 	if input.ProjectID != nil && *input.ProjectID <= 0 {
 		return TaskListFilter{}, ErrInvalidFilter
 	}
+	if !input.Sort.Valid() || !input.Direction.Valid() {
+		return TaskListFilter{}, ErrInvalidFilter
+	}
 
 	now := service.now().In(service.location)
 	return TaskListFilter{
 		View:      input.View,
 		Status:    input.Status,
 		ProjectID: input.ProjectID,
+		Sort:      input.Sort,
+		Direction: input.Direction,
+		Query:     input.Query,
 		Today:     dateOnly(now),
+		Now:       now,
 	}, nil
 }

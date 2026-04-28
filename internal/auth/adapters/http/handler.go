@@ -30,6 +30,8 @@ type Config struct {
 	CookieSecure    bool
 	SuccessRedirect string
 	FailureRedirect string
+	DevBypass       bool
+	DevEmail        string
 }
 
 type Handler struct {
@@ -54,6 +56,12 @@ func NewRouter(service Service, config Config) http.Handler {
 func SessionMiddleware(service Service, config Config) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if config.DevBypass {
+				r = r.WithContext(context.WithValue(r.Context(), principalContextKey{}, devPrincipal(config.DevEmail)))
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			cookie, err := r.Cookie(config.cookieName())
 			if err != nil || strings.TrimSpace(cookie.Value) == "" {
 				next.ServeHTTP(w, r)
@@ -67,6 +75,17 @@ func SessionMiddleware(service Service, config Config) func(http.Handler) http.H
 
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+func devPrincipal(email string) auth.Principal {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		email = "dev@localhost"
+	}
+	return auth.Principal{
+		Email:    email,
+		Provider: "dev",
 	}
 }
 

@@ -19,7 +19,7 @@ func TestTaskCreateListAndValidation(t *testing.T) {
 	router := newTestRouter()
 
 	createResponse := httptest.NewRecorder()
-	router.ServeHTTP(createResponse, httptest.NewRequest(http.MethodPost, "/tasks", bytes.NewBufferString(`{"title":"  Buy milk  "}`)))
+	router.ServeHTTP(createResponse, httptest.NewRequest(http.MethodPost, "/tasks", bytes.NewBufferString(`{"title":"  Buy milk  ","due_date":"2026-04-23","due_time":"09:30","repeat_frequency":"daily","repeat_interval":2,"repeat_until":"2026-04-30","flagged":true,"priority":"high"}`)))
 	if createResponse.Code != http.StatusCreated {
 		t.Fatalf("create status = %d, want %d; body=%s", createResponse.Code, http.StatusCreated, createResponse.Body.String())
 	}
@@ -32,6 +32,9 @@ func TestTaskCreateListAndValidation(t *testing.T) {
 	}
 	if created.Data.Title != "Buy milk" {
 		t.Fatalf("created title = %q, want Buy milk", created.Data.Title)
+	}
+	if created.Data.DueTime == nil || *created.Data.DueTime != "09:30" || created.Data.RepeatFrequency != "daily" || created.Data.RepeatInterval != 2 || !created.Data.Flagged || created.Data.Priority != "high" {
+		t.Fatalf("created schedule fields = %+v, want due time/repeat/flag/priority", created.Data)
 	}
 
 	listResponse := httptest.NewRecorder()
@@ -98,7 +101,7 @@ func TestTaskListAllCompletedAndProjectFilters(t *testing.T) {
 		t.Fatalf("list all status = %d, want %d", allResponse.Code, http.StatusOK)
 	}
 	allTasks := decodeData[[]taskResponse](t, allResponse)
-	if got := responseTaskIDs(allTasks); !slices.Equal(got, []int64{inboxTask.ID, doneTask.ID, projectTask.ID}) {
+	if got := responseTaskIDs(allTasks); !slices.Equal(got, []int64{inboxTask.ID, projectTask.ID, doneTask.ID}) {
 		t.Fatalf("all ids = %v, want [%d %d %d]", got, inboxTask.ID, doneTask.ID, projectTask.ID)
 	}
 
@@ -141,7 +144,7 @@ func TestTaskUpdateClearsNullableFieldsAndRejectsBadInput(t *testing.T) {
 	}
 	task := decodeData[taskResponse](t, createTaskResponse)
 
-	clearResponse := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", task.ID), `{"project_id":null,"notes":null,"due_date":null}`)
+	clearResponse := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", task.ID), `{"project_id":null,"notes":null,"due_date":null,"due_time":null}`)
 	if clearResponse.Code != http.StatusOK {
 		t.Fatalf("clear task status = %d, want %d; body=%s", clearResponse.Code, http.StatusOK, clearResponse.Body.String())
 	}
@@ -158,8 +161,10 @@ func TestTaskUpdateClearsNullableFieldsAndRejectsBadInput(t *testing.T) {
 
 	invalidRequests := map[string]string{
 		"bad json":           `{"title":`,
-		"unknown field":      `{"priority":1}`,
+		"invalid priority":   `{"priority":1}`,
 		"invalid due date":   `{"due_date":"24-04-2026"}`,
+		"invalid due time":   `{"due_date":"2026-04-24","due_time":"9am"}`,
+		"invalid repeat":     `{"repeat_frequency":"daily","repeat_interval":0}`,
 		"invalid status":     `{"status":"blocked"}`,
 		"invalid project id": `{"project_id":0}`,
 	}
@@ -195,7 +200,7 @@ func TestProjectCRUDAndDeleteConflict(t *testing.T) {
 	router := newTestRouter()
 
 	createProjectResponse := httptest.NewRecorder()
-	router.ServeHTTP(createProjectResponse, httptest.NewRequest(http.MethodPost, "/projects", bytes.NewBufferString(`{"name":"Home"}`)))
+	router.ServeHTTP(createProjectResponse, httptest.NewRequest(http.MethodPost, "/projects", bytes.NewBufferString(`{"name":"Home","start_date":"2026-04-01","end_date":"2026-04-30"}`)))
 	if createProjectResponse.Code != http.StatusCreated {
 		t.Fatalf("create project status = %d, want %d", createProjectResponse.Code, http.StatusCreated)
 	}
@@ -205,6 +210,9 @@ func TestProjectCRUDAndDeleteConflict(t *testing.T) {
 	}
 	if err := json.NewDecoder(createProjectResponse.Body).Decode(&createdProject); err != nil {
 		t.Fatalf("decode project response: %v", err)
+	}
+	if createdProject.Data.StartDate == nil || *createdProject.Data.StartDate != "2026-04-01" || createdProject.Data.EndDate == nil || *createdProject.Data.EndDate != "2026-04-30" {
+		t.Fatalf("project period = %+v, want start and end dates", createdProject.Data)
 	}
 
 	updateProjectResponse := httptest.NewRecorder()

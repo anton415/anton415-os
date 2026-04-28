@@ -18,6 +18,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("AUTH_SESSION_TTL", "")
 	t.Setenv("AUTH_TOKEN_TTL", "")
 	t.Setenv("AUTH_COOKIE_SECURE", "")
+	t.Setenv("AUTH_DEV_BYPASS", "")
+	t.Setenv("AUTH_DEV_EMAIL", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -41,6 +43,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.AuthSessionTTL != 30*24*time.Hour {
 		t.Fatalf("AuthSessionTTL = %s, want 720h", cfg.AuthSessionTTL)
+	}
+	if cfg.AuthDevBypass {
+		t.Fatal("AuthDevBypass = true, want false by default")
 	}
 }
 
@@ -89,5 +94,32 @@ func TestLoadParsesAuthSettings(t *testing.T) {
 	}
 	if len(cfg.AuthAllowedEmails) != 2 || cfg.AuthAllowedEmails[0] != "anton@example.com" {
 		t.Fatalf("AuthAllowedEmails = %#v, want normalized emails", cfg.AuthAllowedEmails)
+	}
+}
+
+func TestLoadEnablesDevAuthBypassOnlyOutsideProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("AUTH_DEV_BYPASS", "true")
+	t.Setenv("AUTH_DEV_EMAIL", "local@example.com")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !cfg.AuthDevBypass {
+		t.Fatal("AuthDevBypass = false, want true in development")
+	}
+	if cfg.AuthDevEmail != "local@example.com" {
+		t.Fatalf("AuthDevEmail = %q, want local@example.com", cfg.AuthDevEmail)
+	}
+
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("AUTH_DEV_BYPASS", "true")
+	cfg, err = Load()
+	if err != nil {
+		t.Fatalf("Load() production error = %v", err)
+	}
+	if cfg.AuthDevBypass {
+		t.Fatal("AuthDevBypass = true, want false in production")
 	}
 }

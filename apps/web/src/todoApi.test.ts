@@ -33,10 +33,10 @@ describe("TodoApi", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: [] }));
 
     const api = new TodoApi("http://api.test");
-    await api.listTasks({ view: "today", status: "todo", project_id: 7 });
+    await api.listTasks({ view: "today", status: "todo", project_id: 7, sort: "due", direction: "desc", q: "milk" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://api.test/api/v1/todo/tasks?view=today&status=todo&project_id=7",
+      "http://api.test/api/v1/todo/tasks?view=today&status=todo&project_id=7&sort=due&direction=desc&q=milk",
       {
         credentials: "include",
         headers: {
@@ -79,7 +79,18 @@ describe("TodoApi", () => {
 
     const api = new TodoApi("http://api.test");
 
-    const promise = api.createTask({ project_id: null, title: "", notes: null, due_date: null });
+    const promise = api.createTask({
+      project_id: null,
+      title: "",
+      notes: null,
+      due_date: null,
+      due_time: null,
+      repeat_frequency: "none",
+      repeat_interval: 1,
+      repeat_until: null,
+      flagged: false,
+      priority: "none"
+    });
 
     await expect(promise).rejects.toBeInstanceOf(TodoApiError);
     await expect(promise).rejects.toMatchObject({
