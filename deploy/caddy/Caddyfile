@@ -1,14 +1,24 @@
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+	}
+}
+
+anton415.ru {
+	encode gzip zstd
+	import security_headers
+
+	reverse_proxy app:8080
+}
+
 todo.anton415.ru {
-  encode gzip zstd
+	encode gzip zstd
+	import security_headers
 
-  header {
-    Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    X-Content-Type-Options "nosniff"
-    Referrer-Policy "same-origin"
-  }
+	@root path /
+	redir @root https://anton415.ru/todo{?query} 308
 
-  @root path /
-  redir @root /todo{?query} 308
-
-  reverse_proxy app:8080
+	reverse_proxy app:8080
 }

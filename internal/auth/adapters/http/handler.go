@@ -27,6 +27,7 @@ type Service interface {
 
 type Config struct {
 	CookieName      string
+	CookieDomain    string
 	CookieSecure    bool
 	SuccessRedirect string
 	FailureRedirect string
@@ -205,6 +206,7 @@ func (handler Handler) sessionCookie(session auth.CreatedSession) *http.Cookie {
 	return &http.Cookie{
 		Name:     handler.config.cookieName(),
 		Value:    session.Token,
+		Domain:   handler.config.cookieDomain(),
 		Path:     "/",
 		Expires:  session.ExpiresAt,
 		MaxAge:   maxAge(session.ExpiresAt),
@@ -218,6 +220,7 @@ func (handler Handler) clearSessionCookie() *http.Cookie {
 	return &http.Cookie{
 		Name:     handler.config.cookieName(),
 		Value:    "",
+		Domain:   handler.config.cookieDomain(),
 		Path:     "/",
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
@@ -294,6 +297,10 @@ func (config Config) cookieName() string {
 		return "anton415_session"
 	}
 	return config.CookieName
+}
+
+func (config Config) cookieDomain() string {
+	return strings.TrimPrefix(strings.TrimSpace(config.CookieDomain), ".")
 }
 
 func (config Config) successRedirect() string {

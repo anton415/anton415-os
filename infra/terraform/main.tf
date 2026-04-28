@@ -158,6 +158,7 @@ resource "yandex_compute_instance" "app" {
       registry_id       = yandex_container_registry.app.id
       image_tag         = var.image_tag
       domain_name       = var.domain_name
+      root_domain_name  = var.root_domain_name
       database_name     = local.database_name
       database_user     = local.database_user
       database_password = var.db_password
@@ -167,6 +168,14 @@ resource "yandex_compute_instance" "app" {
       lockbox_secret_id = yandex_lockbox_secret.app.id
     })
   }
+}
+
+resource "yandex_dns_recordset" "root" {
+  zone_id = yandex_dns_zone.public.id
+  name    = "${local.root_zone}."
+  type    = "A"
+  ttl     = 300
+  data    = [yandex_vpc_address.app.external_ipv4_address[0].address]
 }
 
 resource "yandex_dns_recordset" "todo" {

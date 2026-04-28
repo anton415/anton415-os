@@ -1,6 +1,6 @@
 # Production Infrastructure
 
-This Terraform stack is the production baseline for `https://todo.anton415.ru`.
+This Terraform stack is the production baseline for `https://anton415.ru` and `https://anton415.ru/todo`.
 
 It creates:
 
@@ -12,7 +12,7 @@ It creates:
 - Object Storage bucket for independent `pg_dump` archives
 - Container Optimized VM running PostgreSQL, the app, and Caddy HTTPS
 - public Cloud DNS zone for `anton415.ru`
-- static public IP and `A` record for `todo.anton415.ru`
+- static public IP and `A` records for `anton415.ru` and `todo.anton415.ru`
 
 Default sizing is intentionally modest for a private Todo app:
 

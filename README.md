@@ -8,7 +8,7 @@
 
 `anton415-os` is a personal operating-system monorepo: a modular Go and TypeScript application for private productivity, finance, investments, and FIRE planning.
 
-The first production slice is live: a private Todo app at [todo.anton415.ru](https://todo.anton415.ru), protected by Yandex ID and a single-email allowlist.
+The first production slice is live: a private Todo app at [anton415.ru/todo](https://anton415.ru/todo), protected by Yandex ID and a single-email allowlist.
 
 ## Production Status
 
@@ -80,7 +80,7 @@ Local URLs:
 
 | Surface | URL |
 | --- | --- |
-| Web app | `http://localhost:5173` (redirects to `/todo`) |
+| Web app | `http://localhost:5173` |
 | Todo UI | `http://localhost:5173/todo` |
 | API health | `http://localhost:8080/health` |
 | Session check | `http://localhost:8080/api/v1/me` |
@@ -122,7 +122,7 @@ Deployment requires GitHub environment approval and repository secrets. Details 
 The production runbook is [docs/production.md](docs/production.md). The short version:
 
 ```sh
-curl -fsS https://todo.anton415.ru/health
+curl -fsS https://anton415.ru/health
 ```
 
 Important operating rules:

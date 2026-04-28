@@ -15,6 +15,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("SHUTDOWN_TIMEOUT", "")
 	t.Setenv("WEB_ORIGIN", "")
 	t.Setenv("AUTH_ALLOWED_EMAILS", "")
+	t.Setenv("AUTH_COOKIE_DOMAIN", "")
 	t.Setenv("AUTH_SESSION_TTL", "")
 	t.Setenv("AUTH_TOKEN_TTL", "")
 	t.Setenv("AUTH_COOKIE_SECURE", "")
@@ -74,6 +75,7 @@ func TestLoadRejectsInvalidDuration(t *testing.T) {
 func TestLoadParsesAuthSettings(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
 	t.Setenv("AUTH_ALLOWED_EMAILS", " Anton@Example.com, alt@example.com ")
+	t.Setenv("AUTH_COOKIE_DOMAIN", "anton415.ru")
 	t.Setenv("AUTH_COOKIE_SECURE", "")
 	t.Setenv("AUTH_SESSION_TTL", "24h")
 	t.Setenv("AUTH_TOKEN_TTL", "5m")
@@ -91,6 +93,9 @@ func TestLoadParsesAuthSettings(t *testing.T) {
 	}
 	if cfg.AuthTokenTTL != 5*time.Minute {
 		t.Fatalf("AuthTokenTTL = %s, want 5m", cfg.AuthTokenTTL)
+	}
+	if cfg.AuthCookieDomain != "anton415.ru" {
+		t.Fatalf("AuthCookieDomain = %q, want anton415.ru", cfg.AuthCookieDomain)
 	}
 	if len(cfg.AuthAllowedEmails) != 2 || cfg.AuthAllowedEmails[0] != "anton@example.com" {
 		t.Fatalf("AuthAllowedEmails = %#v, want normalized emails", cfg.AuthAllowedEmails)

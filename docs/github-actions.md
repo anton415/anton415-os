@@ -5,7 +5,7 @@ This repository uses two workflows:
 - `CI`: runs on pull requests and pushes to `main`.
 - `Deploy Production`: runs only when manually dispatched or when a GitHub Release is published.
 
-Production deploys target `https://todo.anton415.ru` and require the `production` GitHub environment. The environment is configured with manual approval so a release or manual dispatch can build the production image only after approval.
+Production deploys target `https://anton415.ru` and require the `production` GitHub environment. The environment is configured with manual approval so a release or manual dispatch can build the production image only after approval.
 
 ## Required Repository Secrets
 

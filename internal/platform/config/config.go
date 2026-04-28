@@ -25,6 +25,7 @@ type Config struct {
 	AuthSuccessRedirect string
 	AuthFailureRedirect string
 	AuthSessionCookie   string
+	AuthCookieDomain    string
 	AuthSessionTTL      time.Duration
 	AuthTokenTTL        time.Duration
 	AuthCookieSecure    bool
@@ -80,6 +81,7 @@ func Load() (Config, error) {
 		AuthSuccessRedirect: stringFromEnv("AUTH_SUCCESS_REDIRECT", webOrigin+"/todo"),
 		AuthFailureRedirect: stringFromEnv("AUTH_FAILURE_REDIRECT", webOrigin+"/"),
 		AuthSessionCookie:   stringFromEnv("AUTH_SESSION_COOKIE", "anton415_session"),
+		AuthCookieDomain:    stringFromEnv("AUTH_COOKIE_DOMAIN", ""),
 		AuthSessionTTL:      sessionTTL,
 		AuthTokenTTL:        tokenTTL,
 		AuthCookieSecure:    boolFromEnv("AUTH_COOKIE_SECURE", appEnv == "production"),

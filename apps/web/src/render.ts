@@ -60,7 +60,7 @@ export function renderApp(root: HTMLElement, options: RenderOptions) {
     <div class="app-shell ${options.sidebarCollapsed ? "sidebar-collapsed" : ""}">
       <aside class="sidebar" id="anton-os-sidebar" aria-label="Main navigation">
         <div class="sidebar-head">
-          <a class="brand" href="/todo" data-route="/todo">
+          <a class="brand" href="/" data-route="/">
             <span class="brand-mark" aria-hidden="true">A</span>
             <span>
               <strong>anton415 OS</strong>

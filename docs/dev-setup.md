@@ -15,7 +15,7 @@ make dev
 
 Open:
 
-- Web app: `http://localhost:5173` (redirects to `/todo`)
+- Web app: `http://localhost:5173`
 - Todo UI: `http://localhost:5173/todo`
 - API health: `http://localhost:8080/health`
 - API user stub: `http://localhost:8080/api/v1/me`
@@ -40,6 +40,7 @@ Open:
 | `AUTH_CALLBACK_BASE_URL` | `http://localhost:8080` | Public API base used for OAuth and email callbacks. |
 | `AUTH_SUCCESS_REDIRECT` | `WEB_ORIGIN/todo` | Redirect after successful login. |
 | `AUTH_FAILURE_REDIRECT` | `WEB_ORIGIN/` | Redirect after failed login. |
+| `AUTH_COOKIE_DOMAIN` | empty | Optional cookie domain for sharing production auth across `anton415.ru` subdomains. |
 | `AUTH_COOKIE_SECURE` | production only | Whether auth cookies require HTTPS. |
 | `AUTH_DEV_BYPASS` | `false` | Local-only auth bypass; ignored when `APP_ENV=production`. |
 | `AUTH_DEV_EMAIL` | `dev@localhost` | Email shown by `/api/v1/me` when the dev bypass is enabled. |

@@ -78,15 +78,28 @@ write_files:
   - path: /opt/anton415-os/caddy/Caddyfile
     permissions: "0644"
     content: |
-      ${domain_name} {
-        encode gzip zstd
+      (security_headers) {
         header {
           Strict-Transport-Security "max-age=31536000; includeSubDomains"
           X-Content-Type-Options "nosniff"
           Referrer-Policy "same-origin"
         }
+      }
+
+      ${root_domain_name} {
+        encode gzip zstd
+        import security_headers
+
+        reverse_proxy app:8080
+      }
+
+      ${domain_name} {
+        encode gzip zstd
+        import security_headers
+
         @root path /
-        redir @root /todo{?query} 308
+        redir @root https://${root_domain_name}/todo{?query} 308
+
         reverse_proxy app:8080
       }
 
@@ -101,12 +114,13 @@ write_files:
       POSTGRES_DB=${database_name}
       POSTGRES_USER=${database_user}
       POSTGRES_PASSWORD=${database_password}
-      WEB_ORIGIN=https://${domain_name}
+      WEB_ORIGIN=https://${root_domain_name}
       AUTH_ALLOWED_EMAILS=${allowed_emails}
       AUTH_CALLBACK_BASE_URL=https://${domain_name}
-      AUTH_SUCCESS_REDIRECT=https://${domain_name}/todo
-      AUTH_FAILURE_REDIRECT=https://${domain_name}/
+      AUTH_SUCCESS_REDIRECT=https://${root_domain_name}/todo
+      AUTH_FAILURE_REDIRECT=https://${root_domain_name}/
       AUTH_SESSION_COOKIE=anton415_session
+      AUTH_COOKIE_DOMAIN=${root_domain_name}
       AUTH_SESSION_TTL=720h
       AUTH_TOKEN_TTL=15m
       AUTH_COOKIE_SECURE=true
