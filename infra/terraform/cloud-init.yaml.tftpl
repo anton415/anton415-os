@@ -85,6 +85,8 @@ write_files:
           X-Content-Type-Options "nosniff"
           Referrer-Policy "same-origin"
         }
+        @root path /
+        redir @root /todo{?query} 308
         reverse_proxy app:8080
       }
 

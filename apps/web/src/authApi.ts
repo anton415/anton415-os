@@ -40,8 +40,9 @@ export class AuthApi {
     return this.request<AuthProvider[]>("/api/v1/auth/providers");
   }
 
-  oauthStartUrl(providerId: string): string {
-    return `${this.baseUrl}/api/v1/auth/${encodeURIComponent(providerId)}/start?redirect=/todo`;
+  oauthStartUrl(providerId: string, redirectPath = "/todo"): string {
+    const params = new URLSearchParams({ redirect: redirectPath });
+    return `${this.baseUrl}/api/v1/auth/${encodeURIComponent(providerId)}/start?${params.toString()}`;
   }
 
   async startEmail(email: string): Promise<void> {

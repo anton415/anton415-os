@@ -97,9 +97,10 @@ type Config struct {
 }
 
 type CreatedSession struct {
-	Token     string
-	ExpiresAt time.Time
-	Principal Principal
+	Token        string
+	ExpiresAt    time.Time
+	Principal    Principal
+	RedirectPath string
 }
 
 type Service struct {
@@ -253,7 +254,12 @@ func (service *Service) CompleteOAuth(ctx context.Context, providerID string, st
 		return CreatedSession{}, ErrEmailVerificationRequired
 	}
 
-	return service.createSession(ctx, identity.Email, provider.ID)
+	session, err := service.createSession(ctx, identity.Email, provider.ID)
+	if err != nil {
+		return CreatedSession{}, err
+	}
+	session.RedirectPath = state.RedirectPath
+	return session, nil
 }
 
 func (service *Service) StartEmailLogin(ctx context.Context, email string) error {

@@ -156,7 +156,7 @@ func (handler Handler) completeOAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, handler.sessionCookie(session))
-	http.Redirect(w, r, handler.config.successRedirect(), http.StatusFound)
+	http.Redirect(w, r, handler.config.successRedirectFor(session.RedirectPath), http.StatusFound)
 }
 
 func (handler Handler) startEmail(w http.ResponseWriter, r *http.Request) {
@@ -303,6 +303,28 @@ func (config Config) successRedirect() string {
 	return config.SuccessRedirect
 }
 
+func (config Config) successRedirectFor(redirectPath string) string {
+	configured := config.successRedirect()
+	if strings.TrimSpace(redirectPath) == "" {
+		return configured
+	}
+
+	targetPath := safeRedirectPath(redirectPath)
+	base, err := url.Parse(configured)
+	if err != nil || base.Scheme == "" || base.Host == "" {
+		return targetPath
+	}
+
+	target, err := url.Parse(targetPath)
+	if err != nil {
+		return configured
+	}
+	base.Path = target.Path
+	base.RawQuery = target.RawQuery
+	base.Fragment = ""
+	return base.String()
+}
+
 func (config Config) failureRedirect() string {
 	if strings.TrimSpace(config.FailureRedirect) == "" {
 		return "/"
@@ -311,10 +333,16 @@ func (config Config) failureRedirect() string {
 }
 
 func safeRedirectPath(value string) string {
+	value = strings.TrimSpace(value)
 	if value == "" || !strings.HasPrefix(value, "/") || strings.HasPrefix(value, "//") {
 		return "/todo"
 	}
-	return value
+
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.IsAbs() || parsed.Host != "" || parsed.Path == "" || strings.HasPrefix(parsed.Path, "//") {
+		return "/todo"
+	}
+	return parsed.RequestURI()
 }
 
 func appendQuery(rawURL string, key string, value string) string {

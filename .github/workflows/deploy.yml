@@ -31,7 +31,7 @@ jobs:
       IMAGE_NAME: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref }}
 
@@ -56,7 +56,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to Yandex Container Registry
         env:
@@ -65,7 +65,7 @@ jobs:
           printf '%s' "$YC_SA_JSON_KEY" | docker login --username json_key --password-stdin cr.yandex
 
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
@@ -79,7 +79,7 @@ jobs:
             org.opencontainers.image.version=${{ steps.image.outputs.tag }}
 
       - name: Deploy on production VM
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.PRODUCTION_SSH_HOST }}
           username: ${{ secrets.PRODUCTION_SSH_USER }}

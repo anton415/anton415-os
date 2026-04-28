@@ -290,7 +290,7 @@ describe("renderApp todo", () => {
     expect(options.onEditTask).toHaveBeenCalledWith(1);
   });
 
-  it("renders login controls for unauthenticated Todo access", () => {
+  it("renders login controls for unauthenticated app access", () => {
     const options = optionsForTodo({
       authState: {
         kind: "unauthenticated",
@@ -304,14 +304,34 @@ describe("renderApp todo", () => {
     renderApp(root, options);
 
     expect(root.querySelector("#task-form")).toBeNull();
+    expect(root.querySelector(".module-card")).toBeNull();
+    expect(root.textContent).toContain("Private anton415 OS");
     expect(root.querySelector<HTMLInputElement>('input[name="email"]')).not.toBeNull();
     expect(root.querySelector<HTMLAnchorElement>(".oauth-button")?.href).toBe(
-      "http://api.test/api/v1/auth/github/start?redirect=/todo"
+      "http://api.test/api/v1/auth/github/start?redirect=%2Ftodo"
     );
 
     root.querySelector<HTMLFormElement>("#email-login-form")?.dispatchEvent(new Event("submit", { bubbles: true }));
 
     expect(options.onStartEmailLogin).toHaveBeenCalled();
+  });
+
+  it("keeps the platform shell behind the global login guard", () => {
+    const options = optionsForTodo({
+      currentPath: "/",
+      authState: {
+        kind: "unauthenticated",
+        providers: [{ id: "github", name: "GitHub", kind: "oauth" }]
+      }
+    });
+
+    renderApp(root, options);
+
+    expect(root.querySelector(".module-card")).toBeNull();
+    expect(root.querySelector("h1")?.textContent).toBe("Sign in");
+    expect(root.querySelector<HTMLAnchorElement>(".oauth-button")?.href).toBe(
+      "http://api.test/api/v1/auth/github/start?redirect=%2F"
+    );
   });
 });
 

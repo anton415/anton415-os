@@ -69,7 +69,7 @@ Prerequisites:
 
 - Docker Compose
 - Go 1.25, or Docker fallback through `Makefile`
-- Node.js 22 for frontend work
+- Node.js 24 for frontend work
 
 ```sh
 cp .env.example .env
@@ -80,7 +80,7 @@ Local URLs:
 
 | Surface | URL |
 | --- | --- |
-| Web app | `http://localhost:5173` |
+| Web app | `http://localhost:5173` (redirects to `/todo`) |
 | Todo UI | `http://localhost:5173/todo` |
 | API health | `http://localhost:8080/health` |
 | Session check | `http://localhost:8080/api/v1/me` |

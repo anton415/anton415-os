@@ -32,7 +32,8 @@ describe("AuthApi", () => {
   it("builds OAuth start URLs", () => {
     const api = new AuthApi("http://api.test/");
 
-    expect(api.oauthStartUrl("github")).toBe("http://api.test/api/v1/auth/github/start?redirect=/todo");
+    expect(api.oauthStartUrl("github")).toBe("http://api.test/api/v1/auth/github/start?redirect=%2Ftodo");
+    expect(api.oauthStartUrl("github", "/finance")).toBe("http://api.test/api/v1/auth/github/start?redirect=%2Ffinance");
   });
 
   it("sends email login requests", async () => {

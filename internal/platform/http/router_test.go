@@ -155,3 +155,19 @@ func TestSPAHandlerFallsBackToIndexForClientRoute(t *testing.T) {
 		t.Fatalf("body = %q, want index body", body)
 	}
 }
+
+func TestSPAHandlerRedirectsRootToTodo(t *testing.T) {
+	staticDir := t.TempDir()
+
+	request := httptest.NewRequest(http.MethodGet, "/?auth_error=auth_failed", nil)
+	response := httptest.NewRecorder()
+
+	spaHandler(staticDir).ServeHTTP(response, request)
+
+	if response.Code != http.StatusPermanentRedirect {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusPermanentRedirect)
+	}
+	if location := response.Header().Get("Location"); location != "/todo?auth_error=auth_failed" {
+		t.Fatalf("Location = %q, want /todo?auth_error=auth_failed", location)
+	}
+}

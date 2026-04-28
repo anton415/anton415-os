@@ -12,6 +12,8 @@ The production app image serves both API and frontend, so browser traffic uses o
 https://todo.anton415.ru -> Caddy -> app:8080
 ```
 
+Caddy and the Go static handler redirect `/` to `/todo`, making Todo the default production workspace.
+
 Deployments extract `/app/migrations` from the app image and run `migrate/migrate` on the VM before restarting the app.
 
 GitHub Actions deploys are manual or release-triggered. They build a `linux/amd64` image, push it to Yandex Container Registry, update `/opt/anton415-os/docker-compose.yml` on the VM, extract migrations from the image, run migrations, and recreate the app/Caddy containers.

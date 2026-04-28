@@ -24,6 +24,8 @@ if (!app) {
   throw new Error("App root was not found");
 }
 
+normalizeInitialRoute();
+
 const root = app;
 const authApi = new AuthApi(apiBaseUrl);
 const todoApi = new TodoApi(apiBaseUrl);
@@ -334,6 +336,14 @@ window.addEventListener("popstate", () => {
 
 function routeFromPath(path: string): AppPath {
   return path === "/todo" ? "/todo" : "/";
+}
+
+function normalizeInitialRoute() {
+  if (window.location.pathname !== "/") {
+    return;
+  }
+
+  window.history.replaceState({}, "", `/todo${window.location.search}${window.location.hash}`);
 }
 
 function taskQuery(state: TodoState): TodoTaskQuery {

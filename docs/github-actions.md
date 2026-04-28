@@ -28,3 +28,5 @@ Do not commit service-account JSON keys, SSH private keys, Terraform variables, 
 5. Actions connects to the VM over SSH, syncs Lockbox secrets, updates `APP_VERSION`, extracts migrations from the image, runs migrations, recreates the app/Caddy containers, and checks `/health`.
 
 The deployment workflow always pushes the deployed tag and also refreshes the `main` image tag for convenience.
+
+Frontend CI and the Docker web build use Node.js 24. GitHub-provided and Docker Actions are pinned to major versions that run on the Node 24 action runtime.

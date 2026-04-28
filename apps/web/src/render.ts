@@ -49,11 +49,18 @@ type RenderOptions = {
 };
 
 export function renderApp(root: HTMLElement, options: RenderOptions) {
+  const workspaceContent =
+    options.authState.kind === "authenticated"
+      ? options.currentPath === "/todo"
+        ? renderTodoPage(options)
+        : renderHomePage(options)
+      : renderLoginPage(options);
+
   root.innerHTML = `
     <div class="app-shell ${options.sidebarCollapsed ? "sidebar-collapsed" : ""}">
       <aside class="sidebar" id="anton-os-sidebar" aria-label="Main navigation">
         <div class="sidebar-head">
-          <a class="brand" href="/" data-route="/">
+          <a class="brand" href="/todo" data-route="/todo">
             <span class="brand-mark" aria-hidden="true">A</span>
             <span>
               <strong>anton415 OS</strong>
@@ -78,13 +85,13 @@ export function renderApp(root: HTMLElement, options: RenderOptions) {
       </aside>
 
       <main class="workspace">
-        ${options.currentPath === "/todo" ? renderTodoPage(options) : renderHomePage(options)}
+        ${workspaceContent}
       </main>
     </div>
   `;
 
   bindShellEvents(root, options);
-  if (options.currentPath === "/todo") {
+  if (options.authState.kind === "authenticated" && options.currentPath === "/todo") {
     bindTodoEvents(root, options);
   }
 }
@@ -197,7 +204,7 @@ function renderLoginPage(options: RenderOptions): string {
   return `
     <header class="topbar">
       <div>
-        <p class="eyebrow">Private Todo</p>
+        <p class="eyebrow">Private anton415 OS</p>
         <h1>Sign in</h1>
       </div>
       <div class="topbar-actions">
@@ -237,7 +244,7 @@ function renderLoginPage(options: RenderOptions): string {
                     ${providers
                       .map(
                         (provider) => `
-                          <a class="oauth-button" href="${authStartHref(options.apiBaseUrl, provider.id)}">
+                          <a class="oauth-button" href="${authStartHref(options.apiBaseUrl, provider.id, options.currentPath)}">
                             ${escapeHTML(provider.name)}
                           </a>
                         `
@@ -1107,6 +1114,7 @@ function escapeAttr(value: string): string {
   return escapeHTML(value);
 }
 
-function authStartHref(apiBaseUrl: string, providerId: string): string {
-  return `${apiBaseUrl.replace(/\/$/, "")}/api/v1/auth/${encodeURIComponent(providerId)}/start?redirect=/todo`;
+function authStartHref(apiBaseUrl: string, providerId: string, redirectPath: AppPath): string {
+  const params = new URLSearchParams({ redirect: redirectPath });
+  return `${apiBaseUrl.replace(/\/$/, "")}/api/v1/auth/${encodeURIComponent(providerId)}/start?${params.toString()}`;
 }

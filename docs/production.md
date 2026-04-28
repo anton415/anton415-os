@@ -12,7 +12,7 @@ Production runs as one Docker image:
 - Caddy terminates HTTPS and proxies to the app container
 - Todo and auth data are on the VM disk for this budget-first v1
 
-Todo API routes require a valid `anton415_session` cookie. `/health`, `/api/v1/me`, and auth routes stay public.
+The app shell and product APIs use the shared `anton415_session` cookie for anton415 OS access. `/health`, `/api/v1/me`, and auth routes stay public so the browser can check the session and start login.
 
 ## Required Secrets
 
@@ -41,6 +41,8 @@ AUTH_SUCCESS_REDIRECT=https://todo.anton415.ru/todo
 AUTH_FAILURE_REDIRECT=https://todo.anton415.ru/
 AUTH_COOKIE_SECURE=true
 ```
+
+Opening `https://todo.anton415.ru/` redirects to `/todo`, so the Todo workspace is the first production screen.
 
 Upload runtime secrets after Terraform creates Lockbox:
 

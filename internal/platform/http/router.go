@@ -198,6 +198,11 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func spaHandler(staticDir string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, todoRootRedirect(r), http.StatusPermanentRedirect)
+			return
+		}
+
 		assetPath := staticAssetPath(r.URL.Path)
 		if assetPath == "" {
 			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
@@ -212,6 +217,13 @@ func spaHandler(staticDir string) http.Handler {
 
 		http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
 	})
+}
+
+func todoRootRedirect(r *http.Request) string {
+	if r.URL.RawQuery == "" {
+		return "/todo"
+	}
+	return "/todo?" + r.URL.RawQuery
 }
 
 func staticAssetPath(requestPath string) string {
