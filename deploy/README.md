@@ -1,7 +1,7 @@
 # Deployment Assets
 
 - `docker-compose.production.yml` runs PostgreSQL, migrations, the app image, and Caddy on the VM.
-- `caddy/Caddyfile` terminates HTTPS for `anton415.ru` and `todo.anton415.ru`.
+- `caddy/Caddyfile` terminates HTTPS for `anton415.ru`.
 - `backup/pg_dump_to_object_storage.sh` uploads logical PostgreSQL dumps to Yandex Object Storage.
 
 The default backup policy is budget-first: Terraform keeps independent monthly dumps for 90 days. The script writes archive names with a timestamp plus a unique temporary-directory suffix, so Object Storage versioning is intentionally not enabled.
@@ -13,7 +13,7 @@ https://anton415.ru      -> Caddy -> app:8080
 https://anton415.ru/todo -> Caddy -> app:8080
 ```
 
-`todo.anton415.ru/` is a convenience entrypoint that redirects to `https://anton415.ru/todo`.
+Todo lives at the canonical `https://anton415.ru/todo` path.
 
 Deployments extract `/app/migrations` from the app image and run `migrate/migrate` on the VM before restarting the app.
 

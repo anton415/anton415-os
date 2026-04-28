@@ -103,16 +103,6 @@ jobs:
 
               reverse_proxy app:8080
             }
-
-            todo.anton415.ru {
-              encode gzip zstd
-              import security_headers
-
-              @root path /
-              redir @root https://anton415.ru/todo{?query} 308
-
-              reverse_proxy app:8080
-            }
             CADDY
             upsert_env() {
               key="$1"
@@ -126,10 +116,10 @@ jobs:
             sudo ./sync-lockbox-env.sh
             upsert_env APP_VERSION "${{ steps.image.outputs.tag }}"
             upsert_env WEB_ORIGIN "https://anton415.ru"
-            upsert_env AUTH_CALLBACK_BASE_URL "https://todo.anton415.ru"
+            upsert_env AUTH_CALLBACK_BASE_URL "https://anton415.ru"
             upsert_env AUTH_SUCCESS_REDIRECT "https://anton415.ru/todo"
             upsert_env AUTH_FAILURE_REDIRECT "https://anton415.ru/"
-            upsert_env AUTH_COOKIE_DOMAIN "anton415.ru"
+            upsert_env AUTH_COOKIE_DOMAIN ""
             sudo sed -i.bak -E "s#image: cr.yandex/.*/anton415-os:.*#image: ${image}#g" docker-compose.yml
             sudo docker pull "$image"
             container_id="$(sudo docker create "$image")"

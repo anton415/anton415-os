@@ -93,16 +93,6 @@ write_files:
         reverse_proxy app:8080
       }
 
-      ${domain_name} {
-        encode gzip zstd
-        import security_headers
-
-        @root path /
-        redir @root https://${root_domain_name}/todo{?query} 308
-
-        reverse_proxy app:8080
-      }
-
   - path: /opt/anton415-os/app.env
     permissions: "0600"
     content: |
@@ -116,11 +106,11 @@ write_files:
       POSTGRES_PASSWORD=${database_password}
       WEB_ORIGIN=https://${root_domain_name}
       AUTH_ALLOWED_EMAILS=${allowed_emails}
-      AUTH_CALLBACK_BASE_URL=https://${domain_name}
+      AUTH_CALLBACK_BASE_URL=https://${root_domain_name}
       AUTH_SUCCESS_REDIRECT=https://${root_domain_name}/todo
       AUTH_FAILURE_REDIRECT=https://${root_domain_name}/
       AUTH_SESSION_COOKIE=anton415_session
-      AUTH_COOKIE_DOMAIN=${root_domain_name}
+      AUTH_COOKIE_DOMAIN=
       AUTH_SESSION_TTL=720h
       AUTH_TOKEN_TTL=15m
       AUTH_COOKIE_SECURE=true

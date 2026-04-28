@@ -2,7 +2,7 @@
 
 Snapshot date: 2026-04-26.
 
-This is a pre-apply estimate for `todo.anton415.ru` in the Russia region, RUB pricing, assuming 720 hours per month and the default Terraform sizing.
+This is a pre-apply estimate for `anton415.ru` in the Russia region, RUB pricing, assuming 720 hours per month and the default Terraform sizing.
 
 Yandex Cloud pricing pages warn that some service prices change on 2026-05-01. Re-run this estimate before `terraform apply` if production is launched after that date.
 

@@ -14,7 +14,7 @@ All notable changes to `anton415-os` are summarized here. Releases follow the sh
 
 ### Production
 
-- Launched the private Todo app at `https://todo.anton415.ru`.
+- Launched the private Todo app at `https://anton415.ru/todo`.
 - Added Yandex ID login with a single-email allowlist.
 - Served the Go API and Vite frontend from one production Docker image.
 - Deployed to Yandex Cloud with Caddy HTTPS, VM-local PostgreSQL, Lockbox-backed runtime secrets, Container Registry, Cloud DNS, and Object Storage backup scaffolding.

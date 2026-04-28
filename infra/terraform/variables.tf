@@ -14,12 +14,6 @@ variable "zone" {
   description = "Primary availability zone."
 }
 
-variable "domain_name" {
-  type        = string
-  default     = "todo.anton415.ru"
-  description = "Todo convenience hostname that redirects to the canonical root-domain Todo path."
-}
-
 variable "root_domain_name" {
   type        = string
   default     = "anton415.ru"

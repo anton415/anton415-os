@@ -40,7 +40,7 @@ Open:
 | `AUTH_CALLBACK_BASE_URL` | `http://localhost:8080` | Public API base used for OAuth and email callbacks. |
 | `AUTH_SUCCESS_REDIRECT` | `WEB_ORIGIN/todo` | Redirect after successful login. |
 | `AUTH_FAILURE_REDIRECT` | `WEB_ORIGIN/` | Redirect after failed login. |
-| `AUTH_COOKIE_DOMAIN` | empty | Optional cookie domain for sharing production auth across `anton415.ru` subdomains. |
+| `AUTH_COOKIE_DOMAIN` | empty | Optional cookie domain override. Leave empty for host-only cookies. |
 | `AUTH_COOKIE_SECURE` | production only | Whether auth cookies require HTTPS. |
 | `AUTH_DEV_BYPASS` | `false` | Local-only auth bypass; ignored when `APP_ENV=production`. |
 | `AUTH_DEV_EMAIL` | `dev@localhost` | Email shown by `/api/v1/me` when the dev bypass is enabled. |

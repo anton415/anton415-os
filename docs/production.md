@@ -12,7 +12,7 @@ Production runs as one Docker image:
 - Caddy terminates HTTPS and proxies to the app container
 - Todo and auth data are on the VM disk for this budget-first v1
 
-The app shell and product APIs use the shared `anton415_session` cookie for anton415 OS access. The production cookie domain is `anton415.ru`, so OAuth callbacks on `todo.anton415.ru` can sign in the canonical `anton415.ru` app. `/health`, `/api/v1/me`, and auth routes stay public so the browser can check the session and start login.
+The app shell and product APIs use the shared `anton415_session` cookie for anton415 OS access. `/health`, `/api/v1/me`, and auth routes stay public so the browser can check the session and start login.
 
 ## Required Secrets
 
@@ -36,14 +36,14 @@ Production auth defaults:
 ```sh
 APP_ENV=production
 WEB_ORIGIN=https://anton415.ru
-AUTH_CALLBACK_BASE_URL=https://todo.anton415.ru
+AUTH_CALLBACK_BASE_URL=https://anton415.ru
 AUTH_SUCCESS_REDIRECT=https://anton415.ru/todo
 AUTH_FAILURE_REDIRECT=https://anton415.ru/
-AUTH_COOKIE_DOMAIN=anton415.ru
+AUTH_COOKIE_DOMAIN=
 AUTH_COOKIE_SECURE=true
 ```
 
-Opening `https://anton415.ru/` shows the anton415 OS home shell. Opening `https://todo.anton415.ru/` redirects to `https://anton415.ru/todo`.
+Opening `https://anton415.ru/` shows the anton415 OS home shell. Todo lives at `https://anton415.ru/todo`.
 
 Upload runtime secrets after Terraform creates Lockbox:
 
@@ -58,14 +58,14 @@ The VM stores base non-secret runtime configuration in `/opt/anton415-os/app.env
 
 Register this callback URL:
 
-- `https://todo.anton415.ru/api/v1/auth/yandex/callback`
+- `https://anton415.ru/api/v1/auth/yandex/callback`
 
 Scopes: `login:email` and `login:info`. The allowed login email is `anton415460@yandex.ru`.
 
 GitHub and VK callbacks can be added later:
 
-- `https://todo.anton415.ru/api/v1/auth/github/callback`
-- `https://todo.anton415.ru/api/v1/auth/vk/callback`
+- `https://anton415.ru/api/v1/auth/github/callback`
+- `https://anton415.ru/api/v1/auth/vk/callback`
 
 VK ID is treated as unverified unless it returns a reliable verified email signal; use email magic-link verification if VK returns `email_verification_required`.
 

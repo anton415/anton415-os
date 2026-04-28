@@ -157,7 +157,6 @@ resource "yandex_compute_instance" "app" {
       image_name        = local.image_name
       registry_id       = yandex_container_registry.app.id
       image_tag         = var.image_tag
-      domain_name       = var.domain_name
       root_domain_name  = var.root_domain_name
       database_name     = local.database_name
       database_user     = local.database_user
@@ -173,14 +172,6 @@ resource "yandex_compute_instance" "app" {
 resource "yandex_dns_recordset" "root" {
   zone_id = yandex_dns_zone.public.id
   name    = "${local.root_zone}."
-  type    = "A"
-  ttl     = 300
-  data    = [yandex_vpc_address.app.external_ipv4_address[0].address]
-}
-
-resource "yandex_dns_recordset" "todo" {
-  zone_id = yandex_dns_zone.public.id
-  name    = "${var.domain_name}."
   type    = "A"
   ttl     = 300
   data    = [yandex_vpc_address.app.external_ipv4_address[0].address]

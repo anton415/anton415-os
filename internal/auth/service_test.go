@@ -14,7 +14,7 @@ func TestEmailMagicLinkCreatesSingleUseSession(t *testing.T) {
 	sender := &captureSender{}
 	service := NewService(repo, Config{
 		AllowedEmails:   []string{"anton@example.com"},
-		CallbackBaseURL: "https://todo.anton415.ru",
+		CallbackBaseURL: "https://anton415.ru",
 		EmailSender:     sender,
 		Now: func() time.Time {
 			return now
@@ -47,7 +47,7 @@ func TestEmailMagicLinkExpires(t *testing.T) {
 	sender := &captureSender{}
 	service := NewService(repo, Config{
 		AllowedEmails:   []string{"anton@example.com"},
-		CallbackBaseURL: "https://todo.anton415.ru",
+		CallbackBaseURL: "https://anton415.ru",
 		TokenTTL:        time.Minute,
 		EmailSender:     sender,
 		Now: func() time.Time {
@@ -69,7 +69,7 @@ func TestUnallowedEmailDoesNotSendMagicLink(t *testing.T) {
 	sender := &captureSender{}
 	service := NewService(newMemoryRepository(), Config{
 		AllowedEmails:   []string{"anton@example.com"},
-		CallbackBaseURL: "https://todo.anton415.ru",
+		CallbackBaseURL: "https://anton415.ru",
 		EmailSender:     sender,
 	})
 
