@@ -75,7 +75,7 @@ export class AuthApi {
     if (!response.ok) {
       throw new AuthApiError(
         payload.error?.code ?? "request_failed",
-        payload.error?.message ?? `Request failed with status ${response.status}`
+        payload.error?.message ?? `Запрос завершился с ошибкой ${response.status}`
       );
     }
 

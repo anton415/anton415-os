@@ -11,13 +11,13 @@ export async function fetchHealth(apiBaseUrl: string): Promise<HealthState> {
     if (!response.ok || payload.status !== "ok") {
       return {
         kind: "offline",
-        message: `${payload.service ?? "API"} returned ${payload.status ?? response.statusText}.`
+        message: `${payload.service ?? "API"} вернул ${payload.status ?? response.statusText}.`
       };
     }
 
     return { kind: "online", payload };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown connectivity error";
+    const message = error instanceof Error ? error.message : "Неизвестная ошибка подключения";
     return { kind: "offline", message };
   }
 }

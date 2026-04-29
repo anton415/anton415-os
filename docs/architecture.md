@@ -18,13 +18,13 @@ internal/
   platform/            Cross-cutting platform code
   auth/                Single-user auth, sessions, OAuth, and email magic links
   todo/                Todo domain, use cases, HTTP, and persistence
-  finance/             Finance boundary marker
+  finance/             Finance domain, use cases, HTTP, and persistence
   investments/         Investments boundary marker
   fire/                FIRE boundary marker
 migrations/            Database migrations
 ```
 
-The API is one process. Product modules are packages inside the same Go module. The frontend is one shell with a real Todo workflow and placeholders for Finance, Investments, and FIRE.
+The API is one process. Product modules are packages inside the same Go module. The frontend is one shell with real Todo and Finance workflows and placeholders for Investments and FIRE.
 
 ## Platform responsibilities
 
@@ -94,6 +94,15 @@ Todo v1 is implemented under `internal/todo` with separate domain, application, 
 - Project deletion is restricted while tasks still reference the project.
 - Todo v1 treats the API server's local timezone as the source for `today` and `upcoming` views.
 
+## Finance v1 boundary
+
+Finance v1 is implemented under `internal/finance` with separate domain, application, and adapter packages.
+
+- Domain rules validate RUB money in kopecks, year/month ranges, legacy expense categories, and monthly income/expense facts.
+- Application use cases own yearly snapshots, monthly upsert behavior, zero-month deletion, and annual totals.
+- HTTP and PostgreSQL adapters translate transport/database details without owning business rules.
+- Finance v1 intentionally excludes accounts, bank cards, transfers, balances, limits, forecasts, imports, investments, and FIRE calculations.
+
 ## Microservice-ready seams
 
 Microservice-ready seams mean clear internal ownership, explicit interfaces, and limited coupling inside the monolith.
@@ -102,7 +111,7 @@ They do not mean creating services, network APIs, deployment units, event buses,
 
 ## Postponed until later
 
-- Real Finance business logic
+- Finance accounts, cards, imports, forecasts, and planning logic
 - Real Investments business logic
 - Real FIRE business logic
 - Multi-user account modeling

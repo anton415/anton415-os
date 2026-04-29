@@ -34,7 +34,78 @@ export type ProductModule = {
   state?: string;
 };
 
-export type AppPath = "/" | "/todo";
+export type AppPath = "/" | "/todo" | "/finance/expenses" | "/finance/income" | "/finance/settings";
+
+export const financeExpenseCategoryCodes = [
+  "restaurants",
+  "groceries",
+  "personal",
+  "utilities",
+  "transport",
+  "gifts",
+  "investments",
+  "entertainment",
+  "education"
+] as const;
+
+export type FinanceExpenseCategoryCode = (typeof financeExpenseCategoryCodes)[number];
+export type FinanceCategoryClassification = "expense" | "transfer";
+
+export type FinanceExpenseCategory = {
+  code: FinanceExpenseCategoryCode;
+  label: string;
+  classification: FinanceCategoryClassification;
+};
+
+export type FinanceExpenseCategoryAmounts = Record<FinanceExpenseCategoryCode, string>;
+export type FinanceExpenseCategoryPercents = Record<FinanceExpenseCategoryCode, string>;
+
+export type FinanceExpenseMonth = {
+  month: number;
+  category_amounts: FinanceExpenseCategoryAmounts;
+  total_amount: string;
+  spending_total_amount: string;
+};
+
+export type FinanceExpensesYear = {
+  year: number;
+  currency: "RUB" | string;
+  categories: FinanceExpenseCategory[];
+  months: FinanceExpenseMonth[];
+  annual_totals_by_category: FinanceExpenseCategoryAmounts;
+  annual_total_amount: string;
+  annual_spending_total_amount: string;
+};
+
+export type FinanceIncomeMonth = {
+  month: number;
+  salary_amount: string;
+  bonus_percent: string;
+  total_amount: string;
+};
+
+export type FinanceIncomeYear = {
+  year: number;
+  currency: "RUB" | string;
+  months: FinanceIncomeMonth[];
+  annual_total_amount: string;
+  average_monthly_total_amount: string;
+};
+
+export type FinanceState = {
+  loading: boolean;
+  saving: boolean;
+  year: number;
+  settings: {
+    salary_amount?: string;
+    bonus_percent?: string;
+    expense_limit_percents: Partial<FinanceExpenseCategoryPercents>;
+  };
+  expenses?: FinanceExpensesYear;
+  income?: FinanceIncomeYear;
+  error?: string;
+  formError?: string;
+};
 
 export type TodoTaskStatus = "todo" | "in_progress" | "done";
 export type TodoView = "inbox" | "today" | "overdue" | "upcoming" | "scheduled" | "flagged" | "all" | "completed";

@@ -1,7 +1,23 @@
 import { productModules } from "./modules";
+import {
+  calculateIncomeAmount,
+  calculatePercentAmount,
+  currencyLabel,
+  divideDecimalAmount,
+  expenseLimitStatus,
+  formatRussianDecimal,
+  formatRussianMoneyAmount,
+  normalizeDecimalInputOrRaw
+} from "./financeFormat";
 import type {
   AppPath,
   AuthState,
+  FinanceExpenseCategory,
+  FinanceExpenseCategoryAmounts,
+  FinanceExpenseMonth,
+  FinanceExpensesYear,
+  FinanceIncomeMonth,
+  FinanceState,
   HealthState,
   TodoProject,
   TodoRepeatFrequency,
@@ -27,6 +43,7 @@ type RenderOptions = {
   sidebarCollapsed: boolean;
   authState: AuthState;
   healthState: HealthState;
+  financeState: FinanceState;
   todoState: TodoState;
   onNavigate: (path: string) => void;
   onStartEmailLogin: (form: HTMLFormElement) => void;
@@ -34,6 +51,13 @@ type RenderOptions = {
   onRefreshHealth: () => void;
   onToggleSidebar: () => void;
   onRefreshTodo: () => void;
+  onRefreshFinance: () => void;
+  onChangeFinanceYear: (year: number) => void;
+  onChangeFinanceSettings: (form: HTMLFormElement) => void;
+  onSaveFinanceExpenseYear: (forms: HTMLFormElement[]) => void;
+  onSaveFinanceIncomeYear: (forms: HTMLFormElement[]) => void;
+  onSaveFinanceExpenseMonth: (month: number, form: HTMLFormElement) => void;
+  onSaveFinanceIncomeMonth: (month: number, form: HTMLFormElement) => void;
   onToggleTodoPanel: () => void;
   onChangeTodoQuery: (search: string, sort: TodoSort, direction: TodoSortDirection) => void;
   onSelectTodoScope: (scope: TodoScope) => void;
@@ -53,18 +77,20 @@ export function renderApp(root: HTMLElement, options: RenderOptions) {
     options.authState.kind === "authenticated"
       ? options.currentPath === "/todo"
         ? renderTodoPage(options)
+        : isFinancePath(options.currentPath)
+          ? renderFinancePage(options)
         : renderHomePage(options)
       : renderLoginPage(options);
 
   root.innerHTML = `
     <div class="app-shell ${options.sidebarCollapsed ? "sidebar-collapsed" : ""}">
-      <aside class="sidebar" id="anton-os-sidebar" aria-label="Main navigation">
+      <aside class="sidebar" id="anton-os-sidebar" aria-label="Основная навигация">
         <div class="sidebar-head">
           <a class="brand" href="/" data-route="/">
             <span class="brand-mark" aria-hidden="true">A</span>
             <span>
               <strong>anton415 OS</strong>
-              <span>modular monolith</span>
+              <span>модульный монолит</span>
             </span>
           </a>
           <button
@@ -73,8 +99,8 @@ export function renderApp(root: HTMLElement, options: RenderOptions) {
             data-toggle-sidebar
             aria-controls="anton-os-sidebar"
             aria-expanded="true"
-            aria-label="Hide anton-os panel"
-            title="Hide anton-os panel"
+            aria-label="Скрыть панель anton-os"
+            title="Скрыть панель anton-os"
           >
             &#8249;
           </button>
@@ -94,14 +120,17 @@ export function renderApp(root: HTMLElement, options: RenderOptions) {
   if (options.authState.kind === "authenticated" && options.currentPath === "/todo") {
     bindTodoEvents(root, options);
   }
+  if (options.authState.kind === "authenticated" && isFinancePath(options.currentPath)) {
+    bindFinanceEvents(root, options);
+  }
 }
 
 function renderHomePage(options: RenderOptions): string {
   return `
     <header class="topbar">
       <div>
-        <p class="eyebrow">Step 3 Todo v1</p>
-        <h1>Platform shell</h1>
+        <p class="eyebrow">Шаг 3 Todo v1</p>
+        <h1>Платформенная оболочка</h1>
       </div>
       <div class="topbar-actions">
         ${renderSidebarToggle(options)}
@@ -112,15 +141,15 @@ function renderHomePage(options: RenderOptions): string {
 
     <section class="status-panel" aria-live="polite">
       <div>
-        <p class="section-label">Backend connectivity</p>
+        <p class="section-label">Связь с backend</p>
         ${renderHealthDetails(options.healthState, options.apiBaseUrl)}
       </div>
-      <button class="icon-button" type="button" id="refresh-health" aria-label="Refresh backend health" title="Refresh backend health">
+      <button class="icon-button" type="button" id="refresh-health" aria-label="Обновить статус backend" title="Обновить статус backend">
         &#8635;
       </button>
     </section>
 
-    <section class="module-grid" aria-label="Product modules">
+    <section class="module-grid" aria-label="Продуктовые модули">
       ${renderModuleCards()}
     </section>
   `;
@@ -135,8 +164,8 @@ function renderTodoPage(options: RenderOptions): string {
   return `
     <header class="topbar">
       <div>
-        <p class="eyebrow">Todo v1</p>
-        <h1>Todo</h1>
+        <p class="eyebrow">Задачи v1</p>
+        <h1>Задачи</h1>
       </div>
       <div class="topbar-actions">
         ${renderSidebarToggle(options)}
@@ -147,18 +176,18 @@ function renderTodoPage(options: RenderOptions): string {
           data-toggle-todo-panel
           aria-controls="todo-panel"
           aria-expanded="${state.todoPanelCollapsed ? "false" : "true"}"
-          aria-label="${state.todoPanelCollapsed ? "Show Todo panel" : "Hide Todo panel"}"
-          title="${state.todoPanelCollapsed ? "Show Todo panel" : "Hide Todo panel"}"
+          aria-label="${state.todoPanelCollapsed ? "Показать панель задач" : "Скрыть панель задач"}"
+          title="${state.todoPanelCollapsed ? "Показать панель задач" : "Скрыть панель задач"}"
         >
           <span aria-hidden="true">&#9776;</span>
-          <span>Lists</span>
+          <span>Списки</span>
         </button>
         <span class="auth-chip">${escapeHTML(options.authState.user.email)}</span>
-        <button class="icon-button" type="button" id="logout" aria-label="Log out" title="Log out">
+        <button class="icon-button" type="button" id="logout" aria-label="Выйти" title="Выйти">
           &#8617;
         </button>
         ${renderHealthBadge(options.healthState)}
-        <button class="icon-button" type="button" id="refresh-todo" aria-label="Refresh Todo" title="Refresh Todo">
+        <button class="icon-button" type="button" id="refresh-todo" aria-label="Обновить задачи" title="Обновить задачи">
           &#8635;
         </button>
       </div>
@@ -169,15 +198,15 @@ function renderTodoPage(options: RenderOptions): string {
     <section class="todo-layout ${state.todoPanelCollapsed ? "todo-panel-collapsed" : ""}">
       <aside class="todo-panel ${state.todoPanelCollapsed ? "collapsed" : ""}" id="todo-panel">
         <div class="todo-panel-head">
-          <h2>Lists</h2>
+          <h2>Списки</h2>
           <button
             class="icon-button small"
             type="button"
             data-toggle-todo-panel
             aria-controls="todo-panel"
             aria-expanded="true"
-            aria-label="Hide Todo panel"
-            title="Hide Todo panel"
+            aria-label="Скрыть панель задач"
+            title="Скрыть панель задач"
           >
             &#8249;
           </button>
@@ -194,6 +223,347 @@ function renderTodoPage(options: RenderOptions): string {
   `;
 }
 
+function renderFinancePage(options: RenderOptions): string {
+  const state = options.financeState;
+  if (options.authState.kind !== "authenticated") {
+    return renderLoginPage(options);
+  }
+
+  const section =
+    options.currentPath === "/finance/income"
+      ? renderFinanceIncome(state)
+      : options.currentPath === "/finance/settings"
+        ? renderFinanceSettings(state)
+        : renderFinanceExpenses(state);
+
+  return `
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Финансы v1</p>
+        <h1>Финансы</h1>
+      </div>
+      <div class="topbar-actions">
+        ${renderSidebarToggle(options)}
+        <span class="auth-chip">${escapeHTML(options.authState.user.email)}</span>
+        <button class="icon-button" type="button" id="logout" aria-label="Выйти" title="Выйти">
+          &#8617;
+        </button>
+        ${renderHealthBadge(options.healthState)}
+        <button class="icon-button" type="button" id="refresh-finance" aria-label="Обновить финансы" title="Обновить финансы">
+          &#8635;
+        </button>
+      </div>
+    </header>
+
+    ${state.error ? `<div class="inline-error" role="alert">${escapeHTML(state.error)}</div>` : ""}
+    ${state.formError ? `<div class="inline-error" role="alert">${escapeHTML(state.formError)}</div>` : ""}
+
+    <nav class="finance-tabs" aria-label="Разделы финансов">
+      <a href="/finance/expenses" data-route="/finance/expenses" class="${options.currentPath === "/finance/expenses" ? "active" : ""}">Расходы</a>
+      <a href="/finance/income" data-route="/finance/income" class="${options.currentPath === "/finance/income" ? "active" : ""}">Доходы</a>
+      <a href="/finance/settings" data-route="/finance/settings" class="${options.currentPath === "/finance/settings" ? "active" : ""}">Настройки</a>
+    </nav>
+
+    ${section}
+  `;
+}
+
+function renderFinanceYearRow(state: FinanceState, saveLabel?: string): string {
+  return `
+    <form class="finance-year-row" id="finance-year-form">
+      <span class="finance-year-label">Год</span>
+      <label class="compact-field">
+        <span class="visually-hidden">Год</span>
+        <input name="year" type="number" min="1" max="9999" step="1" value="${state.year}" required>
+      </label>
+      <button class="icon-button" type="submit" aria-label="Загрузить финансовый год" title="Загрузить финансовый год">&#8981;</button>
+      ${
+        saveLabel
+          ? `<button class="finance-year-save" id="save-finance-year" type="button" ${state.saving ? "disabled" : ""} aria-label="${escapeAttr(saveLabel)}" title="${escapeAttr(saveLabel)}">&#10003; ${escapeHTML(saveLabel)}</button>`
+          : ""
+      }
+    </form>
+  `;
+}
+
+function renderFinanceExpenses(state: FinanceState): string {
+  const expenses = state.expenses;
+  if (state.loading && !expenses) {
+    return `<section class="finance-table-shell finance-expense-shell">${renderFinanceYearRow(state, "Сохранить расходы")}<p class="empty-state">Загружаю расходы...</p></section>`;
+  }
+  if (!expenses) {
+    return `<section class="finance-table-shell finance-expense-shell">${renderFinanceYearRow(state, "Сохранить расходы")}<p class="empty-state">Данные о расходах не загружены.</p></section>`;
+  }
+  const monthlyIncomeAmount = calculateIncomeAmount(financeSettingsSalaryAmount(state), financeSettingsBonusPercent(state));
+  const categoryLimitAmounts = financeExpenseCategoryLimitAmounts(expenses.categories, state, monthlyIncomeAmount);
+
+  return `
+    <section class="finance-summary-grid" aria-label="Итоги расходов">
+      ${renderFinanceMetric("Итого за год", expenses.annual_total_amount, expenses.currency)}
+      ${renderFinanceMetric("Расходы без переводов", expenses.annual_spending_total_amount, expenses.currency)}
+      ${renderFinanceMetric("Переводы в инвестиции", expenses.annual_totals_by_category.investments, expenses.currency)}
+    </section>
+
+    <section class="finance-table-shell finance-expense-shell" aria-label="Расходы по месяцам">
+      ${renderFinanceYearRow(state, "Сохранить расходы")}
+      <div class="finance-expense-header">
+        <span>Месяц</span>
+        ${expenses.categories.map((category) => `<span>${escapeHTML(financeCategoryLabel(category))}</span>`).join("")}
+        <span>Итого</span>
+        <span>Расходы</span>
+      </div>
+      ${expenses.months.map((month) => renderFinanceExpenseMonth(month, expenses.categories, categoryLimitAmounts)).join("")}
+      <div class="finance-expense-row finance-total-row">
+        <span>Год</span>
+        ${expenses.categories
+          .map((category) => `<span>${escapeHTML(formatRussianMoneyAmount(expenses.annual_totals_by_category[category.code]))}</span>`)
+          .join("")}
+        <span>${escapeHTML(formatRussianMoneyAmount(expenses.annual_total_amount))}</span>
+        <span>${escapeHTML(formatRussianMoneyAmount(expenses.annual_spending_total_amount))}</span>
+      </div>
+      ${renderFinanceExpenseAverageRow(expenses)}
+    </section>
+  `;
+}
+
+function renderFinanceExpenseMonth(
+  month: FinanceExpenseMonth,
+  categories: FinanceExpenseCategory[],
+  categoryLimitAmounts: Partial<FinanceExpenseCategoryAmounts>
+): string {
+  return `
+    <form class="finance-expense-row" data-finance-expense-month="${month.month}">
+      <span class="finance-month-label">${escapeHTML(monthLabel(month.month))}</span>
+      ${categories.map((category) => renderFinanceCategoryInput(month, category, categoryLimitAmounts[category.code])).join("")}
+      <span class="finance-money-total">${escapeHTML(formatRussianMoneyAmount(month.total_amount))}</span>
+      <span class="finance-money-total">${escapeHTML(formatRussianMoneyAmount(month.spending_total_amount))}</span>
+    </form>
+  `;
+}
+
+function renderFinanceCategoryInput(month: FinanceExpenseMonth, category: FinanceExpenseCategory, limitAmount?: string): string {
+  const transferClass = category.classification === "transfer" ? " transfer" : "";
+  const limitStatus = limitAmount ? expenseLimitStatus(month.category_amounts[category.code], limitAmount) : "none";
+  const limitClass = limitStatus === "none" ? "" : ` limit-${limitStatus}`;
+  const label = financeCategoryLabel(category);
+  return `
+    <label class="finance-money-field${transferClass}${limitClass}">
+      <span class="visually-hidden">${escapeHTML(label)} ${escapeHTML(monthLabel(month.month))}</span>
+      <input
+        name="${category.code}"
+        data-finance-expense-limit="${escapeAttr(limitAmount ?? "0.00")}"
+        inputmode="decimal"
+        pattern="[0-9 ]+([,.][0-9]{1,2})?"
+        value="${escapeAttr(formatRussianMoneyAmount(month.category_amounts[category.code]))}"
+        aria-label="${escapeAttr(`${label} ${monthLabel(month.month)}`)}"
+      >
+    </label>
+  `;
+}
+
+function renderFinanceExpenseAverageRow(expenses: FinanceExpensesYear): string {
+  return `
+    <div class="finance-expense-row finance-total-row finance-average-row">
+      <span>Среднее в месяц</span>
+      ${expenses.categories
+        .map((category) => `<span>${escapeHTML(formatRussianMoneyAmount(divideDecimalAmount(expenses.annual_totals_by_category[category.code], 12)))}</span>`)
+        .join("")}
+      <span>${escapeHTML(formatRussianMoneyAmount(divideDecimalAmount(expenses.annual_total_amount, 12)))}</span>
+      <span>${escapeHTML(formatRussianMoneyAmount(divideDecimalAmount(expenses.annual_spending_total_amount, 12)))}</span>
+    </div>
+  `;
+}
+
+function financeExpenseCategoryLimitAmounts(
+  categories: FinanceExpenseCategory[],
+  state: FinanceState,
+  monthlyIncomeAmount: string
+): Partial<FinanceExpenseCategoryAmounts> {
+  const limits: Partial<FinanceExpenseCategoryAmounts> = {};
+  for (const category of categories) {
+    const percent = state.settings.expense_limit_percents[category.code];
+    if (!percent) {
+      continue;
+    }
+
+    const limitAmount = calculatePercentAmount(monthlyIncomeAmount, percent);
+    if (expenseLimitStatus("1.00", limitAmount) !== "none") {
+      limits[category.code] = limitAmount;
+    }
+  }
+
+  return limits;
+}
+
+function renderFinanceIncome(state: FinanceState): string {
+  const income = state.income;
+  if (state.loading && !income) {
+    return `<section class="finance-table-shell finance-income-shell">${renderFinanceYearRow(state, "Сохранить доходы")}<p class="empty-state">Загружаю доходы...</p></section>`;
+  }
+  if (!income) {
+    return `<section class="finance-table-shell finance-income-shell">${renderFinanceYearRow(state, "Сохранить доходы")}<p class="empty-state">Данные о доходах не загружены.</p></section>`;
+  }
+  const salaryAmount = financeSettingsSalaryAmount(state);
+  const bonusPercent = financeSettingsBonusPercent(state);
+
+  return `
+    <section class="finance-summary-grid finance-income-summary" aria-label="Итоги доходов">
+      ${renderFinanceMetric("Доход за год", income.annual_total_amount, income.currency)}
+      ${renderFinanceMetric("Средний доход в месяц", income.average_monthly_total_amount, income.currency)}
+    </section>
+
+    <section class="finance-table-shell finance-income-shell" aria-label="Доходы по месяцам">
+      ${renderFinanceYearRow(state, "Сохранить доходы")}
+      <div class="finance-income-header">
+        <span>Месяц</span>
+        <span>Общий доход</span>
+      </div>
+      ${income.months
+        .map(
+          (month) => `
+            <form class="finance-income-row" data-finance-income-month="${month.month}">
+              <span class="finance-month-label">${escapeHTML(monthLabel(month.month))}</span>
+              <input type="hidden" name="salary_amount" value="${escapeAttr(salaryAmount)}">
+              <input type="hidden" name="bonus_percent" value="${escapeAttr(bonusPercent)}">
+              <label class="finance-money-field">
+                <span class="visually-hidden">Общий доход ${escapeHTML(monthLabel(month.month))}</span>
+                <input
+                  name="total_amount"
+                  inputmode="decimal"
+                  pattern="[0-9 ]+([,.][0-9]{1,2})?"
+                  value="${escapeAttr(formatRussianMoneyAmount(month.total_amount))}"
+                  aria-label="Общий доход ${escapeAttr(monthLabel(month.month))}"
+                >
+              </label>
+            </form>
+          `
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function renderFinanceSettings(state: FinanceState): string {
+  const expenses = state.expenses;
+  const income = state.income;
+  if (state.loading && (!expenses || !income)) {
+    return `<section class="finance-table-shell finance-settings-shell">${renderFinanceYearRow(state)}<p class="empty-state">Загружаю настройки...</p></section>`;
+  }
+  if (!expenses || !income) {
+    return `<section class="finance-table-shell finance-settings-shell">${renderFinanceYearRow(state)}<p class="empty-state">Данные для настроек не загружены.</p></section>`;
+  }
+
+  const salaryAmount = financeSettingsSalaryAmount(state);
+  const bonusPercent = financeSettingsBonusPercent(state);
+  const calculatedIncomeAmount = calculateIncomeAmount(salaryAmount, bonusPercent);
+
+  return `
+    <section class="finance-table-shell finance-settings-shell" aria-label="Настройки финансов">
+      ${renderFinanceYearRow(state)}
+      <form class="finance-settings-form" id="finance-settings-form">
+        ${renderFinanceIncomeSettings(salaryAmount, bonusPercent, calculatedIncomeAmount)}
+        ${renderFinanceLimitSettings(expenses.categories, state, calculatedIncomeAmount)}
+      </form>
+    </section>
+  `;
+}
+
+function renderFinanceIncomeSettings(salaryAmount: string, bonusPercent: string, calculatedIncomeAmount: string): string {
+  return `
+    <section class="finance-income-settings" aria-label="Оклад, премия и доход">
+      <label class="compact-field">
+        <span>Оклад</span>
+        <input
+          data-finance-income-setting="salary_amount"
+          name="salary_amount"
+          inputmode="decimal"
+          pattern="[0-9 ]+([,.][0-9]{1,2})?"
+          value="${escapeAttr(formatRussianMoneyAmount(salaryAmount))}"
+          aria-label="Оклад"
+        >
+      </label>
+      <label class="compact-field">
+        <span>% премии</span>
+        <input
+          data-finance-income-setting="bonus_percent"
+          name="bonus_percent"
+          inputmode="decimal"
+          pattern="[0-9 ]+([,.][0-9]{1,2})?"
+          value="${escapeAttr(formatRussianDecimal(bonusPercent))}"
+          aria-label="Процент премии"
+        >
+      </label>
+      <label class="compact-field finance-calculated-field">
+        <span>Доход</span>
+        <input
+          data-finance-income-calculated="total_amount"
+          value="${escapeAttr(formatRussianMoneyAmount(calculatedIncomeAmount))}"
+          aria-label="Доход"
+          readonly
+        >
+      </label>
+    </section>
+  `;
+}
+
+function renderFinanceLimitSettings(
+  categories: FinanceExpenseCategory[],
+  state: FinanceState,
+  calculatedIncomeAmount: string
+): string {
+  return `
+    <section class="finance-limit-settings" aria-label="Лимиты расходов">
+      <div class="finance-limit-header">
+        <span>Категория</span>
+        <span>% дохода</span>
+        <span>Лимит</span>
+      </div>
+      ${categories.map((category) => renderFinanceLimitRow(category, state, calculatedIncomeAmount)).join("")}
+    </section>
+  `;
+}
+
+function renderFinanceLimitRow(category: FinanceExpenseCategory, state: FinanceState, calculatedIncomeAmount: string): string {
+  const percent = state.settings.expense_limit_percents[category.code] ?? "0.00";
+  const limitAmount = calculatePercentAmount(calculatedIncomeAmount, percent);
+  return `
+    <label class="finance-limit-row">
+      <span class="finance-month-label">${escapeHTML(financeCategoryLabel(category))}</span>
+      <input
+        data-finance-limit-percent="${category.code}"
+        name="limit_percent_${category.code}"
+        inputmode="decimal"
+        pattern="[0-9 ]+([,.][0-9]{1,2})?"
+        value="${escapeAttr(formatRussianDecimal(percent))}"
+        aria-label="Лимит ${escapeAttr(financeCategoryLabel(category))}, процент дохода"
+      >
+      <output data-finance-limit-amount="${category.code}">${escapeHTML(formatRussianMoneyAmount(limitAmount))}</output>
+    </label>
+  `;
+}
+
+function financeSettingsSalaryAmount(state: FinanceState): string {
+  return state.settings.salary_amount ?? (state.income ? financeIncomeSettingValue(state.income.months, "salary_amount") : "0.00");
+}
+
+function financeSettingsBonusPercent(state: FinanceState): string {
+  return state.settings.bonus_percent ?? (state.income ? financeIncomeSettingValue(state.income.months, "bonus_percent") : "0.00");
+}
+
+function financeIncomeSettingValue(months: FinanceIncomeMonth[], key: "salary_amount" | "bonus_percent"): string {
+  const nonZeroMonth = months.find((month) => month[key] !== "0.00");
+  return nonZeroMonth?.[key] ?? months[0]?.[key] ?? "0.00";
+}
+
+function renderFinanceMetric(label: string, value: string, currency: string): string {
+  return `
+    <article class="finance-metric">
+      <span>${escapeHTML(label)}</span>
+      <strong>${escapeHTML(formatRussianMoneyAmount(value))}${currency ? ` ${escapeHTML(currencyLabel(currency))}` : ""}</strong>
+    </article>
+  `;
+}
+
 function renderLoginPage(options: RenderOptions): string {
   const state = options.authState;
   const providers = state.providers.filter((provider) => provider.kind === "oauth");
@@ -204,8 +574,8 @@ function renderLoginPage(options: RenderOptions): string {
   return `
     <header class="topbar">
       <div>
-        <p class="eyebrow">Private anton415 OS</p>
-        <h1>Sign in</h1>
+        <p class="eyebrow">Личный anton415 OS</p>
+        <h1>Вход</h1>
       </div>
       <div class="topbar-actions">
         ${renderSidebarToggle(options)}
@@ -213,15 +583,15 @@ function renderLoginPage(options: RenderOptions): string {
       </div>
     </header>
 
-    <section class="login-panel" aria-label="Sign in">
+    <section class="login-panel" aria-label="Вход">
       ${
         state.kind === "loading"
-          ? `<p class="empty-state">Checking session...</p>`
+          ? `<p class="empty-state">Проверяю сессию...</p>`
           : `
             ${message ? `<div class="inline-error" role="alert">${escapeHTML(message)}</div>` : ""}
             ${
               emailSent
-                ? `<p class="success-state">Magic link sent.</p>`
+                ? `<p class="success-state">Ссылка для входа отправлена.</p>`
                 : ""
             }
             ${
@@ -229,10 +599,10 @@ function renderLoginPage(options: RenderOptions): string {
                 ? `
                   <form class="login-form" id="email-login-form">
                     <label>
-                      <span>Email</span>
+                      <span>Эл. почта</span>
                       <input name="email" type="email" autocomplete="email" required>
                     </label>
-                    <button type="submit">Send link</button>
+                    <button type="submit">Отправить ссылку</button>
                   </form>
                 `
                 : ""
@@ -273,8 +643,8 @@ function renderSidebarToggle(options: RenderOptions): string {
       data-toggle-sidebar
       aria-controls="anton-os-sidebar"
       aria-expanded="${options.sidebarCollapsed ? "false" : "true"}"
-      aria-label="${options.sidebarCollapsed ? "Show anton-os panel" : "Hide anton-os panel"}"
-      title="${options.sidebarCollapsed ? "Show anton-os panel" : "Hide anton-os panel"}"
+      aria-label="${options.sidebarCollapsed ? "Показать панель anton-os" : "Скрыть панель anton-os"}"
+      title="${options.sidebarCollapsed ? "Показать панель anton-os" : "Скрыть панель anton-os"}"
     >
       <span aria-hidden="true">&#9776;</span>
       <span>anton-os</span>
@@ -286,13 +656,24 @@ function renderModuleNav(currentPath: AppPath): string {
   return productModules
     .map(
       (module) => `
-        <a href="${module.path}" data-route="${module.path}" class="${currentPath === module.path ? "active" : ""}">
+        <a href="${module.path}" data-route="${module.path}" class="${isModuleActive(currentPath, module.path) ? "active" : ""}">
           <span class="nav-swatch" style="background: ${module.accent}"></span>
           ${escapeHTML(module.name)}
         </a>
       `
     )
     .join("");
+}
+
+function isModuleActive(currentPath: AppPath, modulePath: string): boolean {
+  if (modulePath === "/finance") {
+    return isFinancePath(currentPath);
+  }
+  return currentPath === modulePath;
+}
+
+function isFinancePath(path: AppPath): boolean {
+  return path === "/finance/expenses" || path === "/finance/income" || path === "/finance/settings";
 }
 
 function renderModuleCards(): string {
@@ -305,7 +686,7 @@ function renderModuleCards(): string {
             <h2>${escapeHTML(module.name)}</h2>
           </div>
           <p>${escapeHTML(module.summary)}</p>
-          <span class="module-state">${escapeHTML(module.state ?? "not implemented")}</span>
+          <span class="module-state">${escapeHTML(module.state ?? "не реализовано")}</span>
         </article>
       `
     )
@@ -313,19 +694,19 @@ function renderModuleCards(): string {
 }
 
 const smartLists: SmartList[] = [
-  { view: "inbox", label: "Inbox", accent: "#2563eb" },
-  { view: "today", label: "Today", accent: "#ef4444" },
-  { view: "overdue", label: "Overdue", accent: "#b42318" },
-  { view: "upcoming", label: "Upcoming", accent: "#f59e0b" },
-  { view: "scheduled", label: "Scheduled", accent: "#7c3aed" },
-  { view: "flagged", label: "Flagged", accent: "#ec4899" },
-  { view: "all", label: "All", accent: "#64748b" },
-  { view: "completed", label: "Completed", accent: "#22c55e" }
+  { view: "inbox", label: "Входящие", accent: "#2563eb" },
+  { view: "today", label: "Сегодня", accent: "#ef4444" },
+  { view: "overdue", label: "Просрочено", accent: "#b42318" },
+  { view: "upcoming", label: "Скоро", accent: "#f59e0b" },
+  { view: "scheduled", label: "Запланировано", accent: "#7c3aed" },
+  { view: "flagged", label: "С флагом", accent: "#ec4899" },
+  { view: "all", label: "Все", accent: "#64748b" },
+  { view: "completed", label: "Готово", accent: "#22c55e" }
 ];
 
 function renderSmartLists(state: TodoState): string {
   return `
-    <section class="smart-list-panel" aria-label="Smart lists">
+    <section class="smart-list-panel" aria-label="Умные списки">
       <div class="smart-list-grid">
         ${smartLists.map((list) => renderSmartListButton(state, list)).join("")}
       </div>
@@ -347,11 +728,11 @@ function renderProjectForm(state: TodoState): string {
   return `
     <form class="project-row project-form" id="project-form">
       <label class="project-name-field">
-        <span class="visually-hidden">Name</span>
-        <input name="name" type="text" value="" placeholder="New project" autocomplete="off" required>
+        <span class="visually-hidden">Название</span>
+        <input name="name" type="text" value="" placeholder="Новый проект" autocomplete="off" required>
       </label>
       <span class="project-form-actions">
-        <button class="icon-button small project-save-button" type="submit" ${state.saving ? "disabled" : ""} aria-label="Create project" title="Create project">
+        <button class="icon-button small project-save-button" type="submit" ${state.saving ? "disabled" : ""} aria-label="Создать проект" title="Создать проект">
           +
         </button>
       </span>
@@ -371,8 +752,8 @@ function renderProjectList(state: TodoState): string {
             ${projectPeriod(project)}
           </button>
           <span>
-            <button class="icon-button small" type="button" data-edit-project-id="${project.id}" aria-label="Project settings ${escapeAttr(project.name)}" title="Project settings">&#9881;</button>
-            <button class="icon-button small danger" type="button" data-delete-project-id="${project.id}" aria-label="Delete ${escapeAttr(project.name)}" title="Delete project">&#8722;</button>
+            <button class="icon-button small" type="button" data-edit-project-id="${project.id}" aria-label="Настройки проекта ${escapeAttr(project.name)}" title="Настройки проекта">&#9881;</button>
+            <button class="icon-button small danger" type="button" data-delete-project-id="${project.id}" aria-label="Удалить ${escapeAttr(project.name)}" title="Удалить проект">&#8722;</button>
           </span>
         </li>
       `;
@@ -380,13 +761,13 @@ function renderProjectList(state: TodoState): string {
     .join("");
 
   return `
-    <section class="project-list" aria-label="Projects">
+    <section class="project-list" aria-label="Проекты">
       <div class="panel-header">
-        <h2>Projects</h2>
+        <h2>Проекты</h2>
       </div>
       ${
         state.projects.length === 0
-          ? `<p class="empty-state">No projects yet.</p>`
+          ? `<p class="empty-state">Проектов пока нет.</p>`
           : `<ul>${projects}</ul>`
       }
       ${renderProjectForm(state)}
@@ -405,31 +786,31 @@ function renderProjectSettingsPanel(state: TodoState): string {
     <aside class="project-settings-panel" role="dialog" aria-modal="true" aria-labelledby="project-settings-title">
       <div class="settings-panel-header">
         <div>
-          <p class="section-label">Project</p>
-          <h2 id="project-settings-title">Settings</h2>
+          <p class="section-label">Проект</p>
+          <h2 id="project-settings-title">Настройки</h2>
         </div>
-        <button class="icon-button small" type="button" id="cancel-project-edit" aria-label="Close project settings" title="Close project settings">&#215;</button>
+        <button class="icon-button small" type="button" id="cancel-project-edit" aria-label="Закрыть настройки проекта" title="Закрыть настройки проекта">&#215;</button>
       </div>
       <form class="project-settings-form" id="project-settings-form">
         <input type="hidden" name="project_id" value="${project.id}">
         <label>
-          <span>Name</span>
+          <span>Название</span>
           <input name="name" type="text" value="${escapeAttr(project.name)}" autocomplete="off" required>
         </label>
         <div class="settings-form-grid">
           <label>
-            <span>Start</span>
+            <span>Начало</span>
             <input name="start_date" type="date" value="${escapeAttr(project.start_date ?? "")}">
           </label>
           <label>
-            <span>End</span>
+            <span>Конец</span>
             <input name="end_date" type="date" value="${escapeAttr(project.end_date ?? "")}">
           </label>
         </div>
         ${state.projectFormError ? `<p class="form-error">${escapeHTML(state.projectFormError)}</p>` : ""}
         <div class="settings-form-actions">
-          <button class="secondary-button" type="button" id="cancel-project-edit-secondary">Cancel</button>
-          <button class="primary-button" type="submit" ${state.saving ? "disabled" : ""}>Save</button>
+          <button class="secondary-button" type="button" id="cancel-project-edit-secondary">Отмена</button>
+          <button class="primary-button" type="submit" ${state.saving ? "disabled" : ""}>Сохранить</button>
         </div>
       </form>
     </aside>
@@ -440,8 +821,8 @@ function projectPeriod(project: TodoProject): string {
   if (!project.start_date && !project.end_date) {
     return "";
   }
-  const start = project.start_date ?? "Any";
-  const end = project.end_date ?? "Open";
+  const start = project.start_date ?? "Любая";
+  const end = project.end_date ?? "Открыто";
   return `<small>${escapeHTML(start)} - ${escapeHTML(end)}</small>`;
 }
 
@@ -449,28 +830,28 @@ function renderTodoToolbar(state: TodoState): string {
   return `
     <form class="todo-toolbar" id="todo-query-form" role="search">
       <label class="compact-field todo-search-field">
-        <span class="visually-hidden">Search tasks</span>
-        <input name="q" type="search" value="${escapeAttr(state.search)}" placeholder="Search">
+        <span class="visually-hidden">Поиск задач</span>
+        <input name="q" type="search" value="${escapeAttr(state.search)}" placeholder="Поиск">
       </label>
       <div class="todo-sort-controls">
         <label class="compact-field">
-          <span class="visually-hidden">Sort tasks</span>
+          <span class="visually-hidden">Сортировка задач</span>
           <select name="sort">
-            ${renderSortOption("smart", "Smart", state.sort)}
-            ${renderSortOption("due", "Due", state.sort)}
-            ${renderSortOption("created", "Created", state.sort)}
-            ${renderSortOption("title", "Title", state.sort)}
-            ${renderSortOption("priority", "Priority", state.sort)}
+            ${renderSortOption("smart", "Умная", state.sort)}
+            ${renderSortOption("due", "Срок", state.sort)}
+            ${renderSortOption("created", "Создано", state.sort)}
+            ${renderSortOption("title", "Название", state.sort)}
+            ${renderSortOption("priority", "Приоритет", state.sort)}
           </select>
         </label>
         <label class="compact-field">
-          <span class="visually-hidden">Sort direction</span>
+          <span class="visually-hidden">Направление сортировки</span>
           <select name="direction">
-            ${renderDirectionOption("asc", "Asc", state.direction)}
-            ${renderDirectionOption("desc", "Desc", state.direction)}
+            ${renderDirectionOption("asc", "По возрастанию", state.direction)}
+            ${renderDirectionOption("desc", "По убыванию", state.direction)}
           </select>
         </label>
-        <button class="icon-button" type="submit" aria-label="Apply task filters" title="Apply task filters">&#8981;</button>
+        <button class="icon-button" type="submit" aria-label="Применить фильтры задач" title="Применить фильтры задач">&#8981;</button>
       </div>
     </form>
   `;
@@ -495,8 +876,8 @@ function renderTaskForm(state: TodoState): string {
       <div class="task-main">
         <div class="task-title-row">
           <label class="task-title-field">
-            <span class="visually-hidden">Title</span>
-            <input name="title" type="text" value="" placeholder="New task" autocomplete="off" required>
+            <span class="visually-hidden">Название</span>
+            <input name="title" type="text" value="" placeholder="Новая задача" autocomplete="off" required>
           </label>
         </div>
         ${state.taskFormError ? `<p class="form-error">${escapeHTML(state.taskFormError)}</p>` : ""}
@@ -511,15 +892,15 @@ function renderTaskForm(state: TodoState): string {
                 data-open-task-settings
                 aria-controls="task-settings-panel"
                 aria-expanded="false"
-                aria-label="Task settings"
-                title="Task settings"
+                aria-label="Настройки задачи"
+                title="Настройки задачи"
               >
                 &#9881;
               </button>
             `
             : ""
         }
-        <button class="icon-button small task-form-submit" type="submit" aria-label="Create task" title="Create task" ${state.saving ? "disabled" : ""}>
+        <button class="icon-button small task-form-submit" type="submit" aria-label="Создать задачу" title="Создать задачу" ${state.saving ? "disabled" : ""}>
           +
         </button>
       </div>
@@ -567,66 +948,66 @@ function renderNewTaskSettingsPanel(values: {
     >
       <div class="settings-panel-header">
         <div>
-          <p class="section-label">Task</p>
-          <h2 id="task-settings-title">Settings</h2>
+          <p class="section-label">Задача</p>
+          <h2 id="task-settings-title">Настройки</h2>
         </div>
-        <button class="icon-button small" type="button" data-close-task-settings aria-label="Close task settings" title="Close task settings">&#215;</button>
+        <button class="icon-button small" type="button" data-close-task-settings aria-label="Закрыть настройки задачи" title="Закрыть настройки задачи">&#215;</button>
       </div>
       <div class="project-settings-form task-settings-form">
         <label>
-          <span>Notes</span>
-          <textarea form="task-form" name="notes" rows="3" placeholder="Notes">${escapeHTML(values.notes)}</textarea>
+          <span>Заметки</span>
+          <textarea form="task-form" name="notes" rows="3" placeholder="Заметки">${escapeHTML(values.notes)}</textarea>
         </label>
         <div class="settings-form-grid">
           <label>
-            <span>Project</span>
+            <span>Проект</span>
             <select form="task-form" name="project_id">
-              <option value="" ${values.selectedProjectID === null ? "selected" : ""}>Inbox</option>
+              <option value="" ${values.selectedProjectID === null ? "selected" : ""}>Входящие</option>
               ${values.projects.map((project) => renderProjectOption(project, values.selectedProjectID)).join("")}
             </select>
           </label>
           <label>
-            <span>Due date</span>
+            <span>Дата</span>
             <input form="task-form" name="due_date" type="date" value="${escapeAttr(values.dueDate)}">
           </label>
           <label>
-            <span>Due time</span>
+            <span>Время</span>
             <input form="task-form" name="due_time" type="time" value="${escapeAttr(values.dueTime)}">
           </label>
           <label>
-            <span>Repeat</span>
+            <span>Повтор</span>
             <select form="task-form" name="repeat_frequency">
-              ${renderRepeatOption("none", "No repeat", values.repeatFrequency)}
-              ${renderRepeatOption("daily", "Daily", values.repeatFrequency)}
-              ${renderRepeatOption("weekly", "Weekly", values.repeatFrequency)}
-              ${renderRepeatOption("monthly", "Monthly", values.repeatFrequency)}
-              ${renderRepeatOption("yearly", "Yearly", values.repeatFrequency)}
+              ${renderRepeatOption("none", "Не повторять", values.repeatFrequency)}
+              ${renderRepeatOption("daily", "Ежедневно", values.repeatFrequency)}
+              ${renderRepeatOption("weekly", "Еженедельно", values.repeatFrequency)}
+              ${renderRepeatOption("monthly", "Ежемесячно", values.repeatFrequency)}
+              ${renderRepeatOption("yearly", "Ежегодно", values.repeatFrequency)}
             </select>
           </label>
           <label>
-            <span>Every</span>
+            <span>Каждые</span>
             <input form="task-form" name="repeat_interval" type="number" min="1" step="1" value="${values.repeatInterval}">
           </label>
           <label>
-            <span>Until</span>
+            <span>До</span>
             <input form="task-form" name="repeat_until" type="date" value="${escapeAttr(values.repeatUntil)}">
           </label>
         </div>
         <label>
-          <span>Priority</span>
+          <span>Приоритет</span>
           <select form="task-form" name="priority">
-            ${renderPriorityOption("none", "No priority", values.priority)}
-            ${renderPriorityOption("low", "Low", values.priority)}
-            ${renderPriorityOption("medium", "Medium", values.priority)}
-            ${renderPriorityOption("high", "High", values.priority)}
+            ${renderPriorityOption("none", "Без приоритета", values.priority)}
+            ${renderPriorityOption("low", "Низкий", values.priority)}
+            ${renderPriorityOption("medium", "Средний", values.priority)}
+            ${renderPriorityOption("high", "Высокий", values.priority)}
           </select>
         </label>
         <label class="task-flag-field">
           <input form="task-form" name="flagged" type="checkbox" ${values.flagged ? "checked" : ""}>
-          <span>Flag</span>
+          <span>Флаг</span>
         </label>
         <div class="settings-form-actions">
-          <button class="primary-button" type="button" data-close-task-settings>Done</button>
+          <button class="primary-button" type="button" data-close-task-settings>Готово</button>
         </div>
       </div>
     </aside>
@@ -650,74 +1031,74 @@ function renderExistingTaskSettingsPanel(state: TodoState): string {
     >
       <div class="settings-panel-header">
         <div>
-          <p class="section-label">Task</p>
-          <h2 id="task-settings-title">Settings</h2>
+          <p class="section-label">Задача</p>
+          <h2 id="task-settings-title">Настройки</h2>
         </div>
-        <button class="icon-button small" type="button" data-cancel-task-edit aria-label="Close task settings" title="Close task settings">&#215;</button>
+        <button class="icon-button small" type="button" data-cancel-task-edit aria-label="Закрыть настройки задачи" title="Закрыть настройки задачи">&#215;</button>
       </div>
       <form class="project-settings-form task-settings-form" id="task-settings-form">
         <input type="hidden" name="task_id" value="${task.id}">
         <label>
-          <span>Name</span>
+          <span>Название</span>
           <input name="title" type="text" value="${escapeAttr(task.title)}" autocomplete="off" required>
         </label>
         <label>
-          <span>Notes</span>
-          <textarea name="notes" rows="3" placeholder="Notes">${escapeHTML(task.notes ?? "")}</textarea>
+          <span>Заметки</span>
+          <textarea name="notes" rows="3" placeholder="Заметки">${escapeHTML(task.notes ?? "")}</textarea>
         </label>
         <div class="settings-form-grid">
           <label>
-            <span>Project</span>
+            <span>Проект</span>
             <select name="project_id">
-              <option value="" ${task.project_id === null ? "selected" : ""}>Inbox</option>
+              <option value="" ${task.project_id === null ? "selected" : ""}>Входящие</option>
               ${state.projects.map((project) => renderProjectOption(project, task.project_id)).join("")}
             </select>
           </label>
           <label>
-            <span>Due date</span>
+            <span>Дата</span>
             <input name="due_date" type="date" value="${escapeAttr(task.due_date ?? "")}">
           </label>
           <label>
-            <span>Due time</span>
+            <span>Время</span>
             <input name="due_time" type="time" value="${escapeAttr(task.due_time ?? "")}">
           </label>
           <label>
-            <span>Repeat</span>
+            <span>Повтор</span>
             <select name="repeat_frequency">
-              ${renderRepeatOption("none", "No repeat", task.repeat_frequency)}
-              ${renderRepeatOption("daily", "Daily", task.repeat_frequency)}
-              ${renderRepeatOption("weekly", "Weekly", task.repeat_frequency)}
-              ${renderRepeatOption("monthly", "Monthly", task.repeat_frequency)}
-              ${renderRepeatOption("yearly", "Yearly", task.repeat_frequency)}
+              ${renderRepeatOption("none", "Не повторять", task.repeat_frequency)}
+              ${renderRepeatOption("daily", "Ежедневно", task.repeat_frequency)}
+              ${renderRepeatOption("weekly", "Еженедельно", task.repeat_frequency)}
+              ${renderRepeatOption("monthly", "Ежемесячно", task.repeat_frequency)}
+              ${renderRepeatOption("yearly", "Ежегодно", task.repeat_frequency)}
             </select>
           </label>
           <label>
-            <span>Every</span>
+            <span>Каждые</span>
             <input name="repeat_interval" type="number" min="1" step="1" value="${task.repeat_interval}">
           </label>
           <label>
-            <span>Until</span>
+            <span>До</span>
             <input name="repeat_until" type="date" value="${escapeAttr(task.repeat_until ?? "")}">
           </label>
         </div>
         <label>
-          <span>Priority</span>
+          <span>Приоритет</span>
           <select name="priority">
-            ${renderPriorityOption("none", "No priority", task.priority)}
-            ${renderPriorityOption("low", "Low", task.priority)}
-            ${renderPriorityOption("medium", "Medium", task.priority)}
-            ${renderPriorityOption("high", "High", task.priority)}
+            ${renderPriorityOption("none", "Без приоритета", task.priority)}
+            ${renderPriorityOption("low", "Низкий", task.priority)}
+            ${renderPriorityOption("medium", "Средний", task.priority)}
+            ${renderPriorityOption("high", "Высокий", task.priority)}
           </select>
         </label>
         <label class="task-flag-field">
           <input name="flagged" type="checkbox" ${task.flagged ? "checked" : ""}>
-          <span>Flag</span>
+          <span>Флаг</span>
         </label>
         ${state.taskFormError ? `<p class="form-error">${escapeHTML(state.taskFormError)}</p>` : ""}
         <div class="settings-form-actions">
-          <button class="secondary-button danger" type="button" data-delete-current-task-id="${task.id}">Delete</button>
-          <button class="secondary-button" type="button" data-cancel-task-edit>Cancel</button>
-          <button class="primary-button" type="submit" ${state.saving ? "disabled" : ""}>Save</button>
+          <button class="secondary-button danger" type="button" data-delete-current-task-id="${task.id}">Удалить</button>
+          <button class="secondary-button" type="button" data-cancel-task-edit>Отмена</button>
+          <button class="primary-button" type="submit" ${state.saving ? "disabled" : ""}>Сохранить</button>
         </div>
       </form>
     </aside>
@@ -756,26 +1137,26 @@ function renderTaskList(state: TodoState): string {
 
   if (state.loading) {
     return `
-      <section class="task-list" aria-label="Tasks">
+      <section class="task-list" aria-label="Задачи">
         ${taskForm}
         ${taskSettingsPanel}
-        <p class="empty-state">Loading tasks...</p>
+        <p class="empty-state">Загружаю задачи...</p>
       </section>
     `;
   }
 
   if (state.tasks.length === 0) {
     return `
-      <section class="task-list" aria-label="Tasks">
+      <section class="task-list" aria-label="Задачи">
         ${taskForm}
         ${taskSettingsPanel}
-        <p class="empty-state">No tasks in this view.</p>
+        <p class="empty-state">В этом списке нет задач.</p>
       </section>
     `;
   }
 
   return `
-    <section class="task-list" aria-label="Tasks">
+    <section class="task-list" aria-label="Задачи">
       ${taskForm}
       ${state.tasks.map((task) => renderTaskItem(task, state.projects, state.saving)).join("")}
       ${taskSettingsPanel}
@@ -789,10 +1170,10 @@ function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean
   const nextStatus: TodoTaskStatus = done ? "todo" : "done";
   const markers = taskMarkers(task);
   const metaItems = [
-    project ? `<div><dt>Project</dt><dd>${escapeHTML(project.name)}</dd></div>` : "",
-    task.due_date ? `<div><dt>Due</dt><dd>${escapeHTML(taskDueLabel(task))}</dd></div>` : "",
-    task.repeat_frequency !== "none" ? `<div><dt>Repeat</dt><dd>${escapeHTML(repeatLabel(task))}</dd></div>` : "",
-    task.priority !== "none" ? `<div><dt>Priority</dt><dd>${escapeHTML(priorityLabel(task.priority))}</dd></div>` : ""
+    project ? `<div><dt>Проект</dt><dd>${escapeHTML(project.name)}</dd></div>` : "",
+    task.due_date ? `<div><dt>Срок</dt><dd>${escapeHTML(taskDueLabel(task))}</dd></div>` : "",
+    task.repeat_frequency !== "none" ? `<div><dt>Повтор</dt><dd>${escapeHTML(repeatLabel(task))}</dd></div>` : "",
+    task.priority !== "none" ? `<div><dt>Приоритет</dt><dd>${escapeHTML(priorityLabel(task.priority))}</dd></div>` : ""
   ]
     .filter(Boolean)
     .join("");
@@ -804,7 +1185,7 @@ function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean
         type="button"
         data-toggle-task-status-id="${task.id}"
         data-next-status="${nextStatus}"
-        aria-label="${done ? `Reopen ${escapeAttr(task.title)}` : `Complete ${escapeAttr(task.title)}`}"
+        aria-label="${done ? `Вернуть ${escapeAttr(task.title)}` : `Завершить ${escapeAttr(task.title)}`}"
         aria-pressed="${done}"
         ${saving ? "disabled" : ""}
       >
@@ -818,7 +1199,7 @@ function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean
         ${metaItems ? `<dl class="task-meta">${metaItems}</dl>` : ""}
       </div>
       <div class="task-actions">
-        <button class="icon-button small" type="button" data-edit-task-id="${task.id}" aria-label="Task settings ${escapeAttr(task.title)}" title="Task settings">&#9881;</button>
+        <button class="icon-button small" type="button" data-edit-task-id="${task.id}" aria-label="Настройки задачи ${escapeAttr(task.title)}" title="Настройки задачи">&#9881;</button>
       </div>
     </article>
   `;
@@ -827,53 +1208,53 @@ function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean
 function taskMarkers(task: TodoTask): string {
   const markers = [];
   if (task.flagged) {
-    markers.push(`<span class="task-marker flagged" aria-label="Flagged" title="Flagged">&#9873;</span>`);
+    markers.push(`<span class="task-marker flagged" aria-label="С флагом" title="С флагом">&#9873;</span>`);
   }
   if (task.priority !== "none") {
-    markers.push(`<span class="task-marker priority-${task.priority}" aria-label="${priorityLabel(task.priority)} priority" title="${priorityLabel(task.priority)} priority">${prioritySymbol(task.priority)}</span>`);
+    markers.push(`<span class="task-marker priority-${task.priority}" aria-label="${priorityLabel(task.priority)} приоритет" title="${priorityLabel(task.priority)} приоритет">${prioritySymbol(task.priority)}</span>`);
   }
   return markers.join("");
 }
 
 function taskDueLabel(task: TodoTask): string {
   if (!task.due_date) {
-    return "No date";
+    return "Без даты";
   }
   return task.due_time ? `${task.due_date} ${task.due_time}` : task.due_date;
 }
 
 function repeatLabel(task: TodoTask): string {
   const base = repeatName(task.repeat_frequency);
-  const interval = task.repeat_interval > 1 ? ` every ${task.repeat_interval}` : "";
-  const until = task.repeat_until ? ` until ${task.repeat_until}` : "";
+  const interval = task.repeat_interval > 1 ? ` каждые ${task.repeat_interval}` : "";
+  const until = task.repeat_until ? ` до ${task.repeat_until}` : "";
   return `${base}${interval}${until}`;
 }
 
 function repeatName(frequency: TodoRepeatFrequency): string {
   switch (frequency) {
     case "daily":
-      return "Daily";
+      return "Ежедневно";
     case "weekly":
-      return "Weekly";
+      return "Еженедельно";
     case "monthly":
-      return "Monthly";
+      return "Ежемесячно";
     case "yearly":
-      return "Yearly";
+      return "Ежегодно";
     default:
-      return "No repeat";
+      return "Не повторять";
   }
 }
 
 function priorityLabel(priority: TodoTaskPriority): string {
   switch (priority) {
     case "low":
-      return "Low";
+      return "Низкий";
     case "medium":
-      return "Medium";
+      return "Средний";
     case "high":
-      return "High";
+      return "Высокий";
     default:
-      return "No";
+      return "Без";
   }
 }
 
@@ -892,40 +1273,40 @@ function prioritySymbol(priority: TodoTaskPriority): string {
 
 function renderHealthBadge(state: HealthState): string {
   if (state.kind === "online") {
-    return `<span class="health-badge health-badge-ok">API online</span>`;
+    return `<span class="health-badge health-badge-ok">API онлайн</span>`;
   }
   if (state.kind === "offline") {
-    return `<span class="health-badge health-badge-down">API offline</span>`;
+    return `<span class="health-badge health-badge-down">API недоступен</span>`;
   }
-  return `<span class="health-badge">Checking API</span>`;
+  return `<span class="health-badge">Проверяю API</span>`;
 }
 
 function renderAuthBadge(state: AuthState): string {
   if (state.kind === "authenticated") {
-    return `<span class="health-badge health-badge-ok">Signed in</span>`;
+    return `<span class="health-badge health-badge-ok">Вход выполнен</span>`;
   }
   if (state.kind === "unauthenticated") {
-    return `<span class="health-badge health-badge-down">Signed out</span>`;
+    return `<span class="health-badge health-badge-down">Вход не выполнен</span>`;
   }
-  return `<span class="health-badge">Checking session</span>`;
+  return `<span class="health-badge">Проверяю сессию</span>`;
 }
 
 function renderHealthDetails(state: HealthState, apiBaseUrl: string): string {
   if (state.kind === "loading") {
-    return `<h2>Checking health...</h2><p>Calling ${escapeHTML(apiBaseUrl)}/health.</p>`;
+    return `<h2>Проверяю статус...</h2><p>Запрос к ${escapeHTML(apiBaseUrl)}/health.</p>`;
   }
 
   if (state.kind === "offline") {
-    return `<h2>Backend unavailable</h2><p>${escapeHTML(state.message)}</p>`;
+    return `<h2>Backend недоступен</h2><p>${escapeHTML(state.message)}</p>`;
   }
 
   const database = state.payload.checks.database;
   return `
-    <h2>${escapeHTML(state.payload.service)} is ${escapeHTML(state.payload.status)}</h2>
+    <h2>${escapeHTML(state.payload.service)}: ${escapeHTML(state.payload.status)}</h2>
     <dl class="health-list">
-      <div><dt>Version</dt><dd>${escapeHTML(state.payload.version)}</dd></div>
-      <div><dt>Database</dt><dd>${escapeHTML(database?.status ?? "unknown")}</dd></div>
-      <div><dt>Latency</dt><dd>${escapeHTML(database?.latency ?? "n/a")}</dd></div>
+      <div><dt>Версия</dt><dd>${escapeHTML(state.payload.version)}</dd></div>
+      <div><dt>База данных</dt><dd>${escapeHTML(database?.status ?? "неизвестно")}</dd></div>
+      <div><dt>Задержка</dt><dd>${escapeHTML(database?.latency ?? "н/д")}</dd></div>
     </dl>
   `;
 }
@@ -1062,6 +1443,132 @@ function bindTodoEvents(root: HTMLElement, options: RenderOptions) {
   });
 }
 
+function bindFinanceEvents(root: HTMLElement, options: RenderOptions) {
+  root.querySelector("#refresh-finance")?.addEventListener("click", options.onRefreshFinance);
+  bindFinanceSettings(root, options);
+  root.querySelector<HTMLFormElement>("#finance-year-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const form = event.currentTarget as HTMLFormElement;
+    const year = numberFromDataset(String(new FormData(form).get("year") ?? ""));
+    if (year) {
+      options.onChangeFinanceYear(year);
+    }
+  });
+  root.querySelector<HTMLButtonElement>("#save-finance-year")?.addEventListener("click", () => {
+    const expenseForms = Array.from(root.querySelectorAll<HTMLFormElement>("[data-finance-expense-month]"));
+    const incomeForms = Array.from(root.querySelectorAll<HTMLFormElement>("[data-finance-income-month]"));
+    if (expenseForms.length > 0) {
+      options.onSaveFinanceExpenseYear(expenseForms);
+    }
+    if (incomeForms.length > 0) {
+      incomeForms.forEach((form) => syncFinanceIncomeSettings(root, form));
+      options.onSaveFinanceIncomeYear(incomeForms);
+    }
+  });
+
+  root.querySelectorAll<HTMLFormElement>("[data-finance-expense-month]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const month = numberFromDataset(form.dataset.financeExpenseMonth);
+      if (month) {
+        options.onSaveFinanceExpenseMonth(month, form);
+      }
+    });
+  });
+
+  root.querySelectorAll<HTMLInputElement>("[data-finance-expense-limit]").forEach((input) => {
+    updateFinanceExpenseLimitCell(input);
+    input.addEventListener("input", () => updateFinanceExpenseLimitCell(input));
+  });
+
+  root.querySelectorAll<HTMLFormElement>("[data-finance-income-month]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const month = numberFromDataset(form.dataset.financeIncomeMonth);
+      if (month) {
+        syncFinanceIncomeSettings(root, form);
+        options.onSaveFinanceIncomeMonth(month, form);
+      }
+    });
+  });
+}
+
+function updateFinanceExpenseLimitCell(input: HTMLInputElement) {
+  const field = input.closest(".finance-money-field");
+  if (!field) {
+    return;
+  }
+
+  field.classList.remove("limit-safe", "limit-near", "limit-over");
+  const status = expenseLimitStatus(input.value, input.dataset.financeExpenseLimit ?? "0.00");
+  if (status !== "none") {
+    field.classList.add(`limit-${status}`);
+  }
+}
+
+function bindFinanceSettings(root: HTMLElement, options: RenderOptions) {
+  const settingsForm = root.querySelector<HTMLFormElement>("#finance-settings-form");
+  if (settingsForm) {
+    const updateSettings = () => {
+      updateFinanceSettingsCalculations(root);
+      options.onChangeFinanceSettings(settingsForm);
+    };
+
+    settingsForm.addEventListener("input", updateSettings);
+    settingsForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      updateSettings();
+    });
+  }
+
+  updateFinanceSettingsCalculations(root);
+}
+
+function updateFinanceSettingsCalculations(root: HTMLElement) {
+  const salaryInput = root.querySelector<HTMLInputElement>('[data-finance-income-setting="salary_amount"]');
+  const bonusInput = root.querySelector<HTMLInputElement>('[data-finance-income-setting="bonus_percent"]');
+  const incomeInput = root.querySelector<HTMLInputElement>('[data-finance-income-calculated="total_amount"]');
+  if (!salaryInput || !bonusInput || !incomeInput) {
+    return;
+  }
+
+  const incomeAmount = calculateIncomeAmount(salaryInput.value, bonusInput.value);
+  incomeInput.value = formatRussianMoneyAmount(incomeAmount);
+  root.querySelectorAll<HTMLInputElement>("[data-finance-limit-percent]").forEach((input) => {
+    const code = input.dataset.financeLimitPercent;
+    if (!code) {
+      return;
+    }
+    const output = root.querySelector<HTMLOutputElement>(`[data-finance-limit-amount="${code}"]`);
+    if (output) {
+      output.value = formatRussianMoneyAmount(calculatePercentAmount(incomeAmount, input.value));
+    }
+  });
+}
+
+function syncFinanceIncomeSettings(root: HTMLElement, form: HTMLFormElement) {
+  const salaryAmount = root.querySelector<HTMLInputElement>('[data-finance-income-setting="salary_amount"]')?.value;
+  const bonusPercent = root.querySelector<HTMLInputElement>('[data-finance-income-setting="bonus_percent"]')?.value;
+
+  if (salaryAmount !== undefined) {
+    setHiddenInputValue(form, "salary_amount", normalizeDecimalInputOrRaw(salaryAmount));
+  }
+  if (bonusPercent !== undefined) {
+    setHiddenInputValue(form, "bonus_percent", normalizeDecimalInputOrRaw(bonusPercent));
+  }
+}
+
+function setHiddenInputValue(form: HTMLFormElement, name: string, value: string) {
+  let input = form.querySelector<HTMLInputElement>(`input[type="hidden"][name="${name}"]`);
+  if (!input) {
+    input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    form.append(input);
+  }
+  input.value = value;
+}
+
 function setTaskSettingsOpen(root: HTMLElement, open: boolean) {
   root.querySelector<HTMLElement>(".task-settings-backdrop")?.toggleAttribute("hidden", !open);
   root.querySelector<HTMLElement>(".task-settings-panel")?.toggleAttribute("hidden", !open);
@@ -1099,6 +1606,36 @@ function sortValue(value: FormDataEntryValue | null): TodoSort {
 
 function directionValue(value: FormDataEntryValue | null): TodoSortDirection {
   return String(value ?? "asc") === "desc" ? "desc" : "asc";
+}
+
+function monthLabel(month: number): string {
+  const labels = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+  return labels[month - 1] ?? String(month);
+}
+
+function financeCategoryLabel(category: FinanceExpenseCategory): string {
+  switch (category.code) {
+    case "restaurants":
+      return "Рестораны";
+    case "groceries":
+      return "Продукты";
+    case "personal":
+      return "Личное";
+    case "utilities":
+      return "Коммунальные";
+    case "transport":
+      return "Транспорт";
+    case "gifts":
+      return "Подарки";
+    case "investments":
+      return "Инвестиции";
+    case "entertainment":
+      return "Развлечения";
+    case "education":
+      return "Образование";
+    default:
+      return category.label;
+  }
 }
 
 function escapeHTML(value: string): string {

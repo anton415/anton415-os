@@ -89,6 +89,8 @@ Todo v1 intentionally excludes subtasks, tags, drag and drop, reminders, calenda
 
 Purpose: add personal finance tracking after the base application shape is proven by the Todo module.
 
+The first Finance slice now covers monthly RUB income and expense facts without accounts, cards, imports, transfers, limits, or forecasts.
+
 Done means:
 
 - finance workflows are useful without depending on legacy repository structure
@@ -109,7 +111,7 @@ Done means:
 
 ## Current non-goals
 
-- No financial domain logic yet.
+- No finance accounts, cards, import, forecast, or planning logic yet.
 - No investment import or sync yet.
 - No FIRE calculations yet.
 - No complex auth yet.

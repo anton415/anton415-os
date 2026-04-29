@@ -2,6 +2,23 @@
 
 All notable changes to `anton415-os` are summarized here. Releases follow the shape of the product rather than a public API compatibility contract.
 
+## v0.2.0 - 2026-04-29
+
+### Finance
+
+- Added the first production Finance slice for monthly RUB income and expense tracking.
+- Added authenticated Finance API routes for annual expense and income snapshots and month updates.
+- Added PostgreSQL migrations for monthly expense and income actuals, with money stored in integer kopecks.
+- Added Russian-language Finance UI routes for expenses, income, and settings.
+- Added legacy expense categories, yearly totals, monthly averages, and category spending totals excluding transfer categories.
+- Added salary, bonus percent, calculated income, and category limit settings for expense control.
+- Added expense-cell status coloring against configured limits: empty, below limit, near limit, and over limit.
+
+### Platform
+
+- Localized the browser shell and Todo UI to Russian.
+- Added frontend Finance API, formatting, render, and browser-smoke coverage.
+
 ## v0.1.1 - 2026-04-27
 
 ### Maintenance

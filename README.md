@@ -8,7 +8,7 @@
 
 `anton415-os` is a personal operating-system monorepo: a modular Go and TypeScript application for private productivity, finance, investments, and FIRE planning.
 
-The first production slice is live: a private Todo app at [anton415.ru/todo](https://anton415.ru/todo), protected by Yandex ID and a single-email allowlist.
+The production app is live at [anton415.ru](https://anton415.ru), protected by Yandex ID and a single-email allowlist. The current release includes private Todo workflows and the first monthly Finance slice.
 
 ## Production Status
 
@@ -18,7 +18,7 @@ The first production slice is live: a private Todo app at [anton415.ru/todo](htt
 | Hosting | Yandex Cloud VM, Caddy HTTPS, Cloud DNS |
 | Database | PostgreSQL 16 in Docker on the VM |
 | Auth | Yandex ID, server-side sessions, `HttpOnly` secure cookies |
-| Data model | Single-user Todo data, no `user_id` split yet |
+| Data model | Single-user Todo and Finance data, no `user_id` split yet |
 | Backups | Budget-first monthly `pg_dump` path to Object Storage |
 | Email login | Planned later; Postbox is intentionally deferred |
 
@@ -27,7 +27,7 @@ The first production slice is live: a private Todo app at [anton415.ru/todo](htt
 | Module | Current scope |
 | --- | --- |
 | `todo` | Production Todo projects/tasks with browser UI and authenticated REST API |
-| `finance` | Planned personal finance boundary |
+| `finance` | Monthly RUB income and expense facts with browser UI and authenticated REST API |
 | `investments` | Planned investment tracking and analysis boundary |
 | `fire` | Planned FIRE progress and long-term planning boundary |
 
@@ -56,6 +56,7 @@ apps/api/              Go API entrypoint
 apps/web/              Vite TypeScript frontend
 internal/auth/         OAuth, email token, allowlist, session logic
 internal/todo/         Todo domain, use cases, HTTP and PostgreSQL adapters
+internal/finance/      Finance domain, use cases, HTTP and PostgreSQL adapters
 internal/platform/     Config, database, router, logging
 migrations/            SQL migrations
 infra/terraform/       Yandex Cloud production infrastructure
@@ -69,7 +70,7 @@ Prerequisites:
 
 - Docker Compose
 - Go 1.25, or Docker fallback through `Makefile`
-- Node.js 24 for frontend work
+- Node.js 22-24 with npm 10+ for frontend work
 
 ```sh
 cp .env.example .env
@@ -82,6 +83,8 @@ Local URLs:
 | --- | --- |
 | Web app | `http://localhost:5173` |
 | Todo UI | `http://localhost:5173/todo` |
+| Finance expenses | `http://localhost:5173/finance/expenses` |
+| Finance income | `http://localhost:5173/finance/income` |
 | API health | `http://localhost:8080/health` |
 | Session check | `http://localhost:8080/api/v1/me` |
 | PostgreSQL | `localhost:15432` |
@@ -145,6 +148,6 @@ Important operating rules:
 
 ## Release
 
-Current release target: `v0.1.1`, a maintenance patch for the production Todo release.
+Current release target: `v0.2.0`, the first production Finance release.
 
 Release notes are tracked in [CHANGELOG.md](CHANGELOG.md), and GitHub Releases trigger the production deployment workflow after environment approval.

@@ -31,20 +31,20 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await mockTodoApi(page);
   await page.goto("/todo");
 
-  await expect(page.getByRole("button", { name: "Inbox", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Today", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Overdue", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Upcoming", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Scheduled", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Flagged", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "All", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Completed", exact: true })).toBeVisible();
-  await expect(page.getByRole("combobox", { name: "Status" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Входящие", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Сегодня", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Просрочено", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Скоро", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Запланировано", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "С флагом", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Все", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Готово", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Статус" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Task settings Existing task" }).click();
+  await page.getByRole("button", { name: "Настройки задачи Existing task" }).click();
   await page.locator('#task-settings-form input[name="title"]').fill("Existing task updated");
   await page.locator('#task-settings-form textarea[name="notes"]').fill("from panel");
-  await page.getByRole("button", { name: "Save" }).click();
+  await page.getByRole("button", { name: "Сохранить" }).click();
   await expect(page.getByRole("heading", { name: "Existing task updated" })).toBeVisible();
   await expect(page.getByText("from panel")).toBeVisible();
   await expect(page.getByRole("button", { name: "Edit Existing task updated" })).toHaveCount(0);
@@ -60,54 +60,54 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.locator('#task-settings-panel input[name="due_time"]').fill("09:30");
   await page.locator('#task-settings-panel select[name="priority"]').selectOption("high");
   await page.locator('#task-settings-panel input[name="flagged"]').check();
-  await page.getByRole("button", { name: "Done" }).click();
-  await page.getByRole("button", { name: "Create task" }).click();
+  await page.locator("#task-settings-panel .settings-form-actions .primary-button").click();
+  await page.getByRole("button", { name: "Создать задачу" }).click();
 
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
   await expect(page.getByText("2%")).toBeVisible();
-  await expect(page.locator(".task-meta dd", { hasText: /^High$/ })).toBeVisible();
+  await expect(page.locator(".task-meta dd", { hasText: /^Высокий$/ })).toBeVisible();
 
   await page.locator('form#task-form input[name="title"]').fill("Pay rent");
   await page.locator('form#task-form [data-open-task-settings]').click();
   await page.locator('#task-settings-panel input[name="due_date"]').fill(localDateInputValue(new Date()));
   await page.locator('#task-settings-panel select[name="repeat_frequency"]').selectOption("weekly");
-  await page.getByRole("button", { name: "Done" }).click();
-  await page.getByRole("button", { name: "Create task" }).click();
-  await expect(page.locator(".task-meta dd", { hasText: /^Weekly$/ })).toBeVisible();
+  await page.locator("#task-settings-panel .settings-form-actions .primary-button").click();
+  await page.getByRole("button", { name: "Создать задачу" }).click();
+  await expect(page.locator(".task-meta dd", { hasText: /^Еженедельно$/ })).toBeVisible();
 
   await page.locator('input[name="q"]').fill("milk");
-  await page.getByRole("button", { name: "Apply task filters" }).click();
+  await page.getByRole("button", { name: "Применить фильтры задач" }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pay rent" })).toHaveCount(0);
   await page.locator('input[name="q"]').fill("");
   await page.locator('select[name="sort"]').selectOption("priority");
   await page.locator('select[name="direction"]').selectOption("desc");
 
-  await page.getByRole("button", { name: "Flagged", exact: true }).click();
+  await page.getByRole("button", { name: "С флагом", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Overdue", exact: true }).click();
+  await page.getByRole("button", { name: "Просрочено", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Overdue task" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Inbox", exact: true }).click();
-  await page.getByRole("button", { name: "Complete Buy milk" }).click();
+  await page.getByRole("button", { name: "Входящие", exact: true }).click();
+  await page.getByRole("button", { name: "Завершить Buy milk" }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Completed", exact: true }).click();
+  await page.getByRole("button", { name: "Готово", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Create task" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Reopen Buy milk" }).click();
+  await expect(page.getByRole("button", { name: "Создать задачу" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Вернуть Buy milk" }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Today", exact: true }).click();
+  await page.getByRole("button", { name: "Сегодня", exact: true }).click();
   await expect(page.locator('#task-settings-panel input[name="due_date"]')).toHaveValue(localDateInputValue(new Date()));
 
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/todo");
   await expect(page.locator(".app-shell")).toHaveClass(/sidebar-collapsed/);
   await expect(page.locator("#todo-panel")).toHaveClass(/collapsed/);
-  await page.getByRole("button", { name: "Show anton-os panel" }).click();
-  await page.getByRole("button", { name: "Show Todo panel" }).click();
+  await page.getByRole("button", { name: "Показать панель anton-os" }).click();
+  await page.getByRole("button", { name: "Показать панель задач" }).click();
   await expect(page.locator(".todo-layout")).toBeVisible();
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth

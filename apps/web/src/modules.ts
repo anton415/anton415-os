@@ -4,28 +4,29 @@ import type { ProductModule } from "./types";
 // Реальные экраны появятся позже, начиная с первого доменного vertical slice.
 export const productModules: ProductModule[] = [
   {
-    name: "Todo",
+    name: "Задачи",
     path: "/todo",
     accent: "#2563eb",
-    summary: "Projects, tasks, due dates, and simple execution views.",
-    state: "implemented"
+    summary: "Проекты, задачи, сроки и простые рабочие списки.",
+    state: "реализовано"
   },
   {
-    name: "Finance",
+    name: "Финансы",
     path: "/finance",
     accent: "#059669",
-    summary: "Personal finance records and rules boundary."
+    summary: "Месячные факты доходов и расходов для спокойного обзора.",
+    state: "реализовано"
   },
   {
-    name: "Investments",
+    name: "Инвестиции",
     path: "/investments",
     accent: "#7c3aed",
-    summary: "Accounts, positions, and performance boundary."
+    summary: "Граница счетов, позиций и доходности."
   },
   {
     name: "FIRE",
     path: "/fire",
     accent: "#d97706",
-    summary: "Long-term planning and projection boundary."
+    summary: "Граница долгосрочного планирования и прогнозов."
   }
 ];
