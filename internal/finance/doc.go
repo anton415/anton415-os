@@ -1,4 +1,2 @@
-// Package finance will own personal finance records, categories, balances, and finance rules.
-//
-// Step 2 intentionally keeps this package as a boundary marker only.
+// Package finance owns personal finance records, categories, monthly facts, and finance rules.
 package finance

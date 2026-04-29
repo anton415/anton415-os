@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Docker Compose
-- Node.js 24 and npm 11 if running the web shell outside Docker
+- Node.js 22-24 and npm 10+ if running the web shell outside Docker
 - Go is optional locally because backend Make targets use local Go when available and otherwise fall back to the `golang:1.25-alpine` Docker image
 
 ## First run

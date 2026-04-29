@@ -29,4 +29,4 @@ Do not commit service-account JSON keys, SSH private keys, Terraform variables, 
 
 The deployment workflow always pushes the deployed tag and also refreshes the `main` image tag for convenience.
 
-Frontend CI and the Docker web build use Node.js 24. GitHub-provided and Docker Actions are pinned to major versions that run on the Node 24 action runtime.
+Frontend CI and the Docker web build use Node.js 24, while local frontend work supports Node.js 22-24 with npm 10+. GitHub-provided and Docker Actions are pinned to major versions that run on the Node 24 action runtime.

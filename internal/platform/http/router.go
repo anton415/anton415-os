@@ -18,10 +18,13 @@ import (
 	"github.com/anton415/anton415-os/internal/auth"
 	authhttp "github.com/anton415/anton415-os/internal/auth/adapters/http"
 	authpostgres "github.com/anton415/anton415-os/internal/auth/adapters/postgres"
+	financehttp "github.com/anton415/anton415-os/internal/finance/adapters/http"
+	financepostgres "github.com/anton415/anton415-os/internal/finance/adapters/postgres"
+	financeapp "github.com/anton415/anton415-os/internal/finance/application"
 	"github.com/anton415/anton415-os/internal/platform/config"
 	todohttp "github.com/anton415/anton415-os/internal/todo/adapters/http"
 	todopostgres "github.com/anton415/anton415-os/internal/todo/adapters/postgres"
-	"github.com/anton415/anton415-os/internal/todo/application"
+	todoapp "github.com/anton415/anton415-os/internal/todo/application"
 )
 
 type Dependencies struct {
@@ -75,14 +78,20 @@ func NewRouter(deps Dependencies) http.Handler {
 		r.Mount("/auth", authhttp.NewRouter(authService, authConfig))
 
 		todoRepository := todopostgres.NewRepository(deps.DB)
-		todoService := application.NewService(application.Dependencies{
+		todoService := todoapp.NewService(todoapp.Dependencies{
 			Projects: todoRepository,
 			Tasks:    todoRepository,
 			Location: time.Local,
 		})
+		financeRepository := financepostgres.NewRepository(deps.DB)
+		financeService := financeapp.NewService(financeapp.Dependencies{
+			Expenses: financeRepository,
+			Income:   financeRepository,
+		})
 		r.Group(func(r chi.Router) {
 			r.Use(authhttp.RequireAuthenticated)
 			r.Mount("/todo", todohttp.NewRouter(todoService))
+			r.Mount("/finance", financehttp.NewRouter(financeService))
 		})
 	})
 
