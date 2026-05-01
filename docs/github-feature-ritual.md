@@ -39,6 +39,14 @@ The issue must explain:
 
 Move the issue to `Ready` only when the scope, risks, and acceptance criteria are clear enough to implement.
 
+Before an issue moves to `Ready`, it must have:
+
+- a release or maintenance milestone
+- type, area, risk, and stage labels
+- Project fields for `Stage`, `Status`, `Area`, `Risk`, and `Codex Review`
+- acceptance criteria and a test plan
+- a post-release check
+
 ## PR rules
 
 Open a Draft PR early and link it to the issue with:

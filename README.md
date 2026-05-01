@@ -148,6 +148,6 @@ Important operating rules:
 
 ## Release
 
-Current release target: `v0.2.0`, the first production Finance release.
+Current release target: `v0.2.1`, Finance polish for limit persistence and personal finance UI cleanup.
 
 Release notes are tracked in [CHANGELOG.md](CHANGELOG.md), and GitHub Releases trigger the production deployment workflow after environment approval.
