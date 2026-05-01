@@ -1,0 +1,70 @@
+name: Bug report
+description: Track a product or production bug with impact, reproduction, fix, and verification.
+title: "[Bug]: "
+labels:
+  - type:bug
+  - stage:discovery
+projects:
+  - anton415/7
+body:
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What is broken, and how does it affect the product?
+      placeholder: This prevents...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Steps, URLs, inputs, or state needed to reproduce.
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: areas
+    attributes:
+      label: Affected areas
+      options:
+        - label: todo
+        - label: finance
+        - label: investments
+        - label: fire
+        - label: auth
+        - label: platform
+        - label: database/migrations
+        - label: deploy/production
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: It should...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: Instead...
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      placeholder: |
+        - [ ] Regression test added or updated
+        - [ ] Manual scenario verified
+        - [ ] Production check needed/not needed
+    validations:
+      required: true
