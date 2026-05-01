@@ -89,7 +89,7 @@ Todo v1 intentionally excludes subtasks, tags, drag and drop, reminders, calenda
 
 Purpose: add personal finance tracking after the base application shape is proven by the Todo module.
 
-The first Finance slice now covers monthly RUB income and expense facts without accounts, cards, imports, transfers, limits, or forecasts.
+The first Finance slice now covers monthly RUB income and expense facts plus category limit settings, without accounts, cards, imports, transfers, or forecasts.
 
 Done means:
 
@@ -98,9 +98,17 @@ Done means:
 - finance logic has a clear boundary from todo logic
 - migration from old finance work is selective and documented
 
+### Near-term release sequence
+
+- `v0.2.1 - Finance polish`: fix limit persistence and finish the personal finance UI cleanup around category separation, default `0.00` values, and rounded display.
+- `v0.3.0 - Todo project lifecycle`: add project archive and project deletion flows, including the task data they own.
+- `v0.4.0 - Todo hierarchy`: add nested tasks and projects after lifecycle operations are explicit.
+- `v0.5.0 - Investments v1`: first useful Investments slice with accounts, positions, and portfolio facts.
+- `v0.6.0 - FIRE v1`: first useful FIRE slice based on explicit Finance and Investments outputs.
+
 ### Investments + FIRE v1
 
-Purpose: add investment tracking and FIRE progress tracking after finance concepts are stable enough to support them.
+Purpose: add investment tracking and FIRE progress tracking after finance polish and Todo lifecycle/hierarchy work make the core product workflows stable enough.
 
 Done means:
 
