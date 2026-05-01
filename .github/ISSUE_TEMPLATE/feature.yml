@@ -1,0 +1,148 @@
+name: Business feature
+description: Plan a feature from product intent through implementation, review, release, and monitoring.
+title: "[Feature]: "
+labels:
+  - type:feature
+  - stage:discovery
+projects:
+  - anton415/7
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for meaningful product work: Todo, Finance, Investments, FIRE, auth, deploy, migrations, or production-sensitive changes.
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What problem are we solving, and why now?
+      placeholder: This matters because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: User scenario
+      description: Describe the real workflow this feature should improve.
+      placeholder: As the app owner, I want to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: success
+    attributes:
+      label: Success signal
+      description: How will we know this feature is useful after release?
+      placeholder: The feature is successful when...
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is included in this slice?
+      placeholder: |
+        - ...
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: non_goals
+    attributes:
+      label: Non-goals
+      description: What are we deliberately not doing in this slice?
+      placeholder: |
+        - ...
+        - ...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: areas
+    attributes:
+      label: Affected areas
+      options:
+        - label: todo
+        - label: finance
+        - label: investments
+        - label: fire
+        - label: auth
+        - label: platform
+        - label: database/migrations
+        - label: deploy/production
+        - label: backups/restore
+
+  - type: checkboxes
+    id: risks
+    attributes:
+      label: Risks
+      options:
+        - label: Changes persisted data or migrations
+        - label: Touches auth, sessions, cookies, OAuth, or allowlist behavior
+        - label: Changes finance or money calculations
+        - label: Changes production deploy, infrastructure, secrets, or backups
+        - label: Changes module boundaries between finance, investments, and FIRE
+        - label: Needs manual production verification
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution / mini-spec
+      description: Summarize the implementation shape before coding.
+      placeholder: |
+        Domain:
+        API:
+        Database:
+        UI:
+        Operations:
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: Concrete behavior that must be true before merge.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: test_plan
+    attributes:
+      label: Test plan
+      options:
+        - label: Go unit/application/adapter tests where behavior changes
+        - label: Frontend typecheck and unit/render tests where UI changes
+        - label: Browser smoke or e2e test where a user flow changes
+        - label: Integration smoke where API + PostgreSQL behavior changes
+        - label: Manual local check of the primary workflow
+        - label: Manual production check after release
+
+  - type: textarea
+    id: review_notes
+    attributes:
+      label: Review focus for Codex
+      description: Tell automatic review where to look hardest.
+      placeholder: |
+        Please focus on:
+        - ...
+
+  - type: textarea
+    id: post_release
+    attributes:
+      label: Post-release check
+      description: What should be checked while the issue is in Monitoring?
+      placeholder: |
+        - [ ] /health returns ok
+        - [ ] Main UI scenario works in production
+        - [ ] No obvious runtime errors
+        - [ ] Data created by the feature persists correctly
+    validations:
+      required: true

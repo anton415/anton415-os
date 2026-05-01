@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Feature ritual guide
+    url: https://github.com/anton415/anton415-os/blob/main/docs/github-feature-ritual.md
+    about: How feature issues, PR review, releases, and monitoring fit together.
