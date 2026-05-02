@@ -5,10 +5,12 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/anton415/anton415-hub/internal/auth"
+	"github.com/anton415/anton415-hub/internal/platform/httpjson"
 )
 
 func TestSuccessRedirectForKeepsConfiguredOrigin(t *testing.T) {
@@ -54,6 +56,27 @@ func TestSessionCookieUsesConfiguredDomain(t *testing.T) {
 
 	if cookie.Domain != "anton415.ru" {
 		t.Fatalf("Domain = %q, want anton415.ru", cookie.Domain)
+	}
+}
+
+func TestEmailStartRejectsMalformedAndOversizedJSON(t *testing.T) {
+	service := &stubService{}
+	router := NewRouter(service, Config{})
+
+	malformed := performAuthRequest(router, http.MethodPost, "/email/start", `{"email":`)
+	oversized := performAuthRequest(router, http.MethodPost, "/email/start", oversizedEmailStartBody())
+
+	if malformed.Code != http.StatusBadRequest {
+		t.Fatalf("malformed status = %d, want %d; body=%s", malformed.Code, http.StatusBadRequest, malformed.Body.String())
+	}
+	if oversized.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized status = %d, want %d; body=%s", oversized.Code, http.StatusRequestEntityTooLarge, oversized.Body.String())
+	}
+	if !strings.Contains(oversized.Body.String(), `"payload_too_large"`) {
+		t.Fatalf("oversized body = %s, want payload_too_large error", oversized.Body.String())
+	}
+	if service.startEmailCalls != 0 {
+		t.Fatalf("StartEmailLogin calls = %d, want invalid bodies to stop before service", service.startEmailCalls)
 	}
 }
 
@@ -202,6 +225,10 @@ func performAuthRequest(router http.Handler, method string, path string, body st
 
 	router.ServeHTTP(response, request)
 	return response
+}
+
+func oversizedEmailStartBody() string {
+	return `{"email":"` + strings.Repeat("a", int(httpjson.MaxRequestBodyBytes)+1) + `@example.com"}`
 }
 
 type stubService struct {

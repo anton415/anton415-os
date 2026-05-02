@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/anton415/anton415-hub/internal/finance/application"
 	"github.com/anton415/anton415-hub/internal/finance/domain"
+	"github.com/anton415/anton415-hub/internal/platform/httpjson"
 )
 
 func TestExpenseListSaveAndValidation(t *testing.T) {
@@ -43,6 +45,23 @@ func TestExpenseListSaveAndValidation(t *testing.T) {
 		if response.Code != http.StatusBadRequest {
 			t.Fatalf("%s status = %d, want %d; body=%s", label, response.Code, http.StatusBadRequest, response.Body.String())
 		}
+	}
+}
+
+func TestExpenseSaveRejectsMalformedAndOversizedJSON(t *testing.T) {
+	router := newTestRouter()
+
+	malformed := performRequest(router, http.MethodPut, "/expenses/2026/4", `{"category_amounts":`)
+	oversized := performRequest(router, http.MethodPut, "/expenses/2026/4", oversizedExpenseBody())
+
+	if malformed.Code != http.StatusBadRequest {
+		t.Fatalf("malformed status = %d, want %d; body=%s", malformed.Code, http.StatusBadRequest, malformed.Body.String())
+	}
+	if oversized.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized status = %d, want %d; body=%s", oversized.Code, http.StatusRequestEntityTooLarge, oversized.Body.String())
+	}
+	if !strings.Contains(oversized.Body.String(), `"payload_too_large"`) {
+		t.Fatalf("oversized body = %s, want payload_too_large error", oversized.Body.String())
 	}
 }
 
@@ -100,6 +119,10 @@ func decodeData[T any](t *testing.T, response *httptest.ResponseRecorder) T {
 		t.Fatalf("decode data response: %v", err)
 	}
 	return envelope.Data
+}
+
+func oversizedExpenseBody() string {
+	return `{"category_amounts":{"restaurants":"` + strings.Repeat("1", int(httpjson.MaxRequestBodyBytes)+1) + `"}}`
 }
 
 func newTestRouter() http.Handler {

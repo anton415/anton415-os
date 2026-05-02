@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/anton415/anton415-hub/internal/platform/httpjson"
 	"github.com/anton415/anton415-hub/internal/todo/application"
 	"github.com/anton415/anton415-hub/internal/todo/domain"
 )
@@ -67,6 +69,23 @@ func TestTaskNotFound(t *testing.T) {
 
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+}
+
+func TestProjectCreateRejectsMalformedAndOversizedJSON(t *testing.T) {
+	router := newTestRouter()
+
+	malformed := performRequest(router, http.MethodPost, "/projects", `{"name":`)
+	oversized := performRequest(router, http.MethodPost, "/projects", oversizedProjectBody())
+
+	if malformed.Code != http.StatusBadRequest {
+		t.Fatalf("malformed status = %d, want %d; body=%s", malformed.Code, http.StatusBadRequest, malformed.Body.String())
+	}
+	if oversized.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("oversized status = %d, want %d; body=%s", oversized.Code, http.StatusRequestEntityTooLarge, oversized.Body.String())
+	}
+	if !strings.Contains(oversized.Body.String(), `"payload_too_large"`) {
+		t.Fatalf("oversized body = %s, want payload_too_large error", oversized.Body.String())
 	}
 }
 
@@ -266,6 +285,10 @@ func responseTaskIDs(tasks []taskResponse) []int64 {
 		ids = append(ids, task.ID)
 	}
 	return ids
+}
+
+func oversizedProjectBody() string {
+	return `{"name":"` + strings.Repeat("a", int(httpjson.MaxRequestBodyBytes)+1) + `"}`
 }
 
 func newTestRouter() http.Handler {

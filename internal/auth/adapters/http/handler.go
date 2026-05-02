@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/anton415/anton415-hub/internal/auth"
+	"github.com/anton415/anton415-hub/internal/platform/httpjson"
 )
 
 type Service interface {
@@ -250,9 +251,11 @@ func (handler Handler) clearSessionCookie() *http.Cookie {
 }
 
 func decodeRequest(w http.ResponseWriter, r *http.Request, value any) bool {
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(value); err != nil {
+	if err := httpjson.DecodeRequest(w, r, value); err != nil {
+		if errors.Is(err, httpjson.ErrRequestBodyTooLarge) {
+			writeErrorResponse(w, http.StatusRequestEntityTooLarge, "payload_too_large", "request body is too large")
+			return false
+		}
 		writeErrorResponse(w, http.StatusBadRequest, "bad_request", "request body must be valid JSON")
 		return false
 	}

@@ -12,6 +12,7 @@ import (
 
 	"github.com/anton415/anton415-hub/internal/finance/application"
 	"github.com/anton415/anton415-hub/internal/finance/domain"
+	"github.com/anton415/anton415-hub/internal/platform/httpjson"
 )
 
 type Service interface {
@@ -223,9 +224,11 @@ func parseYear(w http.ResponseWriter, value string) (int, bool) {
 }
 
 func decodeRequest(w http.ResponseWriter, r *http.Request, value any) bool {
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(value); err != nil {
+	if err := httpjson.DecodeRequest(w, r, value); err != nil {
+		if errors.Is(err, httpjson.ErrRequestBodyTooLarge) {
+			writeErrorResponse(w, http.StatusRequestEntityTooLarge, "payload_too_large", "request body is too large")
+			return false
+		}
 		writeErrorResponse(w, http.StatusBadRequest, "bad_request", "request body must be valid JSON")
 		return false
 	}
