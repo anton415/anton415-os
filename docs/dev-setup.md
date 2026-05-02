@@ -44,6 +44,9 @@ Open:
 | `AUTH_COOKIE_SECURE` | production only | Whether auth cookies require HTTPS. |
 | `AUTH_DEV_BYPASS` | `false` | Local-only auth bypass; ignored when `APP_ENV=production`. |
 | `AUTH_DEV_EMAIL` | `dev@localhost` | Email shown by `/api/v1/me` when the dev bypass is enabled. |
+| `AUTH_RATE_LIMIT_ENABLED` | `true` | Enables in-memory throttling for public auth-sensitive routes. |
+| `AUTH_RATE_LIMIT_REQUESTS` | `60` dev, `10` prod | Requests allowed per client/subject window. |
+| `AUTH_RATE_LIMIT_WINDOW` | `1m` | Fixed window for auth rate limiting. |
 | `EMAIL_FROM`, `SMTP_*` | empty | SMTP/Postbox settings for email magic links. |
 | `YANDEX_OAUTH_*`, `GITHUB_OAUTH_*`, `VK_OAUTH_*` | empty | OAuth client credentials. |
 

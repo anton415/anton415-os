@@ -247,6 +247,9 @@ jobs:
             upsert_env AUTH_SESSION_COOKIE "anton415_hub_session"
             upsert_env AUTH_COOKIE_DOMAIN ""
             upsert_env AUTH_COOKIE_SECURE "true"
+            upsert_env AUTH_RATE_LIMIT_ENABLED "true"
+            upsert_env AUTH_RATE_LIMIT_REQUESTS "10"
+            upsert_env AUTH_RATE_LIMIT_WINDOW "1m"
             upsert_env LOG_LEVEL "info"
             upsert_env SHUTDOWN_TIMEOUT "10s"
 

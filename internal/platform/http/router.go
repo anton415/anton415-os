@@ -71,10 +71,13 @@ func NewRouter(deps Dependencies) http.Handler {
 			FailureRedirect: deps.Config.AuthFailureRedirect,
 			DevBypass:       deps.Config.AuthDevBypass,
 			DevEmail:        deps.Config.AuthDevEmail,
+			RateLimit: authhttp.RateLimitConfig{
+				Enabled: deps.Config.AuthRateLimitEnabled,
+				Limit:   deps.Config.AuthRateLimitRequests,
+				Window:  deps.Config.AuthRateLimitWindow,
+			},
 		}
 
-		r.Use(authhttp.SessionMiddleware(authService, authConfig))
-		r.Get("/me", authhttp.MeHandler)
 		r.Mount("/auth", authhttp.NewRouter(authService, authConfig))
 
 		todoRepository := todopostgres.NewRepository(deps.DB)
@@ -89,9 +92,14 @@ func NewRouter(deps Dependencies) http.Handler {
 			Income:   financeRepository,
 		})
 		r.Group(func(r chi.Router) {
-			r.Use(authhttp.RequireAuthenticated)
-			r.Mount("/todo", todohttp.NewRouter(todoService))
-			r.Mount("/finance", financehttp.NewRouter(financeService))
+			r.Use(authhttp.SessionMiddleware(authService, authConfig))
+			r.Get("/me", authhttp.MeHandler)
+
+			r.Group(func(r chi.Router) {
+				r.Use(authhttp.RequireAuthenticated)
+				r.Mount("/todo", todohttp.NewRouter(todoService))
+				r.Mount("/finance", financehttp.NewRouter(financeService))
+			})
 		})
 	})
 

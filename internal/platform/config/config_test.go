@@ -22,6 +22,9 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("AUTH_COOKIE_SECURE", "")
 	t.Setenv("AUTH_DEV_BYPASS", "")
 	t.Setenv("AUTH_DEV_EMAIL", "")
+	t.Setenv("AUTH_RATE_LIMIT_ENABLED", "")
+	t.Setenv("AUTH_RATE_LIMIT_REQUESTS", "")
+	t.Setenv("AUTH_RATE_LIMIT_WINDOW", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -48,6 +51,15 @@ func TestLoadUsesDefaults(t *testing.T) {
 	}
 	if cfg.AuthDevBypass {
 		t.Fatal("AuthDevBypass = true, want false by default")
+	}
+	if !cfg.AuthRateLimitEnabled {
+		t.Fatal("AuthRateLimitEnabled = false, want true by default")
+	}
+	if cfg.AuthRateLimitRequests != 60 {
+		t.Fatalf("AuthRateLimitRequests = %d, want 60", cfg.AuthRateLimitRequests)
+	}
+	if cfg.AuthRateLimitWindow != time.Minute {
+		t.Fatalf("AuthRateLimitWindow = %s, want 1m", cfg.AuthRateLimitWindow)
 	}
 }
 
@@ -99,6 +111,9 @@ func TestLoadParsesAuthSettings(t *testing.T) {
 	t.Setenv("AUTH_COOKIE_SECURE", "")
 	t.Setenv("AUTH_SESSION_TTL", "24h")
 	t.Setenv("AUTH_TOKEN_TTL", "5m")
+	t.Setenv("AUTH_RATE_LIMIT_ENABLED", "false")
+	t.Setenv("AUTH_RATE_LIMIT_REQUESTS", "12")
+	t.Setenv("AUTH_RATE_LIMIT_WINDOW", "2m")
 
 	cfg, err := Load()
 	if err != nil {
@@ -119,6 +134,56 @@ func TestLoadParsesAuthSettings(t *testing.T) {
 	}
 	if len(cfg.AuthAllowedEmails) != 1 || cfg.AuthAllowedEmails[0] != "anton@example.com" {
 		t.Fatalf("AuthAllowedEmails = %#v, want normalized emails", cfg.AuthAllowedEmails)
+	}
+	if cfg.AuthRateLimitEnabled {
+		t.Fatal("AuthRateLimitEnabled = true, want parsed false")
+	}
+	if cfg.AuthRateLimitRequests != 12 {
+		t.Fatalf("AuthRateLimitRequests = %d, want 12", cfg.AuthRateLimitRequests)
+	}
+	if cfg.AuthRateLimitWindow != 2*time.Minute {
+		t.Fatalf("AuthRateLimitWindow = %s, want 2m", cfg.AuthRateLimitWindow)
+	}
+}
+
+func TestLoadUsesProductionAuthRateLimitDefaults(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("AUTH_ALLOWED_EMAILS", "owner@example.com")
+	t.Setenv("AUTH_RATE_LIMIT_ENABLED", "")
+	t.Setenv("AUTH_RATE_LIMIT_REQUESTS", "")
+	t.Setenv("AUTH_RATE_LIMIT_WINDOW", "")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !cfg.AuthRateLimitEnabled {
+		t.Fatal("AuthRateLimitEnabled = false, want true")
+	}
+	if cfg.AuthRateLimitRequests != 10 {
+		t.Fatalf("AuthRateLimitRequests = %d, want production default 10", cfg.AuthRateLimitRequests)
+	}
+	if cfg.AuthRateLimitWindow != time.Minute {
+		t.Fatalf("AuthRateLimitWindow = %s, want 1m", cfg.AuthRateLimitWindow)
+	}
+}
+
+func TestLoadRejectsInvalidAuthRateLimitRequests(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("AUTH_RATE_LIMIT_REQUESTS", "zero")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() error = nil, want invalid auth rate limit error")
+	}
+}
+
+func TestLoadRejectsInvalidAuthRateLimitWindow(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("AUTH_RATE_LIMIT_WINDOW", "0s")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() error = nil, want invalid auth rate limit window error")
 	}
 }
 

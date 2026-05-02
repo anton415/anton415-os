@@ -6,7 +6,9 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/anton415/anton415-hub/internal/platform/config"
 )
@@ -116,6 +118,39 @@ func TestProductRoutesRequireAuthentication(t *testing.T) {
 				t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
 			}
 		})
+	}
+}
+
+func TestAuthRoutesAreRateLimitedBeforeSessionLookup(t *testing.T) {
+	router := NewRouter(Dependencies{Config: config.Config{
+		AppVersion:            "test",
+		AuthRateLimitEnabled:  true,
+		AuthRateLimitRequests: 1,
+		AuthRateLimitWindow:   time.Minute,
+	}})
+
+	first := httptest.NewRequest(http.MethodPost, "/api/v1/auth/email/start", strings.NewReader(`{"email":"stranger@example.com"}`))
+	first.RemoteAddr = "203.0.113.20:4242"
+	first.Header.Set("Content-Type", "application/json")
+	first.AddCookie(&http.Cookie{Name: "anton415_hub_session", Value: "bogus"})
+	firstResponse := httptest.NewRecorder()
+
+	router.ServeHTTP(firstResponse, first)
+
+	if firstResponse.Code != http.StatusAccepted {
+		t.Fatalf("first status = %d, want %d", firstResponse.Code, http.StatusAccepted)
+	}
+
+	second := httptest.NewRequest(http.MethodPost, "/api/v1/auth/email/start", strings.NewReader(`{"email":" Stranger@Example.com "}`))
+	second.RemoteAddr = "203.0.113.20:4242"
+	second.Header.Set("Content-Type", "application/json")
+	second.AddCookie(&http.Cookie{Name: "anton415_hub_session", Value: "bogus"})
+	secondResponse := httptest.NewRecorder()
+
+	router.ServeHTTP(secondResponse, second)
+
+	if secondResponse.Code != http.StatusTooManyRequests {
+		t.Fatalf("second status = %d, want %d", secondResponse.Code, http.StatusTooManyRequests)
 	}
 }
 

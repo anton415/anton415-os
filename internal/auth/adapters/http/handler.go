@@ -33,15 +33,17 @@ type Config struct {
 	FailureRedirect string
 	DevBypass       bool
 	DevEmail        string
+	RateLimit       RateLimitConfig
 }
 
 type Handler struct {
-	service Service
-	config  Config
+	service     Service
+	config      Config
+	rateLimiter *rateLimiter
 }
 
 func NewRouter(service Service, config Config) http.Handler {
-	handler := Handler{service: service, config: config}
+	handler := Handler{service: service, config: config, rateLimiter: newRateLimiter(config.RateLimit)}
 	r := chi.NewRouter()
 
 	r.Get("/providers", handler.providers)
@@ -128,8 +130,13 @@ func (handler Handler) providers(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (handler Handler) startOAuth(w http.ResponseWriter, r *http.Request) {
+	providerID := chi.URLParam(r, "provider")
+	if !handler.allowAuthRequest(w, r, "oauth_start", normalizedRateLimitSubject(providerID)) {
+		return
+	}
+
 	redirectPath := safeRedirectPath(r.URL.Query().Get("redirect"))
-	authURL, err := handler.service.AuthCodeURL(r.Context(), chi.URLParam(r, "provider"), redirectPath)
+	authURL, err := handler.service.AuthCodeURL(r.Context(), providerID, redirectPath)
 	if err != nil {
 		writeAuthError(w, err)
 		return
@@ -139,6 +146,11 @@ func (handler Handler) startOAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler Handler) completeOAuth(w http.ResponseWriter, r *http.Request) {
+	providerID := chi.URLParam(r, "provider")
+	if !handler.allowAuthRequest(w, r, "oauth_callback", normalizedRateLimitSubject(providerID)) {
+		return
+	}
+
 	if r.URL.Query().Get("error") != "" {
 		handler.redirectFailure(w, r, "oauth_denied")
 		return
@@ -146,7 +158,7 @@ func (handler Handler) completeOAuth(w http.ResponseWriter, r *http.Request) {
 
 	session, err := handler.service.CompleteOAuth(
 		r.Context(),
-		chi.URLParam(r, "provider"),
+		providerID,
 		r.URL.Query().Get("state"),
 		r.URL.Query().Get("code"),
 	)
@@ -167,6 +179,9 @@ func (handler Handler) startEmail(w http.ResponseWriter, r *http.Request) {
 	if !decodeRequest(w, r, &request) {
 		return
 	}
+	if !handler.allowAuthRequest(w, r, "email_start", normalizedEmailRateLimitSubject(request.Email)) {
+		return
+	}
 
 	if err := handler.service.StartEmailLogin(r.Context(), request.Email); err != nil {
 		writeAuthError(w, err)
@@ -177,6 +192,10 @@ func (handler Handler) startEmail(w http.ResponseWriter, r *http.Request) {
 }
 
 func (handler Handler) completeEmail(w http.ResponseWriter, r *http.Request) {
+	if !handler.allowAuthRequest(w, r, "email_verify", "token") {
+		return
+	}
+
 	session, err := handler.service.CompleteEmailLogin(r.Context(), r.URL.Query().Get("token"))
 	if err != nil {
 		handler.redirectFailure(w, r, authErrorCode(err))

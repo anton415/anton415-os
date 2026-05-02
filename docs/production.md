@@ -44,9 +44,14 @@ AUTH_FAILURE_REDIRECT=https://anton415.ru/
 AUTH_SESSION_COOKIE=anton415_hub_session
 AUTH_COOKIE_DOMAIN=
 AUTH_COOKIE_SECURE=true
+AUTH_RATE_LIMIT_ENABLED=true
+AUTH_RATE_LIMIT_REQUESTS=10
+AUTH_RATE_LIMIT_WINDOW=1m
 POSTGRES_DB=anton415_hub
 POSTGRES_USER=anton415_hub_app
 ```
+
+Auth rate limiting is in-memory per app process and uses a fixed window. Public auth start/callback routes are limited by client IP plus provider or normalized email where applicable; the production default allows 10 attempts per such key per minute.
 
 Production is a single-owner deployment. Before release, confirm `AUTH_ALLOWED_EMAILS` in Lockbox contains one normalized owner email and no comma-separated second account. The API refuses to start in production when the allowlist is empty or contains multiple entries, because Todo and Finance rows are not scoped by `user_id` yet.
 

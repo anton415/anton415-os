@@ -14,33 +14,36 @@ import (
 const defaultDatabaseURL = "postgres://anton415:anton415@localhost:15432/anton415_hub?sslmode=disable"
 
 type Config struct {
-	AppEnv              string
-	AppVersion          string
-	DatabaseURL         string
-	HTTPAddr            string
-	LogLevel            string
-	ShutdownTimeout     time.Duration
-	WebOrigin           string
-	StaticDir           string
-	AuthAllowedEmails   []string
-	AuthCallbackBaseURL string
-	AuthSuccessRedirect string
-	AuthFailureRedirect string
-	AuthSessionCookie   string
-	AuthCookieDomain    string
-	AuthSessionTTL      time.Duration
-	AuthTokenTTL        time.Duration
-	AuthCookieSecure    bool
-	AuthDevBypass       bool
-	AuthDevEmail        string
-	EmailFrom           string
-	SMTPHost            string
-	SMTPPort            string
-	SMTPUsername        string
-	SMTPPassword        string
-	YandexOAuth         OAuthClientConfig
-	GitHubOAuth         OAuthClientConfig
-	VKOAuth             OAuthClientConfig
+	AppEnv                string
+	AppVersion            string
+	DatabaseURL           string
+	HTTPAddr              string
+	LogLevel              string
+	ShutdownTimeout       time.Duration
+	WebOrigin             string
+	StaticDir             string
+	AuthAllowedEmails     []string
+	AuthCallbackBaseURL   string
+	AuthSuccessRedirect   string
+	AuthFailureRedirect   string
+	AuthSessionCookie     string
+	AuthCookieDomain      string
+	AuthSessionTTL        time.Duration
+	AuthTokenTTL          time.Duration
+	AuthCookieSecure      bool
+	AuthDevBypass         bool
+	AuthDevEmail          string
+	AuthRateLimitEnabled  bool
+	AuthRateLimitRequests int
+	AuthRateLimitWindow   time.Duration
+	EmailFrom             string
+	SMTPHost              string
+	SMTPPort              string
+	SMTPUsername          string
+	SMTPPassword          string
+	YandexOAuth           OAuthClientConfig
+	GitHubOAuth           OAuthClientConfig
+	VKOAuth               OAuthClientConfig
 }
 
 type OAuthClientConfig struct {
@@ -68,33 +71,47 @@ func Load() (Config, error) {
 
 	appEnv := stringFromEnv("APP_ENV", "development")
 	production := isProductionEnv(appEnv)
+	authRateLimitRequests, err := intFromEnv("AUTH_RATE_LIMIT_REQUESTS", defaultAuthRateLimitRequests(production))
+	if err != nil {
+		return Config{}, err
+	}
+	authRateLimitWindow, err := durationFromEnv("AUTH_RATE_LIMIT_WINDOW", time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	if authRateLimitWindow <= 0 {
+		return Config{}, fmt.Errorf("parse AUTH_RATE_LIMIT_WINDOW: value must be positive")
+	}
 	webOrigin := stringFromEnv("WEB_ORIGIN", "http://localhost:5173")
 
 	cfg := Config{
-		AppEnv:              appEnv,
-		AppVersion:          stringFromEnv("APP_VERSION", "dev"),
-		DatabaseURL:         databaseURLFromEnv(),
-		HTTPAddr:            httpAddrFromEnv(),
-		LogLevel:            stringFromEnv("LOG_LEVEL", "info"),
-		ShutdownTimeout:     shutdownTimeout,
-		WebOrigin:           webOrigin,
-		StaticDir:           stringFromEnv("STATIC_DIR", ""),
-		AuthAllowedEmails:   listFromEnv("AUTH_ALLOWED_EMAILS"),
-		AuthCallbackBaseURL: stringFromEnv("AUTH_CALLBACK_BASE_URL", "http://localhost:8080"),
-		AuthSuccessRedirect: stringFromEnv("AUTH_SUCCESS_REDIRECT", webOrigin+"/todo"),
-		AuthFailureRedirect: stringFromEnv("AUTH_FAILURE_REDIRECT", webOrigin+"/"),
-		AuthSessionCookie:   stringFromEnv("AUTH_SESSION_COOKIE", "anton415_hub_session"),
-		AuthCookieDomain:    stringFromEnv("AUTH_COOKIE_DOMAIN", ""),
-		AuthSessionTTL:      sessionTTL,
-		AuthTokenTTL:        tokenTTL,
-		AuthCookieSecure:    boolFromEnv("AUTH_COOKIE_SECURE", production),
-		AuthDevBypass:       !production && boolFromEnv("AUTH_DEV_BYPASS", false),
-		AuthDevEmail:        stringFromEnv("AUTH_DEV_EMAIL", "dev@localhost"),
-		EmailFrom:           stringFromEnv("EMAIL_FROM", ""),
-		SMTPHost:            stringFromEnv("SMTP_HOST", ""),
-		SMTPPort:            stringFromEnv("SMTP_PORT", "587"),
-		SMTPUsername:        stringFromEnv("SMTP_USERNAME", ""),
-		SMTPPassword:        stringFromEnv("SMTP_PASSWORD", ""),
+		AppEnv:                appEnv,
+		AppVersion:            stringFromEnv("APP_VERSION", "dev"),
+		DatabaseURL:           databaseURLFromEnv(),
+		HTTPAddr:              httpAddrFromEnv(),
+		LogLevel:              stringFromEnv("LOG_LEVEL", "info"),
+		ShutdownTimeout:       shutdownTimeout,
+		WebOrigin:             webOrigin,
+		StaticDir:             stringFromEnv("STATIC_DIR", ""),
+		AuthAllowedEmails:     listFromEnv("AUTH_ALLOWED_EMAILS"),
+		AuthCallbackBaseURL:   stringFromEnv("AUTH_CALLBACK_BASE_URL", "http://localhost:8080"),
+		AuthSuccessRedirect:   stringFromEnv("AUTH_SUCCESS_REDIRECT", webOrigin+"/todo"),
+		AuthFailureRedirect:   stringFromEnv("AUTH_FAILURE_REDIRECT", webOrigin+"/"),
+		AuthSessionCookie:     stringFromEnv("AUTH_SESSION_COOKIE", "anton415_hub_session"),
+		AuthCookieDomain:      stringFromEnv("AUTH_COOKIE_DOMAIN", ""),
+		AuthSessionTTL:        sessionTTL,
+		AuthTokenTTL:          tokenTTL,
+		AuthCookieSecure:      boolFromEnv("AUTH_COOKIE_SECURE", production),
+		AuthDevBypass:         !production && boolFromEnv("AUTH_DEV_BYPASS", false),
+		AuthDevEmail:          stringFromEnv("AUTH_DEV_EMAIL", "dev@localhost"),
+		AuthRateLimitEnabled:  boolFromEnv("AUTH_RATE_LIMIT_ENABLED", true),
+		AuthRateLimitRequests: authRateLimitRequests,
+		AuthRateLimitWindow:   authRateLimitWindow,
+		EmailFrom:             stringFromEnv("EMAIL_FROM", ""),
+		SMTPHost:              stringFromEnv("SMTP_HOST", ""),
+		SMTPPort:              stringFromEnv("SMTP_PORT", "587"),
+		SMTPUsername:          stringFromEnv("SMTP_USERNAME", ""),
+		SMTPPassword:          stringFromEnv("SMTP_PASSWORD", ""),
 		YandexOAuth: OAuthClientConfig{
 			ClientID:     stringFromEnv("YANDEX_OAUTH_CLIENT_ID", ""),
 			ClientSecret: stringFromEnv("YANDEX_OAUTH_CLIENT_SECRET", ""),
@@ -142,6 +159,13 @@ func validateConfig(cfg Config) error {
 
 func isProductionEnv(appEnv string) bool {
 	return strings.EqualFold(strings.TrimSpace(appEnv), "production")
+}
+
+func defaultAuthRateLimitRequests(production bool) int {
+	if production {
+		return 10
+	}
+	return 60
 }
 
 func httpAddrFromEnv() string {
@@ -223,6 +247,23 @@ func durationFromEnv(key string, fallback time.Duration) (time.Duration, error) 
 	parsed, err := time.ParseDuration(value)
 	if err != nil {
 		return 0, fmt.Errorf("parse %s: %w", key, err)
+	}
+
+	return parsed, nil
+}
+
+func intFromEnv(key string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("parse %s: %w", key, err)
+	}
+	if parsed <= 0 {
+		return 0, fmt.Errorf("parse %s: value must be positive", key)
 	}
 
 	return parsed, nil
