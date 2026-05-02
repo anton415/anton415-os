@@ -1,4 +1,4 @@
-module github.com/anton415/anton415-os
+module github.com/anton415/anton415-hub
 
 go 1.25.0
 

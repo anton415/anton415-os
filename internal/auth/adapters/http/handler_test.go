@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/anton415/anton415-os/internal/auth"
+	"github.com/anton415/anton415-hub/internal/auth"
 )
 
 func TestSuccessRedirectForKeepsConfiguredOrigin(t *testing.T) {
@@ -42,7 +42,7 @@ func TestSuccessRedirectForUsesConfiguredDefaultWithoutRequestedPath(t *testing.
 
 func TestSessionCookieUsesConfiguredDomain(t *testing.T) {
 	handler := Handler{config: Config{
-		CookieName:   "anton415_session",
+		CookieName:   "anton415_hub_session",
 		CookieDomain: ".anton415.ru",
 	}}
 

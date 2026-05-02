@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/anton415/anton415-os/internal/todo/domain"
+	"github.com/anton415/anton415-hub/internal/todo/domain"
 )
 
 type TaskView string

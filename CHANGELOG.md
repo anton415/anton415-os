@@ -1,6 +1,13 @@
 # Changelog
 
-All notable changes to `anton415-os` are summarized here. Releases follow the shape of the product rather than a public API compatibility contract.
+All notable changes to anton415 Hub are summarized here. Releases follow the shape of the product rather than a public API compatibility contract.
+
+## Unreleased
+
+### Platform
+
+- Renamed the product and repository identity from the previous OS-oriented name to anton415 Hub.
+- Updated UI copy, package/module metadata, container image names, deploy paths, and production rename runbooks.
 
 ## v0.2.0 - 2026-04-29
 

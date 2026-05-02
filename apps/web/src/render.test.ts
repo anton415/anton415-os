@@ -171,7 +171,7 @@ describe("renderApp todo", () => {
     expect(options.onToggleTodoPanel).toHaveBeenCalled();
   });
 
-  it("toggles the anton-os sidebar", () => {
+  it("toggles the anton415 Hub sidebar", () => {
     const options = optionsForTodo({ sidebarCollapsed: true });
 
     renderApp(root, options);
@@ -305,7 +305,7 @@ describe("renderApp todo", () => {
 
     expect(root.querySelector("#task-form")).toBeNull();
     expect(root.querySelector(".module-card")).toBeNull();
-    expect(root.textContent).toContain("Личный anton415 OS");
+    expect(root.textContent).toContain("Личный anton415 Hub");
     expect(root.querySelector<HTMLInputElement>('input[name="email"]')).not.toBeNull();
     expect(root.querySelector<HTMLAnchorElement>(".oauth-button")?.href).toBe(
       "http://api.test/api/v1/auth/github/start?redirect=%2Ftodo"
@@ -495,7 +495,7 @@ function authState(overrides: Partial<Extract<AuthState, { kind: "authenticated"
 
 function healthPayload(): Extract<HealthState, { kind: "online" }>["payload"] {
   return {
-    service: "anton415-os-api",
+    service: "anton415-hub-api",
     status: "ok",
     version: "test",
     checks: { database: { status: "ok", latency: "1ms" } }

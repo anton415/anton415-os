@@ -1,8 +1,8 @@
 locals {
-  app_name      = "anton415-os"
-  database_name = "anton415_os"
-  database_user = "anton415_app"
-  image_name    = "cr.yandex/${yandex_container_registry.app.id}/anton415-os:${var.image_tag}"
+  app_name      = "anton415-hub"
+  database_name = "anton415_hub"
+  database_user = "anton415_hub_app"
+  image_name    = "cr.yandex/${yandex_container_registry.app.id}/anton415-hub:${var.image_tag}"
   root_zone     = trimsuffix(var.root_domain_name, ".")
 }
 

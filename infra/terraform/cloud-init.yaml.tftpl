@@ -6,7 +6,7 @@ packages:
   - curl
 
 write_files:
-  - path: /opt/anton415-os/docker-compose.yml
+  - path: /opt/anton415-hub/docker-compose.yml
     permissions: "0644"
     content: |
       services:
@@ -14,7 +14,7 @@ write_files:
           image: postgres:16-alpine
           restart: unless-stopped
           env_file:
-            - /opt/anton415-os/app.env
+            - /opt/anton415-hub/app.env
           volumes:
             - postgres_data:/var/lib/postgresql/data
           healthcheck:
@@ -35,7 +35,7 @@ write_files:
               "up"
             ]
           volumes:
-            - /opt/anton415-os/migrations:/migrations:ro
+            - /opt/anton415-hub/migrations:/migrations:ro
           depends_on:
             postgres:
               condition: service_healthy
@@ -44,8 +44,8 @@ write_files:
           image: ${image_name}
           restart: unless-stopped
           env_file:
-            - /opt/anton415-os/app.env
-            - /opt/anton415-os/secrets.env
+            - /opt/anton415-hub/app.env
+            - /opt/anton415-hub/secrets.env
           expose:
             - "8080"
           depends_on:
@@ -64,7 +64,7 @@ write_files:
             - "80:80"
             - "443:443"
           volumes:
-            - /opt/anton415-os/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+            - /opt/anton415-hub/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
             - caddy_data:/data
             - caddy_config:/config
           depends_on:
@@ -75,7 +75,7 @@ write_files:
         caddy_data:
         caddy_config:
 
-  - path: /opt/anton415-os/caddy/Caddyfile
+  - path: /opt/anton415-hub/caddy/Caddyfile
     permissions: "0644"
     content: |
       (security_headers) {
@@ -93,7 +93,7 @@ write_files:
         reverse_proxy app:8080
       }
 
-  - path: /opt/anton415-os/app.env
+  - path: /opt/anton415-hub/app.env
     permissions: "0600"
     content: |
       APP_ENV=production
@@ -109,7 +109,7 @@ write_files:
       AUTH_CALLBACK_BASE_URL=https://${root_domain_name}
       AUTH_SUCCESS_REDIRECT=https://${root_domain_name}/todo
       AUTH_FAILURE_REDIRECT=https://${root_domain_name}/
-      AUTH_SESSION_COOKIE=anton415_session
+      AUTH_SESSION_COOKIE=anton415_hub_session
       AUTH_COOKIE_DOMAIN=
       AUTH_SESSION_TTL=720h
       AUTH_TOKEN_TTL=15m
@@ -121,14 +121,14 @@ write_files:
       SMTP_PORT=587
       BACKUP_BUCKET=${backup_bucket}
 
-  - path: /opt/anton415-os/sync-lockbox-env.sh
+  - path: /opt/anton415-hub/sync-lockbox-env.sh
     permissions: "0700"
     content: |
       #!/bin/sh
       set -eu
 
       SECRET_ID="${lockbox_secret_id}"
-      OUT="/opt/anton415-os/secrets.env"
+      OUT="/opt/anton415-hub/secrets.env"
       TMP="$(mktemp)"
       OUT_TMP="$(mktemp)"
 
@@ -178,20 +178,20 @@ write_files:
       fi
 
 runcmd:
-  - mkdir -p /opt/anton415-os/caddy /opt/anton415-os/migrations
-  - /opt/anton415-os/sync-lockbox-env.sh
+  - mkdir -p /opt/anton415-hub/caddy /opt/anton415-hub/migrations
+  - /opt/anton415-hub/sync-lockbox-env.sh
   - |
     TOKEN_JSON="$(curl -fsS -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token)"
     IAM_TOKEN="$(printf '%s' "$TOKEN_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
     printf '%s' "$IAM_TOKEN" | docker login --username iam --password-stdin cr.yandex
-  - docker compose -f /opt/anton415-os/docker-compose.yml pull
+  - docker compose -f /opt/anton415-hub/docker-compose.yml pull
   - |
     CONTAINER_ID="$(docker create ${image_name})"
     trap 'docker rm "$CONTAINER_ID" >/dev/null 2>&1 || true' EXIT
-    rm -rf /opt/anton415-os/migrations
-    docker cp "$CONTAINER_ID:/app/migrations" /opt/anton415-os/migrations
+    rm -rf /opt/anton415-hub/migrations
+    docker cp "$CONTAINER_ID:/app/migrations" /opt/anton415-hub/migrations
     docker rm "$CONTAINER_ID"
     trap - EXIT
-  - docker compose -f /opt/anton415-os/docker-compose.yml up -d postgres
-  - docker compose -f /opt/anton415-os/docker-compose.yml run --rm migrate
-  - docker compose -f /opt/anton415-os/docker-compose.yml up -d app caddy
+  - docker compose -f /opt/anton415-hub/docker-compose.yml up -d postgres
+  - docker compose -f /opt/anton415-hub/docker-compose.yml run --rm migrate
+  - docker compose -f /opt/anton415-hub/docker-compose.yml up -d app caddy

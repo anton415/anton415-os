@@ -3,7 +3,7 @@ package application
 import (
 	"context"
 
-	"github.com/anton415/anton415-os/internal/finance/domain"
+	"github.com/anton415/anton415-hub/internal/finance/domain"
 )
 
 type ExpenseRepository interface {

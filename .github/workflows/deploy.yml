@@ -28,7 +28,7 @@ jobs:
     permissions:
       contents: read
     env:
-      IMAGE_NAME: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-os
+      IMAGE_NAME: cr.yandex/${{ secrets.YC_REGISTRY_ID }}/anton415-hub
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -86,9 +86,122 @@ jobs:
           key: ${{ secrets.PRODUCTION_SSH_KEY }}
           script: |
             set -euo pipefail
-            cd /opt/anton415-os
+
+            APP_DIR="/opt/anton415-hub"
+            OLD_APP_DIR="/opt/anton415-os"
+            COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
+            OLD_COMPOSE_FILE="${OLD_APP_DIR}/docker-compose.yml"
+            ENV_FILE="${APP_DIR}/app.env"
+            DB_MIGRATION_MARKER="${APP_DIR}/.anton415-hub-db-migrated"
+            DB_NAME="anton415_hub"
+            DB_USER="anton415_hub_app"
             image="${{ steps.image.outputs.image }}"
-            sudo tee /opt/anton415-os/caddy/Caddyfile >/dev/null <<'CADDY'
+            app_version="${{ steps.image.outputs.tag }}"
+
+            read_env() {
+              file="$1"
+              key="$2"
+              if [ -f "$file" ]; then
+                sudo awk -F= -v key="$key" '$1 == key { sub(/^[^=]*=/, ""); print; exit }' "$file"
+              fi
+            }
+
+            upsert_env() {
+              key="$1"
+              value="$2"
+              tmp="$(mktemp)"
+              sudo awk -v key="$key" -v value="$value" '
+                BEGIN { found = 0 }
+                $0 ~ "^" key "=" {
+                  print key "=" value
+                  found = 1
+                  next
+                }
+                { print }
+                END {
+                  if (!found) {
+                    print key "=" value
+                  }
+                }
+              ' "$ENV_FILE" > "$tmp"
+              sudo install -m 0600 "$tmp" "$ENV_FILE"
+              rm -f "$tmp"
+            }
+
+            url_encode() {
+              python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
+            }
+
+            wait_for_new_postgres() {
+              for _ in $(seq 1 30); do
+                if sudo docker compose -f "$COMPOSE_FILE" exec -T postgres pg_isready -U "$DB_USER" -d "$DB_NAME"; then
+                  return 0
+                fi
+                sleep 2
+              done
+              echo "New anton415 Hub PostgreSQL did not become ready in time" >&2
+              return 1
+            }
+
+            sudo mkdir -p "${APP_DIR}/caddy" "${APP_DIR}/migrations"
+            if [ ! -f "$ENV_FILE" ] && [ -f "${OLD_APP_DIR}/app.env" ]; then
+              sudo install -m 0600 "${OLD_APP_DIR}/app.env" "$ENV_FILE"
+            fi
+            if [ ! -f "$ENV_FILE" ]; then
+              sudo install -m 0600 /dev/null "$ENV_FILE"
+            fi
+
+            db_password="$(read_env "$ENV_FILE" POSTGRES_PASSWORD || true)"
+            if [ -z "$db_password" ] && [ -f "${OLD_APP_DIR}/app.env" ]; then
+              db_password="$(read_env "${OLD_APP_DIR}/app.env" POSTGRES_PASSWORD || true)"
+            fi
+            if [ -z "$db_password" ]; then
+              echo "POSTGRES_PASSWORD is required in ${ENV_FILE} or legacy ${OLD_APP_DIR}/app.env" >&2
+              exit 64
+            fi
+
+            auth_allowed_emails="$(read_env "$ENV_FILE" AUTH_ALLOWED_EMAILS || true)"
+            if [ -z "$auth_allowed_emails" ] && [ -f "${OLD_APP_DIR}/app.env" ]; then
+              auth_allowed_emails="$(read_env "${OLD_APP_DIR}/app.env" AUTH_ALLOWED_EMAILS || true)"
+            fi
+            if [ -z "$auth_allowed_emails" ]; then
+              echo "AUTH_ALLOWED_EMAILS is required in ${ENV_FILE} or legacy ${OLD_APP_DIR}/app.env" >&2
+              exit 64
+            fi
+
+            database_url="postgres://${DB_USER}:$(url_encode "$db_password")@postgres:5432/${DB_NAME}?sslmode=disable"
+
+            upsert_env APP_ENV "production"
+            upsert_env APP_VERSION "$app_version"
+            upsert_env HTTP_ADDR ":8080"
+            upsert_env STATIC_DIR "/app/web"
+            upsert_env DATABASE_URL "$database_url"
+            upsert_env POSTGRES_DB "$DB_NAME"
+            upsert_env POSTGRES_USER "$DB_USER"
+            upsert_env POSTGRES_PASSWORD "$db_password"
+            upsert_env WEB_ORIGIN "https://anton415.ru"
+            upsert_env AUTH_ALLOWED_EMAILS "$auth_allowed_emails"
+            upsert_env AUTH_CALLBACK_BASE_URL "https://anton415.ru"
+            upsert_env AUTH_SUCCESS_REDIRECT "https://anton415.ru/todo"
+            upsert_env AUTH_FAILURE_REDIRECT "https://anton415.ru/"
+            upsert_env AUTH_SESSION_COOKIE "anton415_hub_session"
+            upsert_env AUTH_COOKIE_DOMAIN ""
+            upsert_env AUTH_COOKIE_SECURE "true"
+            upsert_env LOG_LEVEL "info"
+            upsert_env SHUTDOWN_TIMEOUT "10s"
+
+            if [ ! -x "${APP_DIR}/sync-lockbox-env.sh" ] && [ -f "${OLD_APP_DIR}/sync-lockbox-env.sh" ]; then
+              sudo cp "${OLD_APP_DIR}/sync-lockbox-env.sh" "${APP_DIR}/sync-lockbox-env.sh"
+              sudo sed -i.bak 's#/opt/anton415-os/secrets.env#/opt/anton415-hub/secrets.env#g' "${APP_DIR}/sync-lockbox-env.sh"
+              sudo chmod 0700 "${APP_DIR}/sync-lockbox-env.sh"
+            fi
+            if [ -x "${APP_DIR}/sync-lockbox-env.sh" ]; then
+              sudo "${APP_DIR}/sync-lockbox-env.sh"
+            elif [ ! -f "${APP_DIR}/secrets.env" ]; then
+              sudo install -m 0600 /dev/null "${APP_DIR}/secrets.env"
+            fi
+
+            sudo tee "${APP_DIR}/caddy/Caddyfile" >/dev/null <<'CADDY'
             (security_headers) {
               header {
                 Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -104,33 +217,114 @@ jobs:
               reverse_proxy app:8080
             }
             CADDY
-            upsert_env() {
-              key="$1"
-              value="$2"
-              if sudo grep -q -E "^${key}=" app.env; then
-                sudo sed -i.bak -E "s|^${key}=.*|${key}=${value}|g" app.env
-              else
-                printf '%s=%s\n' "$key" "$value" | sudo tee -a app.env >/dev/null
-              fi
-            }
-            sudo ./sync-lockbox-env.sh
-            upsert_env APP_VERSION "${{ steps.image.outputs.tag }}"
-            upsert_env WEB_ORIGIN "https://anton415.ru"
-            upsert_env AUTH_CALLBACK_BASE_URL "https://anton415.ru"
-            upsert_env AUTH_SUCCESS_REDIRECT "https://anton415.ru/todo"
-            upsert_env AUTH_FAILURE_REDIRECT "https://anton415.ru/"
-            upsert_env AUTH_COOKIE_DOMAIN ""
-            sudo sed -i.bak -E "s#image: cr.yandex/.*/anton415-os:.*#image: ${image}#g" docker-compose.yml
+
+            sudo tee "$COMPOSE_FILE" >/dev/null <<'COMPOSE'
+            services:
+              postgres:
+                image: postgres:16-alpine
+                restart: unless-stopped
+                env_file:
+                  - /opt/anton415-hub/app.env
+                volumes:
+                  - postgres_data:/var/lib/postgresql/data
+                healthcheck:
+                  test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+                  interval: 10s
+                  timeout: 5s
+                  retries: 12
+
+              migrate:
+                image: migrate/migrate:v4.18.3
+                restart: "no"
+                command:
+                  [
+                    "-path",
+                    "/migrations",
+                    "-database",
+                    "__DATABASE_URL__",
+                    "up"
+                  ]
+                volumes:
+                  - /opt/anton415-hub/migrations:/migrations:ro
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+
+              app:
+                image: __IMAGE__
+                restart: unless-stopped
+                env_file:
+                  - /opt/anton415-hub/app.env
+                  - /opt/anton415-hub/secrets.env
+                expose:
+                  - "8080"
+                depends_on:
+                  postgres:
+                    condition: service_healthy
+                healthcheck:
+                  test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+                  interval: 30s
+                  timeout: 5s
+                  retries: 5
+
+              caddy:
+                image: caddy:2.8-alpine
+                restart: unless-stopped
+                ports:
+                  - "80:80"
+                  - "443:443"
+                volumes:
+                  - /opt/anton415-hub/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+                  - caddy_data:/data
+                  - caddy_config:/config
+                depends_on:
+                  - app
+
+            volumes:
+              postgres_data:
+              caddy_data:
+              caddy_config:
+            COMPOSE
+            sudo env IMAGE="$image" DATABASE_URL="$database_url" perl -0pi -e 's/__IMAGE__/$ENV{IMAGE}/g; s/__DATABASE_URL__/$ENV{DATABASE_URL}/g' "$COMPOSE_FILE"
+
             sudo docker pull "$image"
             container_id="$(sudo docker create "$image")"
             trap 'sudo docker rm "$container_id" >/dev/null 2>&1 || true' EXIT
-            sudo rm -rf migrations
-            sudo docker cp "$container_id:/app/migrations" migrations
+            sudo rm -rf "${APP_DIR}/migrations"
+            sudo docker cp "$container_id:/app/migrations" "${APP_DIR}/migrations"
             sudo docker rm "$container_id"
             trap - EXIT
-            sudo docker compose up -d postgres
-            sudo docker compose run --rm migrate
-            sudo docker compose up -d --no-deps --force-recreate app
-            sudo docker compose up -d --no-deps --force-recreate caddy
-            sudo docker compose exec -T app wget -qO- http://127.0.0.1:8080/health
+
+            if [ ! -f "$DB_MIGRATION_MARKER" ] && [ -f "$OLD_COMPOSE_FILE" ]; then
+              echo "Migrating production data from legacy /opt/anton415-os to anton415 Hub"
+              old_db_name="$(read_env "${OLD_APP_DIR}/app.env" POSTGRES_DB || true)"
+              old_db_user="$(read_env "${OLD_APP_DIR}/app.env" POSTGRES_USER || true)"
+              old_db_name="${old_db_name:-anton415_os}"
+              old_db_user="${old_db_user:-anton415_app}"
+              dump_file="$(mktemp)"
+              trap 'rm -f "$dump_file"' EXIT
+
+              sudo docker compose -f "$OLD_COMPOSE_FILE" up -d postgres
+              sudo docker compose -f "$OLD_COMPOSE_FILE" stop app caddy || true
+              sudo docker compose -f "$OLD_COMPOSE_FILE" exec -T postgres pg_dump --no-owner --no-privileges -U "$old_db_user" -d "$old_db_name" > "$dump_file"
+
+              sudo docker compose -f "$COMPOSE_FILE" up -d postgres
+              wait_for_new_postgres
+              sudo docker compose -f "$COMPOSE_FILE" exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+              sudo docker compose -f "$COMPOSE_FILE" exec -T postgres psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" < "$dump_file"
+              sudo install -m 0644 /dev/null "$DB_MIGRATION_MARKER"
+              rm -f "$dump_file"
+              trap - EXIT
+            else
+              sudo docker compose -f "$COMPOSE_FILE" up -d postgres
+              wait_for_new_postgres
+            fi
+
+            if [ -f "$OLD_COMPOSE_FILE" ]; then
+              sudo docker compose -f "$OLD_COMPOSE_FILE" stop app caddy || true
+            fi
+            sudo docker compose -f "$COMPOSE_FILE" run --rm migrate
+            sudo docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate app
+            sudo docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate caddy
+            sudo docker compose -f "$COMPOSE_FILE" exec -T app wget -qO- http://127.0.0.1:8080/health
             sudo docker image prune -f

@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/anton415/anton415-os/internal/auth"
+	"github.com/anton415/anton415-hub/internal/auth"
 )
 
 type Service interface {
@@ -294,7 +294,7 @@ func authErrorCode(err error) string {
 
 func (config Config) cookieName() string {
 	if strings.TrimSpace(config.CookieName) == "" {
-		return "anton415_session"
+		return "anton415_hub_session"
 	}
 	return config.CookieName
 }

@@ -1,12 +1,12 @@
-# anton415-os
+# anton415 Hub
 
-[![CI](https://github.com/anton415/anton415-os/actions/workflows/ci.yml/badge.svg)](https://github.com/anton415/anton415-os/actions/workflows/ci.yml)
-[![Deploy Production](https://github.com/anton415/anton415-os/actions/workflows/deploy.yml/badge.svg)](https://github.com/anton415/anton415-os/actions/workflows/deploy.yml)
-[![Release](https://img.shields.io/github/v/release/anton415/anton415-os?display_name=tag&sort=semver)](https://github.com/anton415/anton415-os/releases)
+[![CI](https://github.com/anton415/anton415-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/anton415/anton415-hub/actions/workflows/ci.yml)
+[![Deploy Production](https://github.com/anton415/anton415-hub/actions/workflows/deploy.yml/badge.svg)](https://github.com/anton415/anton415-hub/actions/workflows/deploy.yml)
+[![Release](https://img.shields.io/github/v/release/anton415/anton415-hub?display_name=tag&sort=semver)](https://github.com/anton415/anton415-hub/releases)
 [![Go 1.25](https://img.shields.io/badge/Go-1.25-00ADD8)](https://go.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6)](https://www.typescriptlang.org/)
 
-`anton415-os` is a personal operating-system monorepo: a modular Go and TypeScript application for private productivity, finance, investments, and FIRE planning.
+`anton415-hub` is the anton415 Hub monorepo: a modular Go and TypeScript application for private productivity, finance, investments, and FIRE planning.
 
 The production app is live at [anton415.ru](https://anton415.ru), protected by Yandex ID and a single-email allowlist. The current release includes private Todo workflows and the first monthly Finance slice.
 
@@ -116,7 +116,7 @@ Pull requests and `main` run:
 - Frontend typecheck, unit tests, build, and Playwright smoke
 - Production Docker image build for `linux/amd64`
 
-Production deploys run through [Deploy Production](https://github.com/anton415/anton415-os/actions/workflows/deploy.yml), either manually or from a published GitHub Release. The workflow builds and pushes a `linux/amd64` image to Yandex Container Registry, runs migrations on the VM, recreates the app/Caddy containers, and checks `/health`.
+Production deploys run through [Deploy Production](https://github.com/anton415/anton415-hub/actions/workflows/deploy.yml), either manually or from a published GitHub Release. The workflow builds and pushes a `linux/amd64` image to Yandex Container Registry, runs migrations on the VM, recreates the app/Caddy containers, and checks `/health`.
 
 Deployment requires GitHub environment approval and repository secrets. Details live in [docs/github-actions.md](docs/github-actions.md).
 

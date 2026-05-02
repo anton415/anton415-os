@@ -30,7 +30,7 @@ folder_id          = "..."
 ssh_public_key     = "ssh-ed25519 ..."
 db_password        = "..."
 allowed_emails     = "anton@example.com"
-backup_bucket_name = "anton415-os-postgres-backups"
+backup_bucket_name = "anton415-hub-postgres-backups"
 ```
 
 Then:
@@ -44,6 +44,8 @@ terraform apply
 
 `terraform plan` only calculates changes. `terraform apply` creates paid Yandex resources and must be run only after explicitly reviewing the plan and approving the spend.
 
+For the anton415 Hub rename, review the plan especially carefully: resource names, the VM app directory, registry image name, database name, database user, and backup bucket examples now use `anton415-hub` / `anton415_hub`. Keep pre-rename production backups until the post-release data check is complete.
+
 After apply, add a Lockbox secret version with runtime secrets:
 
 ```sh
@@ -51,7 +53,7 @@ YC_BIN="$HOME/yandex-cloud/bin/yc" \
   ../../deploy/lockbox-sync.sh ../../deploy/lockbox/.env.production "$(terraform output -raw lockbox_secret_id)"
 ```
 
-The VM reads Lockbox into `/opt/anton415-os/secrets.env` with `/opt/anton415-os/sync-lockbox-env.sh`. To rotate secrets later, add a new Lockbox version and run that script on the VM before restarting Compose.
+The VM reads Lockbox into `/opt/anton415-hub/secrets.env` with `/opt/anton415-hub/sync-lockbox-env.sh`. To rotate secrets later, add a new Lockbox version and run that script on the VM before restarting Compose.
 
 Create a JSON key for the deploy service account outside Terraform and store it as the GitHub Actions secret `YC_SA_JSON_KEY`. The service account ID is available from:
 

@@ -87,4 +87,4 @@ jobs:
           platforms: linux/amd64
           push: false
           load: true
-          tags: anton415-os:${{ github.sha }}
+          tags: anton415-hub:${{ github.sha }}

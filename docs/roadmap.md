@@ -13,7 +13,7 @@ The first version should prioritize clear workflows, reliable data ownership, an
 
 ## Constraints
 
-- `anton415-os` is the active source of truth for roadmap and implementation.
+- `anton415/anton415-hub` is the active source of truth for roadmap and implementation.
 - The initial architecture is a Go modular monolith.
 - Product modules live inside this monorepo by default.
 - Separate repositories are only considered during controlled extraction with strong justification.

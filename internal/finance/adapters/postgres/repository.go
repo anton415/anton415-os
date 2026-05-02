@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/anton415/anton415-os/internal/finance/domain"
+	"github.com/anton415/anton415-hub/internal/finance/domain"
 )
 
 type Repository struct {

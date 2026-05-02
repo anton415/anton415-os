@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/anton415/anton415-os/internal/auth"
+	"github.com/anton415/anton415-hub/internal/auth"
 )
 
 type Repository struct {

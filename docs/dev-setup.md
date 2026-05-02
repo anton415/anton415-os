@@ -71,7 +71,7 @@ make docker-config
 
 Local PostgreSQL runs in Docker Compose:
 
-- database: `anton415_os`
+- database: `anton415_hub`
 - user: `anton415`
 - password: `anton415`
 - host port: `15432`

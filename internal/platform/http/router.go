@@ -15,16 +15,16 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/anton415/anton415-os/internal/auth"
-	authhttp "github.com/anton415/anton415-os/internal/auth/adapters/http"
-	authpostgres "github.com/anton415/anton415-os/internal/auth/adapters/postgres"
-	financehttp "github.com/anton415/anton415-os/internal/finance/adapters/http"
-	financepostgres "github.com/anton415/anton415-os/internal/finance/adapters/postgres"
-	financeapp "github.com/anton415/anton415-os/internal/finance/application"
-	"github.com/anton415/anton415-os/internal/platform/config"
-	todohttp "github.com/anton415/anton415-os/internal/todo/adapters/http"
-	todopostgres "github.com/anton415/anton415-os/internal/todo/adapters/postgres"
-	todoapp "github.com/anton415/anton415-os/internal/todo/application"
+	"github.com/anton415/anton415-hub/internal/auth"
+	authhttp "github.com/anton415/anton415-hub/internal/auth/adapters/http"
+	authpostgres "github.com/anton415/anton415-hub/internal/auth/adapters/postgres"
+	financehttp "github.com/anton415/anton415-hub/internal/finance/adapters/http"
+	financepostgres "github.com/anton415/anton415-hub/internal/finance/adapters/postgres"
+	financeapp "github.com/anton415/anton415-hub/internal/finance/application"
+	"github.com/anton415/anton415-hub/internal/platform/config"
+	todohttp "github.com/anton415/anton415-hub/internal/todo/adapters/http"
+	todopostgres "github.com/anton415/anton415-hub/internal/todo/adapters/postgres"
+	todoapp "github.com/anton415/anton415-hub/internal/todo/application"
 )
 
 type Dependencies struct {
@@ -172,7 +172,7 @@ func healthHandler(deps Dependencies) http.HandlerFunc {
 		}
 
 		writeJSON(w, httpStatus, healthResponse{
-			Service: "anton415-os-api",
+			Service: "anton415-hub-api",
 			Status:  status,
 			Version: deps.Config.AppVersion,
 			Checks: map[string]healthCheck{

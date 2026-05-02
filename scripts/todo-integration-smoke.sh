@@ -3,10 +3,10 @@ set -eu
 
 COMPOSE="${COMPOSE:-docker compose}"
 API_BASE_URL="${API_BASE_URL:-http://localhost:8080}"
-POSTGRES_DB="${POSTGRES_DB:-anton415_os}"
+POSTGRES_DB="${POSTGRES_DB:-anton415_hub}"
 POSTGRES_USER="${POSTGRES_USER:-anton415}"
 AUTH_EMAIL="${AUTH_EMAIL:-}"
-SESSION_COOKIE="${AUTH_SESSION_COOKIE:-anton415_session}"
+SESSION_COOKIE="${AUTH_SESSION_COOKIE:-anton415_hub_session}"
 SESSION_TOKEN="${AUTH_TEST_TOKEN:-local-smoke-session}"
 SESSION_HASH="$(printf '%s' "${SESSION_TOKEN}" | shasum -a 256 | awk '{print $1}')"
 

@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/anton415/anton415-os/internal/todo/application"
-	"github.com/anton415/anton415-os/internal/todo/domain"
+	"github.com/anton415/anton415-hub/internal/todo/application"
+	"github.com/anton415/anton415-hub/internal/todo/domain"
 )
 
 const (
