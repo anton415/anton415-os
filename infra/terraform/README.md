@@ -84,13 +84,19 @@ YC_BIN="$HOME/yandex-cloud/bin/yc" \
 
 The VM reads Lockbox into `/opt/anton415-hub/secrets.env` with `/opt/anton415-hub/sync-lockbox-env.sh` and writes a narrowed `/opt/anton415-hub/postgres.env` containing only `POSTGRES_PASSWORD` for the Postgres container. Terraform user-data only writes non-secret runtime defaults to `/opt/anton415-hub/app.env`; production DB credentials and the auth allowlist must not be passed through Terraform variables. Production is intentionally single-owner, so `AUTH_ALLOWED_EMAILS` must stay one email until Todo and Finance gain per-user isolation. To rotate secrets later, add a new Lockbox version, run that script on the VM, and restart Compose.
 
-Create a JSON key for the deploy service account outside Terraform and store it as the GitHub Actions secret `YC_SA_JSON_KEY`. The service account ID is available from:
+Create a JSON key for the deploy service account outside Terraform and store it as the GitHub Actions secret `YC_SA_JSON_KEY`. The service account can push production images and manage the production security group so the deploy workflow can open and close a temporary GitHub runner `/32` SSH rule around the SSH step. The service account ID is available from:
 
 ```sh
 terraform output -raw deploy_service_account_id
 ```
 
 Do not commit the JSON key or store it in Terraform state.
+
+Store the app security group ID as the GitHub repository variable `YC_APP_SECURITY_GROUP_ID`:
+
+```sh
+gh variable set YC_APP_SECURITY_GROUP_ID --body "$(terraform output -raw app_security_group_id)"
+```
 
 Delegate `anton415.ru` at the registrar to the nameservers from `terraform output domain_nameservers`:
 

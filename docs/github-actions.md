@@ -19,7 +19,11 @@ Store these as GitHub Actions secrets:
 
 Do not commit service-account JSON keys, SSH private keys, Terraform variables, Lockbox env files, or Object Storage keys.
 
-The production security group no longer allows SSH from the whole internet. Before running `Deploy Production`, make sure the workflow runner's egress path is included in Terraform's `production_ssh_allowed_cidrs`. Prefer a fixed approved runner/VPN egress. For GitHub-hosted runners with dynamic egress, open a temporary `/32` break-glass window with Terraform, run the deployment, then remove that `/32` and apply Terraform again. Never use `0.0.0.0/0` for this path.
+## Required Repository Variables
+
+- `YC_APP_SECURITY_GROUP_ID`: Yandex VPC security group ID attached to the production VM.
+
+The production security group does not allow broad SSH ingress. `Deploy Production` resolves the current GitHub-hosted runner public IP, adds a temporary `/32` SSH rule to `YC_APP_SECURITY_GROUP_ID`, runs the VM deploy over SSH, and removes that exact rule in an `always()` cleanup step. The deploy service account therefore needs both `container-registry.images.pusher` and `vpc.securityGroups.admin`, managed by Terraform. Keep permanent SSH allowlists empty or limited to fixed admin/VPN `/32` entries; never use `0.0.0.0/0` for SSH.
 
 ## Deploy Flow
 

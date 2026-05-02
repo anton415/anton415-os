@@ -117,7 +117,7 @@ Leave the temporary `/32` in place only for the active operation. The regular ap
 2. Publish a GitHub Release or run the `Deploy Production` workflow manually.
 3. Approve the `production` environment deployment.
 4. GitHub Actions builds and pushes `cr.yandex/<registry>/anton415-hub:<tag>` for `linux/amd64`.
-5. Ensure the deploy source is covered by `production_ssh_allowed_cidrs`. For GitHub-hosted runners, use a short break-glass `/32` window or move deploys to a fixed approved runner/VPN egress; do not reopen SSH globally.
+5. The workflow opens a temporary `/32` SSH ingress rule for the current GitHub-hosted runner and removes it after the deploy step. Confirm the repository variable `YC_APP_SECURITY_GROUP_ID` is set and the deploy service account still has `vpc.securityGroups.admin`; do not reopen SSH globally.
 6. The VM creates or updates `/opt/anton415-hub`, writes the current Compose/Caddy config, pulls the image, extracts migrations from it, runs migrations against the local PostgreSQL container, restarts the app/Caddy services, and checks `/health`.
 7. Check:
 

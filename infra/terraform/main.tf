@@ -90,6 +90,12 @@ resource "yandex_resourcemanager_folder_iam_member" "deploy_registry_pusher" {
   member    = "serviceAccount:${yandex_iam_service_account.deploy.id}"
 }
 
+resource "yandex_resourcemanager_folder_iam_member" "deploy_security_group_admin" {
+  folder_id = var.folder_id
+  role      = "vpc.securityGroups.admin"
+  member    = "serviceAccount:${yandex_iam_service_account.deploy.id}"
+}
+
 resource "yandex_container_registry" "app" {
   name = "${local.app_name}-registry"
 }
