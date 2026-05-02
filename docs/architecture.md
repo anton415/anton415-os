@@ -38,7 +38,9 @@ The API is one process. Product modules are packages inside the same Go module. 
 Step 4 adds `internal/auth` as a platform-adjacent bounded module for single-user access control.
 
 - Auth owns OAuth state, email magic-link tokens, server-side sessions, cookie issuance, and allowlist checks.
-- Todo routes are protected by auth middleware, but Todo data remains single-user and does not receive `user_id` in this stage.
+- Production is explicitly single-owner: `APP_ENV=production` must have exactly one `AUTH_ALLOWED_EMAILS` entry, so a second trusted email cannot share the single-user Todo and Finance records by configuration drift.
+- Todo and Finance routes are protected by auth middleware, but product data remains single-user and does not receive `user_id` in this stage.
+- Multi-user access is blocked until Todo and Finance persistence add owner/user identity to every read and write path.
 - Provider access tokens are used only during callback handling and are not stored.
 - VK ID is treated conservatively: if a reliable verified email is not available, the user must use email magic-link verification.
 

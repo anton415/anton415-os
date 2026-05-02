@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -93,7 +94,7 @@ func TestLoadRejectsInvalidDuration(t *testing.T) {
 
 func TestLoadParsesAuthSettings(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
-	t.Setenv("AUTH_ALLOWED_EMAILS", " Anton@Example.com, alt@example.com ")
+	t.Setenv("AUTH_ALLOWED_EMAILS", " Anton@Example.com ")
 	t.Setenv("AUTH_COOKIE_DOMAIN", "anton415.ru")
 	t.Setenv("AUTH_COOKIE_SECURE", "")
 	t.Setenv("AUTH_SESSION_TTL", "24h")
@@ -116,8 +117,48 @@ func TestLoadParsesAuthSettings(t *testing.T) {
 	if cfg.AuthCookieDomain != "anton415.ru" {
 		t.Fatalf("AuthCookieDomain = %q, want anton415.ru", cfg.AuthCookieDomain)
 	}
-	if len(cfg.AuthAllowedEmails) != 2 || cfg.AuthAllowedEmails[0] != "anton@example.com" {
+	if len(cfg.AuthAllowedEmails) != 1 || cfg.AuthAllowedEmails[0] != "anton@example.com" {
 		t.Fatalf("AuthAllowedEmails = %#v, want normalized emails", cfg.AuthAllowedEmails)
+	}
+}
+
+func TestLoadAllowsMultipleAuthEmailsOutsideProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "development")
+	t.Setenv("AUTH_ALLOWED_EMAILS", " Anton@Example.com, alt@example.com ")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(cfg.AuthAllowedEmails) != 2 || cfg.AuthAllowedEmails[0] != "anton@example.com" || cfg.AuthAllowedEmails[1] != "alt@example.com" {
+		t.Fatalf("AuthAllowedEmails = %#v, want normalized development allowlist", cfg.AuthAllowedEmails)
+	}
+}
+
+func TestLoadRequiresSingleOwnerAuthEmailInProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("AUTH_ALLOWED_EMAILS", "anton@example.com, alt@example.com")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want production single-owner allowlist error")
+	}
+	if !strings.Contains(err.Error(), "single-owner") {
+		t.Fatalf("Load() error = %v, want single-owner allowlist error", err)
+	}
+}
+
+func TestLoadRequiresAuthEmailInProduction(t *testing.T) {
+	t.Setenv("APP_ENV", "production")
+	t.Setenv("AUTH_ALLOWED_EMAILS", "")
+
+	_, err := Load()
+	if err == nil {
+		t.Fatal("Load() error = nil, want production owner allowlist error")
+	}
+	if !strings.Contains(err.Error(), "AUTH_ALLOWED_EMAILS") {
+		t.Fatalf("Load() error = %v, want AUTH_ALLOWED_EMAILS error", err)
 	}
 }
 
@@ -138,6 +179,7 @@ func TestLoadEnablesDevAuthBypassOnlyOutsideProduction(t *testing.T) {
 	}
 
 	t.Setenv("APP_ENV", "production")
+	t.Setenv("AUTH_ALLOWED_EMAILS", "owner@example.com")
 	t.Setenv("AUTH_DEV_BYPASS", "true")
 	cfg, err = Load()
 	if err != nil {

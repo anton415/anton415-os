@@ -47,7 +47,7 @@ For the anton415 Hub rename, review the plan especially carefully: resource name
 After apply, add a Lockbox secret version with runtime secrets. It must include at least:
 
 - `POSTGRES_PASSWORD`
-- `AUTH_ALLOWED_EMAILS`
+- `AUTH_ALLOWED_EMAILS` with exactly one owner email
 - `YANDEX_OAUTH_CLIENT_ID`
 - `YANDEX_OAUTH_CLIENT_SECRET`
 
@@ -56,7 +56,7 @@ YC_BIN="$HOME/yandex-cloud/bin/yc" \
   ../../deploy/lockbox-sync.sh ../../deploy/lockbox/.env.production "$(terraform output -raw lockbox_secret_id)"
 ```
 
-The VM reads Lockbox into `/opt/anton415-hub/secrets.env` with `/opt/anton415-hub/sync-lockbox-env.sh` and writes a narrowed `/opt/anton415-hub/postgres.env` containing only `POSTGRES_PASSWORD` for the Postgres container. Terraform user-data only writes non-secret runtime defaults to `/opt/anton415-hub/app.env`; production DB credentials and the auth allowlist must not be passed through Terraform variables. To rotate secrets later, add a new Lockbox version, run that script on the VM, and restart Compose.
+The VM reads Lockbox into `/opt/anton415-hub/secrets.env` with `/opt/anton415-hub/sync-lockbox-env.sh` and writes a narrowed `/opt/anton415-hub/postgres.env` containing only `POSTGRES_PASSWORD` for the Postgres container. Terraform user-data only writes non-secret runtime defaults to `/opt/anton415-hub/app.env`; production DB credentials and the auth allowlist must not be passed through Terraform variables. Production is intentionally single-owner, so `AUTH_ALLOWED_EMAILS` must stay one email until Todo and Finance gain per-user isolation. To rotate secrets later, add a new Lockbox version, run that script on the VM, and restart Compose.
 
 Create a JSON key for the deploy service account outside Terraform and store it as the GitHub Actions secret `YC_SA_JSON_KEY`. The service account ID is available from:
 

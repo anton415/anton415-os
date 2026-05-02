@@ -99,16 +99,23 @@ func TestMeEndpointReportsDevBypassSession(t *testing.T) {
 	}
 }
 
-func TestTodoRequiresAuthentication(t *testing.T) {
+func TestProductRoutesRequireAuthentication(t *testing.T) {
 	router := NewRouter(Dependencies{Config: config.Config{AppVersion: "test"}})
 
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/todo/tasks", nil)
-	response := httptest.NewRecorder()
+	for _, path := range []string{
+		"/api/v1/todo/tasks",
+		"/api/v1/finance/expenses?year=2026",
+	} {
+		t.Run(path, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, path, nil)
+			response := httptest.NewRecorder()
 
-	router.ServeHTTP(response, request)
+			router.ServeHTTP(response, request)
 
-	if response.Code != http.StatusUnauthorized {
-		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
+			if response.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want %d", response.Code, http.StatusUnauthorized)
+			}
+		})
 	}
 }
 

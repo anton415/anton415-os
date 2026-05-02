@@ -8,7 +8,7 @@
 
 `anton415-hub` is the anton415 Hub monorepo: a modular Go and TypeScript application for private productivity, finance, investments, and FIRE planning.
 
-The production app is live at [anton415.ru](https://anton415.ru), protected by Yandex ID and a single-email allowlist. The current release includes private Todo workflows and the first monthly Finance slice.
+The production app is live at [anton415.ru](https://anton415.ru), protected by Yandex ID and a single-owner email allowlist. The current release includes private Todo workflows and the first monthly Finance slice.
 
 ## Production Status
 
@@ -18,7 +18,7 @@ The production app is live at [anton415.ru](https://anton415.ru), protected by Y
 | Hosting | Yandex Cloud VM, Caddy HTTPS, Cloud DNS |
 | Database | PostgreSQL 16 in Docker on the VM |
 | Auth | Yandex ID, server-side sessions, `HttpOnly` secure cookies |
-| Data model | Single-user Todo and Finance data, no `user_id` split yet |
+| Data model | Single-owner Todo and Finance data; production rejects multiple allowlist emails until `user_id` isolation exists |
 | Backups | Budget-first monthly `pg_dump` path to Object Storage |
 | Email login | Planned later; Postbox is intentionally deferred |
 

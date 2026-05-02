@@ -36,7 +36,7 @@ Open:
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, or `error`. |
 | `SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown timeout. |
 | `VITE_API_BASE_URL` | `http://localhost:8080` | API base URL used by the web shell. |
-| `AUTH_ALLOWED_EMAILS` | empty | Comma-separated emails allowed to sign in. |
+| `AUTH_ALLOWED_EMAILS` | empty | Comma-separated emails allowed to sign in. Production must contain exactly one owner email. |
 | `AUTH_CALLBACK_BASE_URL` | `http://localhost:8080` | Public API base used for OAuth and email callbacks. |
 | `AUTH_SUCCESS_REDIRECT` | `WEB_ORIGIN/todo` | Redirect after successful login. |
 | `AUTH_FAILURE_REDIRECT` | `WEB_ORIGIN/` | Redirect after failed login. |
@@ -84,7 +84,7 @@ Migrations create `platform_metadata` plus Todo v1 tables:
 
 Todo v1 stores task status as text with a database check constraint. Deleting a project with tasks is blocked; move or delete the tasks first. The Todo `today` and `upcoming` views use the API server's local timezone.
 
-Auth sessions, OAuth state, and email magic-link tokens are also stored in PostgreSQL. Todo tables remain single-user and do not include `user_id`.
+Auth sessions, OAuth state, and email magic-link tokens are also stored in PostgreSQL. Todo and Finance data remain single-owner and do not include `user_id`; `APP_ENV=production` rejects zero or multiple `AUTH_ALLOWED_EMAILS` entries until per-user isolation is added.
 
 ## Integration smoke
 

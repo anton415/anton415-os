@@ -67,9 +67,10 @@ func Load() (Config, error) {
 	}
 
 	appEnv := stringFromEnv("APP_ENV", "development")
+	production := isProductionEnv(appEnv)
 	webOrigin := stringFromEnv("WEB_ORIGIN", "http://localhost:5173")
 
-	return Config{
+	cfg := Config{
 		AppEnv:              appEnv,
 		AppVersion:          stringFromEnv("APP_VERSION", "dev"),
 		DatabaseURL:         databaseURLFromEnv(),
@@ -86,8 +87,8 @@ func Load() (Config, error) {
 		AuthCookieDomain:    stringFromEnv("AUTH_COOKIE_DOMAIN", ""),
 		AuthSessionTTL:      sessionTTL,
 		AuthTokenTTL:        tokenTTL,
-		AuthCookieSecure:    boolFromEnv("AUTH_COOKIE_SECURE", appEnv == "production"),
-		AuthDevBypass:       appEnv != "production" && boolFromEnv("AUTH_DEV_BYPASS", false),
+		AuthCookieSecure:    boolFromEnv("AUTH_COOKIE_SECURE", production),
+		AuthDevBypass:       !production && boolFromEnv("AUTH_DEV_BYPASS", false),
 		AuthDevEmail:        stringFromEnv("AUTH_DEV_EMAIL", "dev@localhost"),
 		EmailFrom:           stringFromEnv("EMAIL_FROM", ""),
 		SMTPHost:            stringFromEnv("SMTP_HOST", ""),
@@ -115,7 +116,32 @@ func Load() (Config, error) {
 			TokenURL:     stringFromEnv("VK_OAUTH_TOKEN_URL", "https://oauth.vk.com/access_token"),
 			UserInfoURL:  stringFromEnv("VK_OAUTH_USERINFO_URL", "https://api.vk.com/method/users.get?v=5.199"),
 		},
-	}, nil
+	}
+
+	if err := validateConfig(cfg); err != nil {
+		return Config{}, err
+	}
+
+	return cfg, nil
+}
+
+func validateConfig(cfg Config) error {
+	if !isProductionEnv(cfg.AppEnv) {
+		return nil
+	}
+
+	switch len(cfg.AuthAllowedEmails) {
+	case 1:
+		return nil
+	case 0:
+		return fmt.Errorf("production single-owner auth requires exactly one AUTH_ALLOWED_EMAILS owner")
+	default:
+		return fmt.Errorf("production single-owner auth requires exactly one AUTH_ALLOWED_EMAILS owner, got %d", len(cfg.AuthAllowedEmails))
+	}
+}
+
+func isProductionEnv(appEnv string) bool {
+	return strings.EqualFold(strings.TrimSpace(appEnv), "production")
 }
 
 func httpAddrFromEnv() string {

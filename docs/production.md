@@ -21,7 +21,7 @@ Store secret values in Yandex Lockbox and GitHub production secrets, not in the 
 - `YANDEX_OAUTH_CLIENT_ID`
 - `YANDEX_OAUTH_CLIENT_SECRET`
 - `POSTGRES_PASSWORD`
-- `AUTH_ALLOWED_EMAILS`
+- `AUTH_ALLOWED_EMAILS` with exactly one owner email
 - `GITHUB_OAUTH_CLIENT_ID`
 - `GITHUB_OAUTH_CLIENT_SECRET`
 - `VK_OAUTH_CLIENT_ID`
@@ -47,6 +47,8 @@ AUTH_COOKIE_SECURE=true
 POSTGRES_DB=anton415_hub
 POSTGRES_USER=anton415_hub_app
 ```
+
+Production is a single-owner deployment. Before release, confirm `AUTH_ALLOWED_EMAILS` in Lockbox contains one normalized owner email and no comma-separated second account. The API refuses to start in production when the allowlist is empty or contains multiple entries, because Todo and Finance rows are not scoped by `user_id` yet.
 
 Opening `https://anton415.ru/` shows the anton415 Hub home shell. Todo lives at `https://anton415.ru/todo`.
 
@@ -117,6 +119,7 @@ Rollback during the cutover is manual: stop the new app/Caddy containers under `
 Post-release checks:
 
 - `curl -fsS https://anton415.ru/health` returns `status: "ok"` and `service: "anton415-hub-api"`.
+- Lockbox `AUTH_ALLOWED_EMAILS` contains exactly one owner email; adding a second email is blocked until Todo and Finance have per-user persistence isolation.
 - The app shell shows `anton415 Hub`.
 - Todo and Finance data are present after the dump/restore migration.
 - A browser session may need to sign in again because the cookie changed to `anton415_hub_session`.
