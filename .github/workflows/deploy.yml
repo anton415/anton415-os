@@ -128,6 +128,39 @@ jobs:
               rm -f "$tmp"
             }
 
+            env_has_nonempty_key() {
+              file="$1"
+              key="$2"
+              [ -f "$file" ] || return 1
+              sudo awk -F= -v key="$key" '
+                $1 == key {
+                  value = substr($0, index($0, "=") + 1)
+                  if (length(value) > 0) {
+                    found = 1
+                  }
+                }
+                END { exit found ? 0 : 1 }
+              ' "$file"
+            }
+
+            copy_legacy_secret_if_missing() {
+              key="$1"
+              if env_has_nonempty_key "${APP_DIR}/secrets.env" "$key"; then
+                return
+              fi
+              if ! env_has_nonempty_key "${OLD_APP_DIR}/secrets.env" "$key"; then
+                return
+              fi
+
+              tmp="$(mktemp)"
+              if [ -f "${APP_DIR}/secrets.env" ]; then
+                sudo awk -F= -v key="$key" '$1 != key { print }' "${APP_DIR}/secrets.env" > "$tmp"
+              fi
+              sudo awk -F= -v key="$key" '$1 == key { print; exit }' "${OLD_APP_DIR}/secrets.env" >> "$tmp"
+              sudo install -m 0600 "$tmp" "${APP_DIR}/secrets.env"
+              rm -f "$tmp"
+            }
+
             url_encode() {
               python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
             }
@@ -199,6 +232,27 @@ jobs:
               sudo "${APP_DIR}/sync-lockbox-env.sh"
             elif [ ! -f "${APP_DIR}/secrets.env" ]; then
               sudo install -m 0600 /dev/null "${APP_DIR}/secrets.env"
+            fi
+            if [ ! -f "${APP_DIR}/secrets.env" ]; then
+              sudo install -m 0600 /dev/null "${APP_DIR}/secrets.env"
+            fi
+            for secret_key in \
+              YANDEX_OAUTH_CLIENT_ID \
+              YANDEX_OAUTH_CLIENT_SECRET \
+              GITHUB_OAUTH_CLIENT_ID \
+              GITHUB_OAUTH_CLIENT_SECRET \
+              VK_OAUTH_CLIENT_ID \
+              VK_OAUTH_CLIENT_SECRET \
+              AWS_ACCESS_KEY_ID \
+              AWS_SECRET_ACCESS_KEY \
+              SMTP_USERNAME \
+              SMTP_PASSWORD
+            do
+              copy_legacy_secret_if_missing "$secret_key"
+            done
+            if ! env_has_nonempty_key "${APP_DIR}/secrets.env" YANDEX_OAUTH_CLIENT_ID || ! env_has_nonempty_key "${APP_DIR}/secrets.env" YANDEX_OAUTH_CLIENT_SECRET; then
+              echo "Yandex OAuth secrets are missing after Lockbox sync and legacy secret fallback" >&2
+              exit 65
             fi
 
             sudo tee "${APP_DIR}/caddy/Caddyfile" >/dev/null <<'CADDY'
