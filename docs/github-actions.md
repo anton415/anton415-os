@@ -19,6 +19,8 @@ Store these as GitHub Actions secrets:
 
 Do not commit service-account JSON keys, SSH private keys, Terraform variables, Lockbox env files, or Object Storage keys.
 
+The production security group no longer allows SSH from the whole internet. Before running `Deploy Production`, make sure the workflow runner's egress path is included in Terraform's `production_ssh_allowed_cidrs`. Prefer a fixed approved runner/VPN egress. For GitHub-hosted runners with dynamic egress, open a temporary `/32` break-glass window with Terraform, run the deployment, then remove that `/32` and apply Terraform again. Never use `0.0.0.0/0` for this path.
+
 ## Deploy Flow
 
 1. Merge code to `main`.

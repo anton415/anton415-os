@@ -10,6 +10,10 @@ output "app_public_ip" {
   value = yandex_vpc_address.app.external_ipv4_address[0].address
 }
 
+output "app_security_group_id" {
+  value = yandex_vpc_security_group.app.id
+}
+
 output "lockbox_secret_id" {
   value = yandex_lockbox_secret.app.id
 }

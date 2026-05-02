@@ -1,9 +1,10 @@
 locals {
-  app_name      = "anton415-hub"
-  database_name = "anton415_hub"
-  database_user = "anton415_hub_app"
-  image_name    = "cr.yandex/${yandex_container_registry.app.id}/anton415-hub:${var.image_tag}"
-  root_zone     = trimsuffix(var.root_domain_name, ".")
+  app_name          = "anton415-hub"
+  database_name     = "anton415_hub"
+  database_user     = "anton415_hub_app"
+  image_name        = "cr.yandex/${yandex_container_registry.app.id}/anton415-hub:${var.image_tag}"
+  root_zone         = trimsuffix(var.root_domain_name, ".")
+  ssh_allowed_cidrs = sort(distinct(var.production_ssh_allowed_cidrs))
 }
 
 resource "yandex_vpc_network" "main" {
@@ -29,11 +30,15 @@ resource "yandex_vpc_security_group" "app" {
   name       = "${local.app_name}-app-sg"
   network_id = yandex_vpc_network.main.id
 
-  ingress {
-    protocol       = "TCP"
-    description    = "SSH"
-    v4_cidr_blocks = ["0.0.0.0/0"]
-    port           = 22
+  dynamic "ingress" {
+    for_each = length(local.ssh_allowed_cidrs) == 0 ? [] : [local.ssh_allowed_cidrs]
+
+    content {
+      protocol       = "TCP"
+      description    = "SSH from approved admin networks"
+      v4_cidr_blocks = ingress.value
+      port           = 22
+    }
   }
 
   ingress {

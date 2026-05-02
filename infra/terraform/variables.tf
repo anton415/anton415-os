@@ -25,6 +25,20 @@ variable "ssh_public_key" {
   description = "SSH public key for VM access."
 }
 
+variable "production_ssh_allowed_cidrs" {
+  type        = list(string)
+  default     = []
+  description = "IPv4 CIDR blocks allowed to SSH into the production VM. Leave empty to disable public SSH; use /32s for individual admin addresses or a narrow VPN/bastion range."
+
+  validation {
+    condition = alltrue([
+      for cidr in var.production_ssh_allowed_cidrs :
+      try(cidrnetmask(cidr), "") != "" && try(tonumber(split("/", cidr)[1]), -1) >= 24
+    ])
+    error_message = "production_ssh_allowed_cidrs must contain valid IPv4 CIDRs with prefix length /24 or narrower; use /32 for a single admin IP and never 0.0.0.0/0."
+  }
+}
+
 variable "image_tag" {
   type        = string
   default     = "main"

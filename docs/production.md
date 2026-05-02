@@ -91,14 +91,30 @@ ns2.yandexcloud.net.
 
 Postbox can be added later. When it is worth enabling email magic links, create sender `todo@anton415.ru` for domain `anton415.ru` with selector `postbox`, add the generated DKIM TXT record to Cloud DNS, and put the API key ID/secret into Lockbox as `SMTP_USERNAME` and `SMTP_PASSWORD`.
 
+## Admin SSH Access
+
+Production SSH ingress is restricted by Terraform through `production_ssh_allowed_cidrs`. The default is an empty list, so public SSH is disabled unless an explicit admin CIDR is provided. Keep permanent entries to `/32` admin addresses or a narrow VPN/bastion egress range; the variable rejects broad CIDRs wider than `/24`, including `0.0.0.0/0`.
+
+For a temporary admin or deploy window from a dynamic address:
+
+```sh
+ADMIN_IP="$(curl -fsS https://api.ipify.org)"
+terraform -chdir=infra/terraform apply -var="production_ssh_allowed_cidrs=[\"${ADMIN_IP}/32\"]"
+ssh ubuntu@anton415.ru
+terraform -chdir=infra/terraform apply -var='production_ssh_allowed_cidrs=[]'
+```
+
+Leave the temporary `/32` in place only for the active operation. The regular app does not need SSH; HTTP and HTTPS remain public through ports 80 and 443.
+
 ## Deployment
 
 1. Merge to `main`.
 2. Publish a GitHub Release or run the `Deploy Production` workflow manually.
 3. Approve the `production` environment deployment.
 4. GitHub Actions builds and pushes `cr.yandex/<registry>/anton415-hub:<tag>` for `linux/amd64`.
-5. The VM creates or updates `/opt/anton415-hub`, writes the current Compose/Caddy config, pulls the image, extracts migrations from it, runs migrations against the local PostgreSQL container, restarts the app/Caddy services, and checks `/health`.
-6. Check:
+5. Ensure the deploy source is covered by `production_ssh_allowed_cidrs`. For GitHub-hosted runners, use a short break-glass `/32` window or move deploys to a fixed approved runner/VPN egress; do not reopen SSH globally.
+6. The VM creates or updates `/opt/anton415-hub`, writes the current Compose/Caddy config, pulls the image, extracts migrations from it, runs migrations against the local PostgreSQL container, restarts the app/Caddy services, and checks `/health`.
+7. Check:
 
 ```sh
 curl -fsS https://anton415.ru/health
