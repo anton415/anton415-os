@@ -31,18 +31,6 @@ variable "image_tag" {
   description = "Container image tag to boot on first VM start."
 }
 
-variable "db_password" {
-  type        = string
-  sensitive   = true
-  description = "Initial PostgreSQL application user password."
-}
-
-variable "allowed_emails" {
-  type        = string
-  sensitive   = true
-  description = "Comma-separated auth allowlist."
-}
-
 variable "backup_bucket_name" {
   type        = string
   description = "Object Storage bucket for independent pg_dump archives."

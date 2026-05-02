@@ -28,8 +28,6 @@ Create a local `terraform.tfvars` file outside Git history:
 cloud_id           = "..."
 folder_id          = "..."
 ssh_public_key     = "ssh-ed25519 ..."
-db_password        = "..."
-allowed_emails     = "anton@example.com"
 backup_bucket_name = "anton415-hub-postgres-backups"
 ```
 
@@ -46,14 +44,19 @@ terraform apply
 
 For the anton415 Hub rename, review the plan especially carefully: resource names, the VM app directory, registry image name, database name, database user, and backup bucket examples now use `anton415-hub` / `anton415_hub`. Keep pre-rename production backups until the post-release data check is complete.
 
-After apply, add a Lockbox secret version with runtime secrets:
+After apply, add a Lockbox secret version with runtime secrets. It must include at least:
+
+- `POSTGRES_PASSWORD`
+- `AUTH_ALLOWED_EMAILS`
+- `YANDEX_OAUTH_CLIENT_ID`
+- `YANDEX_OAUTH_CLIENT_SECRET`
 
 ```sh
 YC_BIN="$HOME/yandex-cloud/bin/yc" \
   ../../deploy/lockbox-sync.sh ../../deploy/lockbox/.env.production "$(terraform output -raw lockbox_secret_id)"
 ```
 
-The VM reads Lockbox into `/opt/anton415-hub/secrets.env` with `/opt/anton415-hub/sync-lockbox-env.sh`. To rotate secrets later, add a new Lockbox version and run that script on the VM before restarting Compose.
+The VM reads Lockbox into `/opt/anton415-hub/secrets.env` with `/opt/anton415-hub/sync-lockbox-env.sh` and writes a narrowed `/opt/anton415-hub/postgres.env` containing only `POSTGRES_PASSWORD` for the Postgres container. Terraform user-data only writes non-secret runtime defaults to `/opt/anton415-hub/app.env`; production DB credentials and the auth allowlist must not be passed through Terraform variables. To rotate secrets later, add a new Lockbox version, run that script on the VM, and restart Compose.
 
 Create a JSON key for the deploy service account outside Terraform and store it as the GitHub Actions secret `YC_SA_JSON_KEY`. The service account ID is available from:
 

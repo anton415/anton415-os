@@ -91,7 +91,7 @@ resource "yandex_container_registry" "app" {
 
 resource "yandex_lockbox_secret" "app" {
   name        = "${local.app_name}-runtime"
-  description = "Runtime OAuth, SMTP/Postbox, cookie, and object storage secrets. Add versions outside Terraform."
+  description = "Runtime database, auth, OAuth, SMTP/Postbox, and object storage secrets. Add versions outside Terraform."
 }
 
 resource "yandex_storage_bucket" "backups" {
@@ -160,9 +160,6 @@ resource "yandex_compute_instance" "app" {
       root_domain_name  = var.root_domain_name
       database_name     = local.database_name
       database_user     = local.database_user
-      database_password = var.db_password
-      database_url      = "postgres://${local.database_user}:${urlencode(var.db_password)}@postgres:5432/${local.database_name}?sslmode=disable"
-      allowed_emails    = var.allowed_emails
       backup_bucket     = var.backup_bucket_name
       lockbox_secret_id = yandex_lockbox_secret.app.id
     })

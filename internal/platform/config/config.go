@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -70,7 +72,7 @@ func Load() (Config, error) {
 	return Config{
 		AppEnv:              appEnv,
 		AppVersion:          stringFromEnv("APP_VERSION", "dev"),
-		DatabaseURL:         stringFromEnv("DATABASE_URL", defaultDatabaseURL),
+		DatabaseURL:         databaseURLFromEnv(),
 		HTTPAddr:            httpAddrFromEnv(),
 		LogLevel:            stringFromEnv("LOG_LEVEL", "info"),
 		ShutdownTimeout:     shutdownTimeout,
@@ -125,6 +127,28 @@ func httpAddrFromEnv() string {
 		return ":" + value
 	}
 	return ":8080"
+}
+
+func databaseURLFromEnv() string {
+	if value := strings.TrimSpace(os.Getenv("DATABASE_URL")); value != "" {
+		return value
+	}
+
+	password := strings.TrimSpace(os.Getenv("POSTGRES_PASSWORD"))
+	if password == "" {
+		return defaultDatabaseURL
+	}
+
+	dbURL := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(stringFromEnv("POSTGRES_USER", "anton415"), password),
+		Host:   net.JoinHostPort(stringFromEnv("POSTGRES_HOST", "localhost"), stringFromEnv("POSTGRES_PORT", "15432")),
+		Path:   stringFromEnv("POSTGRES_DB", "anton415_hub"),
+	}
+	query := dbURL.Query()
+	query.Set("sslmode", stringFromEnv("POSTGRES_SSLMODE", "disable"))
+	dbURL.RawQuery = query.Encode()
+	return dbURL.String()
 }
 
 func stringFromEnv(key, fallback string) string {

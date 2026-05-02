@@ -15,6 +15,7 @@ write_files:
           restart: unless-stopped
           env_file:
             - /opt/anton415-hub/app.env
+            - /opt/anton415-hub/postgres.env
           volumes:
             - postgres_data:/var/lib/postgresql/data
           healthcheck:
@@ -26,14 +27,6 @@ write_files:
         migrate:
           image: migrate/migrate:v4.18.3
           restart: "no"
-          command:
-            [
-              "-path",
-              "/migrations",
-              "-database",
-              "${database_url}",
-              "up"
-            ]
           volumes:
             - /opt/anton415-hub/migrations:/migrations:ro
           depends_on:
@@ -100,12 +93,11 @@ write_files:
       APP_VERSION=${image_tag}
       HTTP_ADDR=:8080
       STATIC_DIR=/app/web
-      DATABASE_URL=${database_url}
+      POSTGRES_HOST=postgres
+      POSTGRES_PORT=5432
       POSTGRES_DB=${database_name}
       POSTGRES_USER=${database_user}
-      POSTGRES_PASSWORD=${database_password}
       WEB_ORIGIN=https://${root_domain_name}
-      AUTH_ALLOWED_EMAILS=${allowed_emails}
       AUTH_CALLBACK_BASE_URL=https://${root_domain_name}
       AUTH_SUCCESS_REDIRECT=https://${root_domain_name}/todo
       AUTH_FAILURE_REDIRECT=https://${root_domain_name}/
@@ -121,6 +113,59 @@ write_files:
       SMTP_PORT=587
       BACKUP_BUCKET=${backup_bucket}
 
+  - path: /opt/anton415-hub/run-migrations.sh
+    permissions: "0700"
+    content: |
+      #!/bin/sh
+      set -eu
+
+      COMPOSE_FILE="/opt/anton415-hub/docker-compose.yml"
+      APP_ENV_FILE="/opt/anton415-hub/app.env"
+      SECRETS_FILE="/opt/anton415-hub/secrets.env"
+
+      read_env() {
+        file="$1"
+        key="$2"
+        [ -f "$file" ] || return 1
+        awk -F= -v key="$key" '
+          $1 == key {
+            sub(/^[^=]*=/, "")
+            print
+            found = 1
+            exit
+          }
+          END { exit found ? 0 : 1 }
+        ' "$file"
+      }
+
+      require_env() {
+        file="$1"
+        key="$2"
+        value="$(read_env "$file" "$key" || true)"
+        if [ -z "$value" ]; then
+          echo "$key is required in $file" >&2
+          exit 64
+        fi
+        printf '%s' "$value"
+      }
+
+      db_user="$(require_env "$APP_ENV_FILE" POSTGRES_USER)"
+      db_name="$(require_env "$APP_ENV_FILE" POSTGRES_DB)"
+      db_password="$(require_env "$SECRETS_FILE" POSTGRES_PASSWORD)"
+      db_host="$(read_env "$APP_ENV_FILE" POSTGRES_HOST || printf '%s' postgres)"
+      db_port="$(read_env "$APP_ENV_FILE" POSTGRES_PORT || printf '%s' 5432)"
+
+      database_url="$(python3 - "$db_user" "$db_host" "$db_port" "$db_name" <<'PY'
+      import sys
+      from urllib.parse import quote
+
+      user, host, port, name = sys.argv[1:]
+      print(f"postgres://{quote(user)}@{host}:{port}/{quote(name)}?sslmode=disable")
+      PY
+      )"
+
+      PGPASSWORD="$db_password" docker compose -f "$COMPOSE_FILE" run --rm -e PGPASSWORD migrate -path /migrations -database "$database_url" up
+
   - path: /opt/anton415-hub/sync-lockbox-env.sh
     permissions: "0700"
     content: |
@@ -129,6 +174,7 @@ write_files:
 
       SECRET_ID="${lockbox_secret_id}"
       OUT="/opt/anton415-hub/secrets.env"
+      POSTGRES_OUT="/opt/anton415-hub/postgres.env"
       TMP="$(mktemp)"
       OUT_TMP="$(mktemp)"
 
@@ -136,6 +182,19 @@ write_files:
         rm -f "$TMP" "$OUT_TMP"
       }
       trap cleanup EXIT
+
+      write_postgres_env() {
+        password="$(awk -F= '$1 == "POSTGRES_PASSWORD" { sub(/^[^=]*=/, ""); print; found = 1; exit } END { exit found ? 0 : 1 }' "$OUT" || true)"
+        if [ -z "$password" ]; then
+          install -m 0600 /dev/null "$POSTGRES_OUT"
+          return
+        fi
+
+        POSTGRES_TMP="$(mktemp)"
+        printf 'POSTGRES_PASSWORD=%s\n' "$password" > "$POSTGRES_TMP"
+        install -m 0600 "$POSTGRES_TMP" "$POSTGRES_OUT"
+        rm -f "$POSTGRES_TMP"
+      }
 
       TOKEN_JSON="$(curl -fsS -H 'Metadata-Flavor: Google' http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token)"
       IAM_TOKEN="$(printf '%s' "$TOKEN_JSON" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
@@ -176,6 +235,7 @@ write_files:
       else
         install -m 0600 /dev/null "$OUT"
       fi
+      write_postgres_env
 
 runcmd:
   - mkdir -p /opt/anton415-hub/caddy /opt/anton415-hub/migrations
@@ -193,5 +253,5 @@ runcmd:
     docker rm "$CONTAINER_ID"
     trap - EXIT
   - docker compose -f /opt/anton415-hub/docker-compose.yml up -d postgres
-  - docker compose -f /opt/anton415-hub/docker-compose.yml run --rm migrate
+  - /opt/anton415-hub/run-migrations.sh
   - docker compose -f /opt/anton415-hub/docker-compose.yml up -d app caddy

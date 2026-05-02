@@ -92,6 +92,9 @@ jobs:
             COMPOSE_FILE="${APP_DIR}/docker-compose.yml"
             OLD_COMPOSE_FILE="${OLD_APP_DIR}/docker-compose.yml"
             ENV_FILE="${APP_DIR}/app.env"
+            SECRETS_FILE="${APP_DIR}/secrets.env"
+            POSTGRES_ENV_FILE="${APP_DIR}/postgres.env"
+            MIGRATE_SCRIPT="${APP_DIR}/run-migrations.sh"
             DB_MIGRATION_MARKER="${APP_DIR}/.anton415-hub-db-migrated"
             DB_NAME="anton415_hub"
             DB_USER="anton415_hub_app"
@@ -128,6 +131,14 @@ jobs:
               rm -f "$tmp"
             }
 
+            remove_env() {
+              key="$1"
+              tmp="$(mktemp)"
+              sudo awk -F= -v key="$key" '$1 != key { print }' "$ENV_FILE" > "$tmp"
+              sudo install -m 0600 "$tmp" "$ENV_FILE"
+              rm -f "$tmp"
+            }
+
             env_has_nonempty_key() {
               file="$1"
               key="$2"
@@ -143,9 +154,31 @@ jobs:
               ' "$file"
             }
 
+            require_env_key() {
+              file="$1"
+              key="$2"
+              if ! env_has_nonempty_key "$file" "$key"; then
+                echo "$key is required in $file after Lockbox sync" >&2
+                exit 64
+              fi
+            }
+
+            write_postgres_env_file() {
+              db_password="$(read_env "$SECRETS_FILE" POSTGRES_PASSWORD || true)"
+              if [ -z "$db_password" ]; then
+                sudo install -m 0600 /dev/null "$POSTGRES_ENV_FILE"
+                return
+              fi
+
+              tmp="$(mktemp)"
+              printf 'POSTGRES_PASSWORD=%s\n' "$db_password" > "$tmp"
+              sudo install -m 0600 "$tmp" "$POSTGRES_ENV_FILE"
+              rm -f "$tmp"
+            }
+
             copy_legacy_secret_if_missing() {
               key="$1"
-              if env_has_nonempty_key "${APP_DIR}/secrets.env" "$key"; then
+              if env_has_nonempty_key "$SECRETS_FILE" "$key"; then
                 return
               fi
               if ! env_has_nonempty_key "${OLD_APP_DIR}/secrets.env" "$key"; then
@@ -153,16 +186,12 @@ jobs:
               fi
 
               tmp="$(mktemp)"
-              if [ -f "${APP_DIR}/secrets.env" ]; then
-                sudo awk -F= -v key="$key" '$1 != key { print }' "${APP_DIR}/secrets.env" > "$tmp"
+              if [ -f "$SECRETS_FILE" ]; then
+                sudo awk -F= -v key="$key" '$1 != key { print }' "$SECRETS_FILE" > "$tmp"
               fi
               sudo awk -F= -v key="$key" '$1 == key { print; exit }' "${OLD_APP_DIR}/secrets.env" >> "$tmp"
-              sudo install -m 0600 "$tmp" "${APP_DIR}/secrets.env"
+              sudo install -m 0600 "$tmp" "$SECRETS_FILE"
               rm -f "$tmp"
-            }
-
-            url_encode() {
-              python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
             }
 
             wait_for_new_postgres() {
@@ -183,37 +212,19 @@ jobs:
             if [ ! -f "$ENV_FILE" ]; then
               sudo install -m 0600 /dev/null "$ENV_FILE"
             fi
-
-            db_password="$(read_env "$ENV_FILE" POSTGRES_PASSWORD || true)"
-            if [ -z "$db_password" ] && [ -f "${OLD_APP_DIR}/app.env" ]; then
-              db_password="$(read_env "${OLD_APP_DIR}/app.env" POSTGRES_PASSWORD || true)"
-            fi
-            if [ -z "$db_password" ]; then
-              echo "POSTGRES_PASSWORD is required in ${ENV_FILE} or legacy ${OLD_APP_DIR}/app.env" >&2
-              exit 64
-            fi
-
-            auth_allowed_emails="$(read_env "$ENV_FILE" AUTH_ALLOWED_EMAILS || true)"
-            if [ -z "$auth_allowed_emails" ] && [ -f "${OLD_APP_DIR}/app.env" ]; then
-              auth_allowed_emails="$(read_env "${OLD_APP_DIR}/app.env" AUTH_ALLOWED_EMAILS || true)"
-            fi
-            if [ -z "$auth_allowed_emails" ]; then
-              echo "AUTH_ALLOWED_EMAILS is required in ${ENV_FILE} or legacy ${OLD_APP_DIR}/app.env" >&2
-              exit 64
-            fi
-
-            database_url="postgres://${DB_USER}:$(url_encode "$db_password")@postgres:5432/${DB_NAME}?sslmode=disable"
+            for stale_secret_key in DATABASE_URL POSTGRES_PASSWORD AUTH_ALLOWED_EMAILS; do
+              remove_env "$stale_secret_key"
+            done
 
             upsert_env APP_ENV "production"
             upsert_env APP_VERSION "$app_version"
             upsert_env HTTP_ADDR ":8080"
             upsert_env STATIC_DIR "/app/web"
-            upsert_env DATABASE_URL "$database_url"
+            upsert_env POSTGRES_HOST "postgres"
+            upsert_env POSTGRES_PORT "5432"
             upsert_env POSTGRES_DB "$DB_NAME"
             upsert_env POSTGRES_USER "$DB_USER"
-            upsert_env POSTGRES_PASSWORD "$db_password"
             upsert_env WEB_ORIGIN "https://anton415.ru"
-            upsert_env AUTH_ALLOWED_EMAILS "$auth_allowed_emails"
             upsert_env AUTH_CALLBACK_BASE_URL "https://anton415.ru"
             upsert_env AUTH_SUCCESS_REDIRECT "https://anton415.ru/todo"
             upsert_env AUTH_FAILURE_REDIRECT "https://anton415.ru/"
@@ -230,11 +241,11 @@ jobs:
             fi
             if [ -x "${APP_DIR}/sync-lockbox-env.sh" ]; then
               sudo "${APP_DIR}/sync-lockbox-env.sh"
-            elif [ ! -f "${APP_DIR}/secrets.env" ]; then
-              sudo install -m 0600 /dev/null "${APP_DIR}/secrets.env"
+            elif [ ! -f "$SECRETS_FILE" ]; then
+              sudo install -m 0600 /dev/null "$SECRETS_FILE"
             fi
-            if [ ! -f "${APP_DIR}/secrets.env" ]; then
-              sudo install -m 0600 /dev/null "${APP_DIR}/secrets.env"
+            if [ ! -f "$SECRETS_FILE" ]; then
+              sudo install -m 0600 /dev/null "$SECRETS_FILE"
             fi
             for secret_key in \
               YANDEX_OAUTH_CLIENT_ID \
@@ -250,10 +261,11 @@ jobs:
             do
               copy_legacy_secret_if_missing "$secret_key"
             done
-            if ! env_has_nonempty_key "${APP_DIR}/secrets.env" YANDEX_OAUTH_CLIENT_ID || ! env_has_nonempty_key "${APP_DIR}/secrets.env" YANDEX_OAUTH_CLIENT_SECRET; then
-              echo "Yandex OAuth secrets are missing after Lockbox sync and legacy secret fallback" >&2
-              exit 65
-            fi
+            require_env_key "$SECRETS_FILE" POSTGRES_PASSWORD
+            require_env_key "$SECRETS_FILE" AUTH_ALLOWED_EMAILS
+            require_env_key "$SECRETS_FILE" YANDEX_OAUTH_CLIENT_ID
+            require_env_key "$SECRETS_FILE" YANDEX_OAUTH_CLIENT_SECRET
+            write_postgres_env_file
 
             sudo tee "${APP_DIR}/caddy/Caddyfile" >/dev/null <<'CADDY'
             (security_headers) {
@@ -272,6 +284,59 @@ jobs:
             }
             CADDY
 
+            sudo tee "$MIGRATE_SCRIPT" >/dev/null <<'MIGRATE'
+            #!/bin/sh
+            set -eu
+
+            COMPOSE_FILE="/opt/anton415-hub/docker-compose.yml"
+            APP_ENV_FILE="/opt/anton415-hub/app.env"
+            SECRETS_FILE="/opt/anton415-hub/secrets.env"
+
+            read_env() {
+              file="$1"
+              key="$2"
+              [ -f "$file" ] || return 1
+              awk -F= -v key="$key" '
+                $1 == key {
+                  sub(/^[^=]*=/, "")
+                  print
+                  found = 1
+                  exit
+                }
+                END { exit found ? 0 : 1 }
+              ' "$file"
+            }
+
+            require_env() {
+              file="$1"
+              key="$2"
+              value="$(read_env "$file" "$key" || true)"
+              if [ -z "$value" ]; then
+                echo "$key is required in $file" >&2
+                exit 64
+              fi
+              printf '%s' "$value"
+            }
+
+            db_user="$(require_env "$APP_ENV_FILE" POSTGRES_USER)"
+            db_name="$(require_env "$APP_ENV_FILE" POSTGRES_DB)"
+            db_password="$(require_env "$SECRETS_FILE" POSTGRES_PASSWORD)"
+            db_host="$(read_env "$APP_ENV_FILE" POSTGRES_HOST || printf '%s' postgres)"
+            db_port="$(read_env "$APP_ENV_FILE" POSTGRES_PORT || printf '%s' 5432)"
+
+            database_url="$(python3 - "$db_user" "$db_host" "$db_port" "$db_name" <<'PY'
+            import sys
+            from urllib.parse import quote
+
+            user, host, port, name = sys.argv[1:]
+            print(f"postgres://{quote(user)}@{host}:{port}/{quote(name)}?sslmode=disable")
+            PY
+            )"
+
+            PGPASSWORD="$db_password" docker compose -f "$COMPOSE_FILE" run --rm -e PGPASSWORD migrate -path /migrations -database "$database_url" up
+            MIGRATE
+            sudo chmod 0700 "$MIGRATE_SCRIPT"
+
             sudo tee "$COMPOSE_FILE" >/dev/null <<'COMPOSE'
             services:
               postgres:
@@ -279,6 +344,7 @@ jobs:
                 restart: unless-stopped
                 env_file:
                   - /opt/anton415-hub/app.env
+                  - /opt/anton415-hub/postgres.env
                 volumes:
                   - postgres_data:/var/lib/postgresql/data
                 healthcheck:
@@ -290,14 +356,6 @@ jobs:
               migrate:
                 image: migrate/migrate:v4.18.3
                 restart: "no"
-                command:
-                  [
-                    "-path",
-                    "/migrations",
-                    "-database",
-                    "__DATABASE_URL__",
-                    "up"
-                  ]
                 volumes:
                   - /opt/anton415-hub/migrations:/migrations:ro
                 depends_on:
@@ -339,7 +397,7 @@ jobs:
               caddy_data:
               caddy_config:
             COMPOSE
-            sudo env IMAGE="$image" DATABASE_URL="$database_url" perl -0pi -e 's/__IMAGE__/$ENV{IMAGE}/g; s/__DATABASE_URL__/$ENV{DATABASE_URL}/g' "$COMPOSE_FILE"
+            sudo env IMAGE="$image" perl -0pi -e 's/__IMAGE__/$ENV{IMAGE}/g' "$COMPOSE_FILE"
 
             sudo docker pull "$image"
             container_id="$(sudo docker create "$image")"
@@ -377,7 +435,7 @@ jobs:
             if [ -f "$OLD_COMPOSE_FILE" ]; then
               sudo docker compose -f "$OLD_COMPOSE_FILE" stop app caddy || true
             fi
-            sudo docker compose -f "$COMPOSE_FILE" run --rm migrate
+            sudo "$MIGRATE_SCRIPT"
             sudo docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate app
             sudo docker compose -f "$COMPOSE_FILE" up -d --no-deps --force-recreate caddy
             sudo docker compose -f "$COMPOSE_FILE" exec -T app wget -qO- http://127.0.0.1:8080/health

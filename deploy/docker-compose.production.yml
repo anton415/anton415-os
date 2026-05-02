@@ -4,6 +4,7 @@ services:
     restart: unless-stopped
     env_file:
       - /opt/anton415-hub/app.env
+      - /opt/anton415-hub/postgres.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -15,14 +16,6 @@ services:
   migrate:
     image: migrate/migrate:v4.18.3
     restart: "no"
-    command:
-      [
-        "-path",
-        "/migrations",
-        "-database",
-        "postgres://${POSTGRES_USER:-anton415_hub_app}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-anton415_hub}?sslmode=disable",
-        "up"
-      ]
     volumes:
       - /opt/anton415-hub/migrations:/migrations:ro
     depends_on:

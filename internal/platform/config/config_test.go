@@ -64,6 +64,25 @@ func TestLoadUsesPortWhenHTTPAddrIsUnset(t *testing.T) {
 	}
 }
 
+func TestLoadBuildsDatabaseURLFromPostgresSettings(t *testing.T) {
+	t.Setenv("DATABASE_URL", "")
+	t.Setenv("POSTGRES_HOST", "postgres")
+	t.Setenv("POSTGRES_PORT", "5432")
+	t.Setenv("POSTGRES_DB", "anton415_hub")
+	t.Setenv("POSTGRES_USER", "anton415_hub_app")
+	t.Setenv("POSTGRES_PASSWORD", "secret with / symbols")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	want := "postgres://anton415_hub_app:secret%20with%20%2F%20symbols@postgres:5432/anton415_hub?sslmode=disable"
+	if cfg.DatabaseURL != want {
+		t.Fatalf("DatabaseURL = %q, want %q", cfg.DatabaseURL, want)
+	}
+}
+
 func TestLoadRejectsInvalidDuration(t *testing.T) {
 	t.Setenv("SHUTDOWN_TIMEOUT", "soon")
 
