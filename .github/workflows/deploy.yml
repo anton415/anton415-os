@@ -194,6 +194,25 @@ jobs:
               rm -f "$tmp"
             }
 
+            copy_env_secret_if_missing() {
+              source_file="$1"
+              key="$2"
+              if env_has_nonempty_key "$SECRETS_FILE" "$key"; then
+                return
+              fi
+              if ! env_has_nonempty_key "$source_file" "$key"; then
+                return
+              fi
+
+              tmp="$(mktemp)"
+              if [ -f "$SECRETS_FILE" ]; then
+                sudo awk -F= -v key="$key" '$1 != key { print }' "$SECRETS_FILE" > "$tmp"
+              fi
+              sudo awk -F= -v key="$key" '$1 == key { print; exit }' "$source_file" >> "$tmp"
+              sudo install -m 0600 "$tmp" "$SECRETS_FILE"
+              rm -f "$tmp"
+            }
+
             wait_for_new_postgres() {
               for _ in $(seq 1 30); do
                 if sudo docker compose -f "$COMPOSE_FILE" exec -T postgres pg_isready -U "$DB_USER" -d "$DB_NAME"; then
@@ -212,9 +231,6 @@ jobs:
             if [ ! -f "$ENV_FILE" ]; then
               sudo install -m 0600 /dev/null "$ENV_FILE"
             fi
-            for stale_secret_key in DATABASE_URL POSTGRES_PASSWORD AUTH_ALLOWED_EMAILS; do
-              remove_env "$stale_secret_key"
-            done
 
             upsert_env APP_ENV "production"
             upsert_env APP_VERSION "$app_version"
@@ -261,11 +277,20 @@ jobs:
             do
               copy_legacy_secret_if_missing "$secret_key"
             done
+            copy_env_secret_if_missing "$ENV_FILE" POSTGRES_PASSWORD
+            copy_env_secret_if_missing "$ENV_FILE" AUTH_ALLOWED_EMAILS
+            if [ -f "${OLD_APP_DIR}/app.env" ]; then
+              copy_env_secret_if_missing "${OLD_APP_DIR}/app.env" POSTGRES_PASSWORD
+              copy_env_secret_if_missing "${OLD_APP_DIR}/app.env" AUTH_ALLOWED_EMAILS
+            fi
             require_env_key "$SECRETS_FILE" POSTGRES_PASSWORD
             require_env_key "$SECRETS_FILE" AUTH_ALLOWED_EMAILS
             require_env_key "$SECRETS_FILE" YANDEX_OAUTH_CLIENT_ID
             require_env_key "$SECRETS_FILE" YANDEX_OAUTH_CLIENT_SECRET
             write_postgres_env_file
+            for stale_secret_key in DATABASE_URL POSTGRES_PASSWORD AUTH_ALLOWED_EMAILS; do
+              remove_env "$stale_secret_key"
+            done
 
             sudo tee "${APP_DIR}/caddy/Caddyfile" >/dev/null <<'CADDY'
             (security_headers) {
