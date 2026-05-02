@@ -45,6 +45,14 @@ describe("renderApp todo", () => {
     expect(root.querySelector("script")).toBeNull();
   });
 
+  it("renders CSP-compatible swatches without inline style attributes", () => {
+    renderApp(root, optionsForTodo());
+
+    expect(root.querySelectorAll("[style]")).toHaveLength(0);
+    expect(root.querySelector(".module-accent-todo")).not.toBeNull();
+    expect(root.querySelector(".smart-list-icon-inbox")).not.toBeNull();
+  });
+
   it("defaults quick-add due date for Today", () => {
     renderApp(root, optionsForTodo({ todoState: todoState({ scope: { kind: "view", view: "today" } }) }));
 

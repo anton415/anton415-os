@@ -130,6 +130,26 @@ button {
   height: 10px;
 }
 
+.module-accent-todo {
+  background: #2563eb;
+}
+
+.module-accent-finance {
+  background: #059669;
+}
+
+.module-accent-investments {
+  background: #7c3aed;
+}
+
+.module-accent-fire {
+  background: #d97706;
+}
+
+.module-accent-default {
+  background: #64748b;
+}
+
 .workspace {
   display: grid;
   align-content: start;
@@ -656,6 +676,38 @@ p {
   height: 13px;
   flex: 0 0 auto;
   border-radius: 999px;
+}
+
+.smart-list-icon-inbox {
+  background: #2563eb;
+}
+
+.smart-list-icon-today {
+  background: #ef4444;
+}
+
+.smart-list-icon-overdue {
+  background: #b42318;
+}
+
+.smart-list-icon-upcoming {
+  background: #f59e0b;
+}
+
+.smart-list-icon-scheduled {
+  background: #7c3aed;
+}
+
+.smart-list-icon-flagged {
+  background: #ec4899;
+}
+
+.smart-list-icon-all {
+  background: #64748b;
+}
+
+.smart-list-icon-completed {
+  background: #22c55e;
 }
 
 .panel-header {

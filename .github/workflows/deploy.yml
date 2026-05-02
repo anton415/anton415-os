@@ -349,8 +349,11 @@ jobs:
             sudo tee "${APP_DIR}/caddy/Caddyfile" >/dev/null <<'CADDY'
             (security_headers) {
               header {
+                Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; form-action 'self'; upgrade-insecure-requests"
                 Strict-Transport-Security "max-age=31536000; includeSubDomains"
+                X-Frame-Options "DENY"
                 X-Content-Type-Options "nosniff"
+                Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=(), fullscreen=(self)"
                 Referrer-Policy "same-origin"
               }
             }

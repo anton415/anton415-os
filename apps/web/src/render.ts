@@ -34,7 +34,6 @@ import type {
 type SmartList = {
   view: TodoView;
   label: string;
-  accent: string;
 };
 
 type RenderOptions = {
@@ -657,7 +656,7 @@ function renderModuleNav(currentPath: AppPath): string {
     .map(
       (module) => `
         <a href="${module.path}" data-route="${module.path}" class="${isModuleActive(currentPath, module.path) ? "active" : ""}">
-          <span class="nav-swatch" style="background: ${module.accent}"></span>
+          <span class="nav-swatch ${moduleAccentClass(module.path)}"></span>
           ${escapeHTML(module.name)}
         </a>
       `
@@ -682,7 +681,7 @@ function renderModuleCards(): string {
       (module) => `
         <article class="module-card">
           <div class="module-card-header">
-            <span class="module-swatch" style="background: ${module.accent}"></span>
+            <span class="module-swatch ${moduleAccentClass(module.path)}"></span>
             <h2>${escapeHTML(module.name)}</h2>
           </div>
           <p>${escapeHTML(module.summary)}</p>
@@ -694,14 +693,14 @@ function renderModuleCards(): string {
 }
 
 const smartLists: SmartList[] = [
-  { view: "inbox", label: "Входящие", accent: "#2563eb" },
-  { view: "today", label: "Сегодня", accent: "#ef4444" },
-  { view: "overdue", label: "Просрочено", accent: "#b42318" },
-  { view: "upcoming", label: "Скоро", accent: "#f59e0b" },
-  { view: "scheduled", label: "Запланировано", accent: "#7c3aed" },
-  { view: "flagged", label: "С флагом", accent: "#ec4899" },
-  { view: "all", label: "Все", accent: "#64748b" },
-  { view: "completed", label: "Готово", accent: "#22c55e" }
+  { view: "inbox", label: "Входящие" },
+  { view: "today", label: "Сегодня" },
+  { view: "overdue", label: "Просрочено" },
+  { view: "upcoming", label: "Скоро" },
+  { view: "scheduled", label: "Запланировано" },
+  { view: "flagged", label: "С флагом" },
+  { view: "all", label: "Все" },
+  { view: "completed", label: "Готово" }
 ];
 
 function renderSmartLists(state: TodoState): string {
@@ -718,10 +717,26 @@ function renderSmartListButton(state: TodoState, list: SmartList): string {
   const active = state.scope.kind === "view" && state.scope.view === list.view;
   return `
     <button class="smart-list-button ${active ? "active" : ""}" type="button" data-todo-view="${list.view}" aria-pressed="${active}">
-      <span class="smart-list-icon" style="background: ${list.accent}" aria-hidden="true"></span>
+      <span class="smart-list-icon smart-list-icon-${list.view}" aria-hidden="true"></span>
       <span>${escapeHTML(list.label)}</span>
     </button>
   `;
+}
+
+function moduleAccentClass(modulePath: string): string {
+  if (modulePath === "/todo") {
+    return "module-accent-todo";
+  }
+  if (modulePath === "/finance") {
+    return "module-accent-finance";
+  }
+  if (modulePath === "/investments") {
+    return "module-accent-investments";
+  }
+  if (modulePath === "/fire") {
+    return "module-accent-fire";
+  }
+  return "module-accent-default";
 }
 
 function renderProjectForm(state: TodoState): string {

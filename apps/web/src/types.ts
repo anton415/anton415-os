@@ -29,7 +29,6 @@ export type AuthState =
 export type ProductModule = {
   name: string;
   path: string;
-  accent: string;
   summary: string;
   state?: string;
 };
