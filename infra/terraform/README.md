@@ -29,6 +29,10 @@ cloud_id           = "..."
 folder_id          = "..."
 ssh_public_key     = "ssh-ed25519 ..."
 backup_bucket_name = "anton415-hub-postgres-backups"
+
+production_ssh_allowed_cidrs = [
+  "203.0.113.10/32",
+]
 ```
 
 Then:
@@ -43,6 +47,28 @@ terraform apply
 `terraform plan` only calculates changes. `terraform apply` creates paid Yandex resources and must be run only after explicitly reviewing the plan and approving the spend.
 
 For the anton415 Hub rename, review the plan especially carefully: resource names, the VM app directory, registry image name, database name, database user, and backup bucket examples now use `anton415-hub` / `anton415_hub`. Keep pre-rename production backups until the post-release data check is complete.
+
+## SSH Access
+
+Public SSH is closed by default. `production_ssh_allowed_cidrs` is the only Terraform-controlled SSH allowlist for the production VM, and every entry must be a valid IPv4 CIDR with prefix length `/24` or narrower. Prefer `/32` entries for individual admin addresses or a small fixed VPN/bastion egress range.
+
+Use this permanent admin path:
+
+```hcl
+production_ssh_allowed_cidrs = [
+  "203.0.113.10/32",
+]
+```
+
+If the admin source address is dynamic, use a temporary break-glass window instead of leaving SSH open:
+
+```sh
+ADMIN_IP="$(curl -fsS https://api.ipify.org)"
+terraform plan -var="production_ssh_allowed_cidrs=[\"${ADMIN_IP}/32\"]"
+terraform apply -var="production_ssh_allowed_cidrs=[\"${ADMIN_IP}/32\"]"
+```
+
+After the admin task or deployment is complete, remove the temporary `/32` entry and apply Terraform again. Do not use `0.0.0.0/0`; the variable validation rejects it.
 
 After apply, add a Lockbox secret version with runtime secrets. It must include at least:
 

@@ -8,6 +8,7 @@ All notable changes to anton415 Hub are summarized here. Releases follow the sha
 
 - Renamed the product and repository identity from the previous OS-oriented name to anton415 Hub.
 - Updated UI copy, package/module metadata, container image names, deploy paths, and production rename runbooks.
+- Restricted production SSH ingress to explicit admin CIDRs and documented the break-glass deploy path.
 
 ## v0.2.0 - 2026-04-29
 
