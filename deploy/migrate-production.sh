@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-COMPOSE_FILE="${COMPOSE_FILE:-/opt/anton415-os/docker-compose.yml}"
+COMPOSE_FILE="${COMPOSE_FILE:-/opt/anton415-hub/docker-compose.yml}"
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-$(pwd)/migrations}"
 
 if [ -n "${DATABASE_URL:-}" ]; then

@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/anton415/anton415-os/internal/platform/config"
-	"github.com/anton415/anton415-os/internal/platform/db"
-	platformhttp "github.com/anton415/anton415-os/internal/platform/http"
-	"github.com/anton415/anton415-os/internal/platform/logging"
+	"github.com/anton415/anton415-hub/internal/platform/config"
+	"github.com/anton415/anton415-hub/internal/platform/db"
+	platformhttp "github.com/anton415/anton415-hub/internal/platform/http"
+	"github.com/anton415/anton415-hub/internal/platform/logging"
 )
 
 func main() {

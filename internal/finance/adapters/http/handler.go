@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/anton415/anton415-os/internal/finance/application"
-	"github.com/anton415/anton415-os/internal/finance/domain"
+	"github.com/anton415/anton415-hub/internal/finance/application"
+	"github.com/anton415/anton415-hub/internal/finance/domain"
 )
 
 type Service interface {

@@ -4,7 +4,7 @@ GO_DOCKER = docker run --rm -v "$(CURDIR)":/workspace -w /workspace $(GO_IMAGE)
 GO ?= $(if $(shell command -v go 2>/dev/null),go,$(GO_DOCKER) go)
 GOFMT ?= $(if $(shell command -v gofmt 2>/dev/null),gofmt,$(GO_DOCKER) gofmt)
 GO_FILES := $(shell find . -name "*.go" -not -path "./.git/*" -not -path "./apps/web/node_modules/*")
-MIGRATE_DATABASE_URL ?= postgres://anton415:anton415@postgres:5432/anton415_os?sslmode=disable
+MIGRATE_DATABASE_URL ?= postgres://anton415:anton415@postgres:5432/anton415_hub?sslmode=disable
 WEB_DIR := apps/web
 
 .PHONY: dev api web db stop test test-e2e test-integration lint build docker-build migrate-up migrate-down docker-config go-mod-tidy
@@ -44,7 +44,7 @@ build:
 	cd $(WEB_DIR) && npm install && npm run build
 
 docker-build:
-	docker build -t anton415-os:local .
+	docker build -t anton415-hub:local .
 
 migrate-up: db
 	$(COMPOSE) run --rm migrate -path /migrations -database "$(MIGRATE_DATABASE_URL)" up

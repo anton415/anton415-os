@@ -8,8 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/anton415/anton415-os/internal/finance/application"
-	"github.com/anton415/anton415-os/internal/finance/domain"
+	"github.com/anton415/anton415-hub/internal/finance/application"
+	"github.com/anton415/anton415-hub/internal/finance/domain"
 )
 
 func TestExpenseListSaveAndValidation(t *testing.T) {

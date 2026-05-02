@@ -71,7 +71,7 @@ async function mockFinanceApi(page: Page) {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        service: "anton415-os-api",
+        service: "anton415-hub-api",
         status: "ok",
         version: "test",
         checks: { database: { status: "ok", latency: "1ms" } }

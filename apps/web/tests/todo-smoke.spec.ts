@@ -106,7 +106,7 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.goto("/todo");
   await expect(page.locator(".app-shell")).toHaveClass(/sidebar-collapsed/);
   await expect(page.locator("#todo-panel")).toHaveClass(/collapsed/);
-  await page.getByRole("button", { name: "Показать панель anton-os" }).click();
+  await page.getByRole("button", { name: "Показать панель anton415 Hub" }).click();
   await page.getByRole("button", { name: "Показать панель задач" }).click();
   await expect(page.locator(".todo-layout")).toBeVisible();
   const hasHorizontalOverflow = await page.evaluate(
@@ -162,7 +162,7 @@ async function mockTodoApi(page: Page) {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        service: "anton415-os-api",
+        service: "anton415-hub-api",
         status: "ok",
         version: "test",
         checks: { database: { status: "ok", latency: "1ms" } }

@@ -7,14 +7,14 @@ set -eu
 : "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}"
 
 BACKUP_PREFIX="${BACKUP_PREFIX:-postgres}"
-BACKUP_COMPOSE_FILE="${BACKUP_COMPOSE_FILE:-/opt/anton415-os/docker-compose.yml}"
+BACKUP_COMPOSE_FILE="${BACKUP_COMPOSE_FILE:-/opt/anton415-hub/docker-compose.yml}"
 S3_ENDPOINT="${S3_ENDPOINT:-https://storage.yandexcloud.net}"
 AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-ru-central1}"
 export AWS_DEFAULT_REGION
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 WORKDIR="$(mktemp -d)"
 RUN_ID="${TIMESTAMP}-$(basename "${WORKDIR}")"
-ARCHIVE="${WORKDIR}/anton415-os-${RUN_ID}.sql.gz"
+ARCHIVE="${WORKDIR}/anton415-hub-${RUN_ID}.sql.gz"
 
 cleanup() {
   rm -rf "${WORKDIR}"
@@ -37,7 +37,7 @@ dump_database() {
 }
 
 upload_archive() {
-  destination="s3://${BACKUP_BUCKET}/${BACKUP_PREFIX}/monthly/anton415-os-${RUN_ID}.sql.gz"
+  destination="s3://${BACKUP_BUCKET}/${BACKUP_PREFIX}/monthly/anton415-hub-${RUN_ID}.sql.gz"
   if command -v aws >/dev/null 2>&1; then
     aws --endpoint-url "${S3_ENDPOINT}" s3 cp "${ARCHIVE}" "${destination}"
     return

@@ -44,7 +44,7 @@ func (sender *SMTPSender) SendMagicLink(ctx context.Context, email string, link 
 	message := strings.Join([]string{
 		"From: " + sender.config.From,
 		"To: " + email,
-		"Subject: Your anton415 OS Todo login link",
+		"Subject: Your anton415 Hub Todo login link",
 		"MIME-Version: 1.0",
 		"Content-Type: text/plain; charset=UTF-8",
 		"",

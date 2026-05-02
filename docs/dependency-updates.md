@@ -22,7 +22,7 @@ cd apps/web && npm outdated
 ```sh
 go test ./...
 cd apps/web && npm run test:run && npm run build
-docker buildx build --platform linux/amd64 --load -t anton415-os:release-check .
+docker buildx build --platform linux/amd64 --load -t anton415-hub:release-check .
 ```
 
 4. Open one release-prep PR with the dependency changes and changelog note.

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/anton415/anton415-os/internal/platform/config"
+	"github.com/anton415/anton415-hub/internal/platform/config"
 )
 
 func TestHealthReportsDegradedWithoutDatabase(t *testing.T) {

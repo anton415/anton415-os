@@ -17,7 +17,7 @@ Issue -> Discovery -> Spec -> Ready -> Draft PR -> Implementation -> Review Gate
 - Release: changelog/release notes and production deploy.
 - Monitoring: production verification after release.
 
-The issue forms automatically add new feature and bug issues to the `anton415-os - Feature Ritual` GitHub Project.
+The issue forms automatically add new feature and bug issues to the `anton415 Hub - Feature Ritual` GitHub Project.
 
 ## Issue rules
 

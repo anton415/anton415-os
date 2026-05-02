@@ -13,8 +13,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"github.com/anton415/anton415-os/internal/todo/application"
-	"github.com/anton415/anton415-os/internal/todo/domain"
+	"github.com/anton415/anton415-hub/internal/todo/application"
+	"github.com/anton415/anton415-hub/internal/todo/domain"
 )
 
 type Service interface {

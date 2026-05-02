@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/anton415/anton415-os/internal/finance/domain"
+	"github.com/anton415/anton415-hub/internal/finance/domain"
 )
 
 func TestServiceListExpensesReturnsTwelveMonthsAndTotals(t *testing.T) {

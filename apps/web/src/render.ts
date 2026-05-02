@@ -84,12 +84,12 @@ export function renderApp(root: HTMLElement, options: RenderOptions) {
 
   root.innerHTML = `
     <div class="app-shell ${options.sidebarCollapsed ? "sidebar-collapsed" : ""}">
-      <aside class="sidebar" id="anton-os-sidebar" aria-label="Основная навигация">
+      <aside class="sidebar" id="anton415-hub-sidebar" aria-label="Основная навигация">
         <div class="sidebar-head">
           <a class="brand" href="/" data-route="/">
             <span class="brand-mark" aria-hidden="true">A</span>
             <span>
-              <strong>anton415 OS</strong>
+              <strong>anton415 Hub</strong>
               <span>модульный монолит</span>
             </span>
           </a>
@@ -97,10 +97,10 @@ export function renderApp(root: HTMLElement, options: RenderOptions) {
             class="icon-button small sidebar-collapse"
             type="button"
             data-toggle-sidebar
-            aria-controls="anton-os-sidebar"
+            aria-controls="anton415-hub-sidebar"
             aria-expanded="true"
-            aria-label="Скрыть панель anton-os"
-            title="Скрыть панель anton-os"
+            aria-label="Скрыть панель anton415 Hub"
+            title="Скрыть панель anton415 Hub"
           >
             &#8249;
           </button>
@@ -574,7 +574,7 @@ function renderLoginPage(options: RenderOptions): string {
   return `
     <header class="topbar">
       <div>
-        <p class="eyebrow">Личный anton415 OS</p>
+        <p class="eyebrow">Личный anton415 Hub</p>
         <h1>Вход</h1>
       </div>
       <div class="topbar-actions">
@@ -641,13 +641,13 @@ function renderSidebarToggle(options: RenderOptions): string {
       type="button"
       id="toggle-sidebar"
       data-toggle-sidebar
-      aria-controls="anton-os-sidebar"
+      aria-controls="anton415-hub-sidebar"
       aria-expanded="${options.sidebarCollapsed ? "false" : "true"}"
-      aria-label="${options.sidebarCollapsed ? "Показать панель anton-os" : "Скрыть панель anton-os"}"
-      title="${options.sidebarCollapsed ? "Показать панель anton-os" : "Скрыть панель anton-os"}"
+      aria-label="${options.sidebarCollapsed ? "Показать панель anton415 Hub" : "Скрыть панель anton415 Hub"}"
+      title="${options.sidebarCollapsed ? "Показать панель anton415 Hub" : "Скрыть панель anton415 Hub"}"
     >
       <span aria-hidden="true">&#9776;</span>
-      <span>anton-os</span>
+      <span>anton415 Hub</span>
     </button>
   `;
 }

@@ -2,7 +2,7 @@
 
 ## Direction
 
-`anton415-os` starts as a Go modular monolith.
+anton415 Hub starts as a Go modular monolith.
 
 The product is for one user, so the early engineering priority is low-stress development, clear boundaries, and easy local operation. The repository should preserve future extraction options through package ownership and explicit interfaces, not by adding distributed-system machinery before it is needed.
 
@@ -63,7 +63,7 @@ Platform code should stay boring and cross-cutting. It must not accumulate domai
 
 ## Repository strategy
 
-`anton415-os` is the main engineering monorepo and source of truth. Modules live inside this repository by default.
+`anton415/anton415-hub` is the main engineering monorepo and source of truth. Modules live inside this repository by default.
 
 Monorepo remains the default while:
 

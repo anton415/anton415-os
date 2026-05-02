@@ -9,7 +9,7 @@ import (
 )
 
 // Локальный порт 15432 выбран, чтобы не конфликтовать с уже установленным Postgres на 5432.
-const defaultDatabaseURL = "postgres://anton415:anton415@localhost:15432/anton415_os?sslmode=disable"
+const defaultDatabaseURL = "postgres://anton415:anton415@localhost:15432/anton415_hub?sslmode=disable"
 
 type Config struct {
 	AppEnv              string
@@ -80,7 +80,7 @@ func Load() (Config, error) {
 		AuthCallbackBaseURL: stringFromEnv("AUTH_CALLBACK_BASE_URL", "http://localhost:8080"),
 		AuthSuccessRedirect: stringFromEnv("AUTH_SUCCESS_REDIRECT", webOrigin+"/todo"),
 		AuthFailureRedirect: stringFromEnv("AUTH_FAILURE_REDIRECT", webOrigin+"/"),
-		AuthSessionCookie:   stringFromEnv("AUTH_SESSION_COOKIE", "anton415_session"),
+		AuthSessionCookie:   stringFromEnv("AUTH_SESSION_COOKIE", "anton415_hub_session"),
 		AuthCookieDomain:    stringFromEnv("AUTH_COOKIE_DOMAIN", ""),
 		AuthSessionTTL:      sessionTTL,
 		AuthTokenTTL:        tokenTTL,

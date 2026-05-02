@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     env_file:
-      - /opt/anton415-os/app.env
+      - /opt/anton415-hub/app.env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,21 +20,21 @@ services:
         "-path",
         "/migrations",
         "-database",
-        "postgres://${POSTGRES_USER:-anton415_app}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-anton415_os}?sslmode=disable",
+        "postgres://${POSTGRES_USER:-anton415_hub_app}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-anton415_hub}?sslmode=disable",
         "up"
       ]
     volumes:
-      - /opt/anton415-os/migrations:/migrations:ro
+      - /opt/anton415-hub/migrations:/migrations:ro
     depends_on:
       postgres:
         condition: service_healthy
 
   app:
-    image: cr.yandex/${YC_REGISTRY_ID}/anton415-os:${IMAGE_TAG}
+    image: cr.yandex/${YC_REGISTRY_ID}/anton415-hub:${IMAGE_TAG}
     restart: unless-stopped
     env_file:
-      - /opt/anton415-os/app.env
-      - /opt/anton415-os/secrets.env
+      - /opt/anton415-hub/app.env
+      - /opt/anton415-hub/secrets.env
     expose:
       - "8080"
     depends_on:
