@@ -53,6 +53,7 @@ let todoState: TodoState = {
   tasks: [],
   scope: { kind: "view", view: "inbox" },
   todoPanelCollapsed: compactTodoPanelQuery.matches,
+  searchPanelCollapsed: true,
   sort: "smart",
   direction: "asc",
   search: ""
@@ -111,6 +112,10 @@ function render() {
     },
     onToggleTodoPanel: () => {
       todoState = { ...todoState, todoPanelCollapsed: !todoState.todoPanelCollapsed };
+      render();
+    },
+    onToggleTodoSearchPanel: () => {
+      todoState = { ...todoState, searchPanelCollapsed: !todoState.searchPanelCollapsed };
       render();
     },
     onSelectTodoScope: (scope) => {

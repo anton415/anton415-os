@@ -162,6 +162,7 @@ export type TodoState = {
   editingTaskId?: number;
   editingProjectId?: number;
   todoPanelCollapsed?: boolean;
+  searchPanelCollapsed?: boolean;
   sort: TodoSort;
   direction: TodoSortDirection;
   search: string;

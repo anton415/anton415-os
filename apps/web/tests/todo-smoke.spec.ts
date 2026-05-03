@@ -40,6 +40,8 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await expect(page.getByRole("button", { name: "Все", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Готово", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Статус" })).toHaveCount(0);
+  await expect(page.locator("#todo-query-form")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Поиск" })).toHaveAttribute("aria-expanded", "false");
   await expectSmartListsOneColumn(page);
 
   await page.getByRole("button", { name: "Настройки задачи Existing task" }).click();
@@ -76,10 +78,16 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.getByRole("button", { name: "Создать задачу" }).click();
   await expect(page.locator(".task-meta dd", { hasText: /^Еженедельно$/ })).toBeVisible();
 
+  await page.getByRole("button", { name: "Поиск" }).click();
+  await expect(page.locator("#todo-query-form")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Скрыть поиск" })).toHaveAttribute("aria-expanded", "true");
   await page.locator('input[name="q"]').fill("milk");
   await page.getByRole("button", { name: "Применить фильтры задач" }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pay rent" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Скрыть поиск" }).click();
+  await expect(page.getByText("Поиск: milk")).toBeVisible();
+  await page.getByRole("button", { name: "Поиск" }).click();
   await page.locator('input[name="q"]').fill("");
   await page.locator('select[name="sort"]').selectOption("priority");
   await page.locator('select[name="direction"]').selectOption("desc");
@@ -114,6 +122,7 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.goto("/todo");
   await expect(page.locator(".app-shell")).toHaveClass(/sidebar-collapsed/);
   await expect(page.locator("#todo-panel")).toHaveClass(/collapsed/);
+  await expect(page.locator("#todo-query-form")).toBeHidden();
   await page.getByRole("button", { name: "Показать панель anton415 Hub" }).click();
   await page.getByRole("button", { name: "Показать панель задач" }).click();
   await expect(page.locator(".todo-layout")).toBeVisible();

@@ -940,12 +940,50 @@ p {
   gap: 6px;
 }
 
+.todo-query-panel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.todo-query-panel.collapsed {
+  padding-bottom: 0;
+}
+
+.todo-query-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.todo-search-toggle {
+  min-height: 40px;
+}
+
+.todo-search-summary {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  border: 1px solid #dbeafe;
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
 .todo-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px;
+  padding: 0;
+}
+
+.todo-toolbar[hidden] {
+  display: none;
 }
 
 .todo-search-field {

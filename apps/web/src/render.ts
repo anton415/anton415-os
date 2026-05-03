@@ -64,6 +64,7 @@ type RenderOptions = {
   onSaveFinanceExpenseMonth: (month: number, form: HTMLFormElement) => void;
   onSaveFinanceIncomeMonth: (month: number, form: HTMLFormElement) => void;
   onToggleTodoPanel: () => void;
+  onToggleTodoSearchPanel: () => void;
   onChangeTodoQuery: (search: string, sort: TodoSort, direction: TodoSortDirection) => void;
   onSelectTodoScope: (scope: TodoScope) => void;
   onEditTask: (taskId: number) => void;
@@ -936,33 +937,53 @@ function projectPeriod(project: TodoProject): string {
 }
 
 function renderTodoToolbar(state: TodoState): string {
+  const searchPanelCollapsed = state.searchPanelCollapsed ?? true;
+  const searchSummary =
+    searchPanelCollapsed && state.search.trim() !== ""
+      ? `<span class="todo-search-summary">Поиск: ${escapeHTML(state.search.trim())}</span>`
+      : "";
+
   return `
-    <form class="todo-toolbar" id="todo-query-form" role="search">
-      <label class="compact-field todo-search-field">
-        <span class="visually-hidden">Поиск задач</span>
-        <input name="q" type="search" value="${escapeAttr(state.search)}" placeholder="Поиск">
-      </label>
-      <div class="todo-sort-controls">
-        <label class="compact-field">
-          <span class="visually-hidden">Сортировка задач</span>
-          <select name="sort">
-            ${renderSortOption("smart", "Умная", state.sort)}
-            ${renderSortOption("due", "Срок", state.sort)}
-            ${renderSortOption("created", "Создано", state.sort)}
-            ${renderSortOption("title", "Название", state.sort)}
-            ${renderSortOption("priority", "Приоритет", state.sort)}
-          </select>
-        </label>
-        <label class="compact-field">
-          <span class="visually-hidden">Направление сортировки</span>
-          <select name="direction">
-            ${renderDirectionOption("asc", "По возрастанию", state.direction)}
-            ${renderDirectionOption("desc", "По убыванию", state.direction)}
-          </select>
-        </label>
-        <button class="icon-button" type="submit" aria-label="Применить фильтры задач" title="Применить фильтры задач">&#8981;</button>
+    <section class="todo-query-panel ${searchPanelCollapsed ? "collapsed" : ""}" aria-label="Поиск задач">
+      <div class="todo-query-panel-head">
+        <button
+          class="secondary-button todo-search-toggle"
+          type="button"
+          data-toggle-todo-search-panel
+          aria-controls="todo-query-form"
+          aria-expanded="${searchPanelCollapsed ? "false" : "true"}"
+        >
+          ${searchPanelCollapsed ? "Поиск" : "Скрыть поиск"}
+        </button>
+        ${searchSummary}
       </div>
-    </form>
+      <form class="todo-toolbar" id="todo-query-form" role="search" ${searchPanelCollapsed ? "hidden" : ""}>
+        <label class="compact-field todo-search-field">
+          <span class="visually-hidden">Поиск задач</span>
+          <input name="q" type="search" value="${escapeAttr(state.search)}" placeholder="Поиск">
+        </label>
+        <div class="todo-sort-controls">
+          <label class="compact-field">
+            <span class="visually-hidden">Сортировка задач</span>
+            <select name="sort">
+              ${renderSortOption("smart", "Умная", state.sort)}
+              ${renderSortOption("due", "Срок", state.sort)}
+              ${renderSortOption("created", "Создано", state.sort)}
+              ${renderSortOption("title", "Название", state.sort)}
+              ${renderSortOption("priority", "Приоритет", state.sort)}
+            </select>
+          </label>
+          <label class="compact-field">
+            <span class="visually-hidden">Направление сортировки</span>
+            <select name="direction">
+              ${renderDirectionOption("asc", "По возрастанию", state.direction)}
+              ${renderDirectionOption("desc", "По убыванию", state.direction)}
+            </select>
+          </label>
+          <button class="icon-button" type="submit" aria-label="Применить фильтры задач" title="Применить фильтры задач">&#8981;</button>
+        </div>
+      </form>
+    </section>
   `;
 }
 
@@ -1444,6 +1465,7 @@ function bindTodoEvents(root: HTMLElement, options: RenderOptions) {
   root.querySelectorAll("[data-toggle-todo-panel]").forEach((button) => {
     button.addEventListener("click", options.onToggleTodoPanel);
   });
+  root.querySelector("[data-toggle-todo-search-panel]")?.addEventListener("click", options.onToggleTodoSearchPanel);
   root.querySelector<HTMLFormElement>("#todo-query-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;

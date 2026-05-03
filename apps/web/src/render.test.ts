@@ -192,9 +192,36 @@ describe("renderApp todo", () => {
     expect(options.onToggleSidebar).toHaveBeenCalled();
   });
 
+  it("hides the search panel by default and keeps an explicit toggle", () => {
+    const options = optionsForTodo();
+
+    renderApp(root, options);
+
+    expect(root.querySelector("#todo-query-form")?.hasAttribute("hidden")).toBe(true);
+    expect(root.querySelector("[data-toggle-todo-search-panel]")?.getAttribute("aria-expanded")).toBe("false");
+
+    root.querySelector<HTMLButtonElement>("[data-toggle-todo-search-panel]")?.click();
+
+    expect(options.onToggleTodoSearchPanel).toHaveBeenCalled();
+  });
+
+  it("shows the search panel when expanded", () => {
+    renderApp(root, optionsForTodo({ todoState: todoState({ searchPanelCollapsed: false }) }));
+
+    expect(root.querySelector("#todo-query-form")?.hasAttribute("hidden")).toBe(false);
+    expect(root.querySelector("[data-toggle-todo-search-panel]")?.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("keeps active search visible when the search panel is collapsed", () => {
+    renderApp(root, optionsForTodo({ todoState: todoState({ search: "milk", searchPanelCollapsed: true }) }));
+
+    expect(root.querySelector("#todo-query-form")?.hasAttribute("hidden")).toBe(true);
+    expect(root.querySelector(".todo-search-summary")?.textContent).toBe("Поиск: milk");
+  });
+
   it("submits search and sort controls", () => {
     const options = optionsForTodo({
-      todoState: todoState({ search: "milk", sort: "priority", direction: "desc" })
+      todoState: todoState({ search: "milk", searchPanelCollapsed: false, sort: "priority", direction: "desc" })
     });
 
     renderApp(root, options);
@@ -494,6 +521,7 @@ function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
     onSaveFinanceExpenseMonth: vi.fn(),
     onSaveFinanceIncomeMonth: vi.fn(),
     onToggleTodoPanel: vi.fn(),
+    onToggleTodoSearchPanel: vi.fn(),
     onChangeTodoQuery: vi.fn(),
     onSelectTodoScope: vi.fn(),
     onEditTask: vi.fn(),
