@@ -40,6 +40,7 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await expect(page.getByRole("button", { name: "Все", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Готово", exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Статус" })).toHaveCount(0);
+  await expectSmartListsOneColumn(page);
 
   await page.getByRole("button", { name: "Настройки задачи Existing task" }).click();
   await page.locator('#task-settings-form input[name="title"]').fill("Existing task updated");
@@ -116,11 +117,32 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.getByRole("button", { name: "Показать панель anton415 Hub" }).click();
   await page.getByRole("button", { name: "Показать панель задач" }).click();
   await expect(page.locator(".todo-layout")).toBeVisible();
+  await expectSmartListsOneColumn(page);
   const hasHorizontalOverflow = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth
   );
   expect(hasHorizontalOverflow).toBe(false);
 });
+
+async function expectSmartListsOneColumn(page: Page) {
+  await page.locator('[data-todo-view="scheduled"] span').last().evaluate((span) => {
+    span.textContent = "Запланировано с очень длинным названием списка на несколько строк";
+  });
+
+  const layout = await page.locator(".smart-list-button").evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const rect = button.getBoundingClientRect();
+      return {
+        left: Math.round(rect.left),
+        scrollWidth: button.scrollWidth,
+        clientWidth: button.clientWidth
+      };
+    })
+  );
+
+  expect(new Set(layout.map((item) => item.left)).size).toBe(1);
+  expect(layout.every((item) => item.scrollWidth <= item.clientWidth)).toBe(true);
+}
 
 async function mockTodoApi(page: Page) {
   const now = "2026-04-23T10:00:00Z";
