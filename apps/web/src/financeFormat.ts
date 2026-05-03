@@ -68,6 +68,15 @@ export function divideDecimalAmount(value: string, divisor: number): string {
   return formatApiMinorUnits(roundDivide(minorUnits, BigInt(divisor)));
 }
 
+export function multiplyDecimalAmount(value: string, multiplier: number): string {
+  const minorUnits = decimalInputToMinorUnits(value);
+  if (minorUnits === undefined || multiplier < 0 || !Number.isInteger(multiplier)) {
+    return "0.00";
+  }
+
+  return formatApiMinorUnits(minorUnits * BigInt(multiplier));
+}
+
 export function currencyLabel(currency: string): string {
   return currency === "RUB" ? "₽" : currency;
 }

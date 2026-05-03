@@ -29,8 +29,9 @@ describe("FinanceApi", () => {
     });
   });
 
-  it("saves expense and income months with JSON payloads", async () => {
+  it("saves expense, income, and settings with JSON payloads", async () => {
     fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: {} }))
       .mockResolvedValueOnce(jsonResponse({ data: {} }))
       .mockResolvedValueOnce(jsonResponse({ data: {} }));
 
@@ -40,6 +41,11 @@ describe("FinanceApi", () => {
       salary_amount: "200000.00",
       bonus_percent: "25.00",
       total_amount: "250000.00"
+    });
+    await api.saveSettings({
+      salary_amount: "200000.00",
+      bonus_percent: "25.00",
+      expense_limit_percents: { restaurants: "10.00" }
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, "http://api.test/api/v1/finance/expenses/2026/4", {
@@ -57,6 +63,19 @@ describe("FinanceApi", () => {
         salary_amount: "200000.00",
         bonus_percent: "25.00",
         total_amount: "250000.00"
+      }),
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      }
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "http://api.test/api/v1/finance/settings", {
+      method: "PUT",
+      body: JSON.stringify({
+        salary_amount: "200000.00",
+        bonus_percent: "25.00",
+        expense_limit_percents: { restaurants: "10.00" }
       }),
       credentials: "include",
       headers: {

@@ -9,7 +9,7 @@ import (
 
 func TestServiceListExpensesReturnsTwelveMonthsAndTotals(t *testing.T) {
 	store := newMemoryStore()
-	service := NewService(Dependencies{Expenses: store, Income: store})
+	service := NewService(Dependencies{Expenses: store, Income: store, Settings: store})
 	_, err := service.SaveExpense(context.Background(), 2026, 4, SaveExpenseActualInput{
 		CategoryAmounts: map[domain.ExpenseCategory]domain.Money{
 			domain.ExpenseCategoryRestaurants: domain.MustMoneyFromKopecks(150000),
@@ -41,7 +41,7 @@ func TestServiceListExpensesReturnsTwelveMonthsAndTotals(t *testing.T) {
 
 func TestServiceDeletesZeroExpenseAndIncomeMonths(t *testing.T) {
 	store := newMemoryStore()
-	service := NewService(Dependencies{Expenses: store, Income: store})
+	service := NewService(Dependencies{Expenses: store, Income: store, Settings: store})
 	ctx := context.Background()
 
 	_, err := service.SaveExpense(ctx, 2026, 4, SaveExpenseActualInput{
@@ -79,7 +79,7 @@ func TestServiceDeletesZeroExpenseAndIncomeMonths(t *testing.T) {
 
 func TestServiceListIncomeReturnsAverageForNonZeroIncomeMonths(t *testing.T) {
 	store := newMemoryStore()
-	service := NewService(Dependencies{Expenses: store, Income: store})
+	service := NewService(Dependencies{Expenses: store, Income: store, Settings: store})
 	ctx := context.Background()
 
 	_, _ = service.SaveIncome(ctx, 2026, 1, SaveIncomeActualInput{
@@ -115,15 +115,57 @@ func TestServiceListIncomeReturnsAverageForNonZeroIncomeMonths(t *testing.T) {
 	}
 }
 
+func TestServiceSavesAndListsFinanceSettings(t *testing.T) {
+	store := newMemoryStore()
+	service := NewService(Dependencies{Expenses: store, Income: store, Settings: store})
+	ctx := context.Background()
+
+	_, err := service.SaveSettings(ctx, SaveFinanceSettingsInput{
+		SalaryAmount: domain.MustMoneyFromKopecks(20000000),
+		BonusPercent: domain.MustPercentFromBasisPoints(2500),
+		ExpenseLimitPercents: map[domain.ExpenseCategory]domain.Percent{
+			domain.ExpenseCategoryRestaurants: domain.MustPercentFromBasisPoints(1000),
+			domain.ExpenseCategoryEducation:   domain.MustPercentFromBasisPoints(550),
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveSettings() error = %v", err)
+	}
+
+	settings, err := service.ListSettings(ctx)
+	if err != nil {
+		t.Fatalf("ListSettings() error = %v", err)
+	}
+
+	if !settings.HasIncomeSettings {
+		t.Fatal("settings.HasIncomeSettings = false, want true")
+	}
+	if got := settings.SalaryAmount.Decimal(); got != "200000.00" {
+		t.Fatalf("SalaryAmount = %s, want 200000.00", got)
+	}
+	if got := settings.BonusPercent.Decimal(); got != "25.00" {
+		t.Fatalf("BonusPercent = %s, want 25.00", got)
+	}
+	percents := settings.ExpenseLimitPercents()
+	if got := percents[domain.ExpenseCategoryRestaurants].Decimal(); got != "10.00" {
+		t.Fatalf("restaurants limit = %s, want 10.00", got)
+	}
+	if got := percents[domain.ExpenseCategoryEducation].Decimal(); got != "5.50" {
+		t.Fatalf("education limit = %s, want 5.50", got)
+	}
+}
+
 type memoryStore struct {
 	expenses map[[2]int]domain.MonthlyExpenseActual
 	income   map[[2]int]domain.MonthlyIncomeActual
+	settings domain.FinanceSettings
 }
 
 func newMemoryStore() *memoryStore {
 	return &memoryStore{
 		expenses: map[[2]int]domain.MonthlyExpenseActual{},
 		income:   map[[2]int]domain.MonthlyIncomeActual{},
+		settings: domain.EmptyFinanceSettings(),
 	}
 }
 
@@ -164,5 +206,14 @@ func (store *memoryStore) UpsertIncomeActual(_ context.Context, actual domain.Mo
 
 func (store *memoryStore) DeleteIncomeActual(_ context.Context, year int, month int) error {
 	delete(store.income, [2]int{year, month})
+	return nil
+}
+
+func (store *memoryStore) GetFinanceSettings(_ context.Context) (domain.FinanceSettings, error) {
+	return store.settings, nil
+}
+
+func (store *memoryStore) SaveFinanceSettings(_ context.Context, settings domain.FinanceSettings) error {
+	store.settings = settings
 	return nil
 }

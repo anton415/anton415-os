@@ -18,20 +18,28 @@ type IncomeRepository interface {
 	DeleteIncomeActual(ctx context.Context, year int, month int) error
 }
 
+type SettingsRepository interface {
+	GetFinanceSettings(ctx context.Context) (domain.FinanceSettings, error)
+	SaveFinanceSettings(ctx context.Context, settings domain.FinanceSettings) error
+}
+
 type Dependencies struct {
 	Expenses ExpenseRepository
 	Income   IncomeRepository
+	Settings SettingsRepository
 }
 
 type Service struct {
 	expenses ExpenseRepository
 	income   IncomeRepository
+	settings SettingsRepository
 }
 
 func NewService(deps Dependencies) *Service {
 	return &Service{
 		expenses: deps.Expenses,
 		income:   deps.Income,
+		settings: deps.Settings,
 	}
 }
 
@@ -58,6 +66,12 @@ type SaveIncomeActualInput struct {
 	SalaryAmount domain.Money
 	BonusPercent domain.Percent
 	TotalAmount  domain.Money
+}
+
+type SaveFinanceSettingsInput struct {
+	SalaryAmount         domain.Money
+	BonusPercent         domain.Percent
+	ExpenseLimitPercents map[domain.ExpenseCategory]domain.Percent
 }
 
 func (service *Service) ListExpenses(ctx context.Context, year int) (ExpensesYear, error) {
@@ -183,6 +197,22 @@ func (service *Service) SaveIncome(ctx context.Context, year int, month int, inp
 		return domain.MonthlyIncomeActual{}, err
 	}
 	return actual, nil
+}
+
+func (service *Service) ListSettings(ctx context.Context) (domain.FinanceSettings, error) {
+	return service.settings.GetFinanceSettings(ctx)
+}
+
+func (service *Service) SaveSettings(ctx context.Context, input SaveFinanceSettingsInput) (domain.FinanceSettings, error) {
+	settings, err := domain.NewFinanceSettings(true, input.SalaryAmount, input.BonusPercent, input.ExpenseLimitPercents)
+	if err != nil {
+		return domain.FinanceSettings{}, err
+	}
+
+	if err := service.settings.SaveFinanceSettings(ctx, settings); err != nil {
+		return domain.FinanceSettings{}, err
+	}
+	return settings, nil
 }
 
 func zeroByCategory() map[domain.ExpenseCategory]domain.Money {

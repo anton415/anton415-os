@@ -91,15 +91,18 @@ export type FinanceIncomeYear = {
   average_monthly_total_amount: string;
 };
 
+export type FinanceSettings = {
+  currency?: "RUB" | string;
+  salary_amount?: string;
+  bonus_percent?: string;
+  expense_limit_percents: Partial<FinanceExpenseCategoryPercents>;
+};
+
 export type FinanceState = {
   loading: boolean;
   saving: boolean;
   year: number;
-  settings: {
-    salary_amount?: string;
-    bonus_percent?: string;
-    expense_limit_percents: Partial<FinanceExpenseCategoryPercents>;
-  };
+  settings: FinanceSettings;
   expenses?: FinanceExpensesYear;
   income?: FinanceIncomeYear;
   error?: string;

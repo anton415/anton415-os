@@ -2,8 +2,10 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/anton415/anton415-hub/internal/finance/domain"
@@ -139,6 +141,114 @@ func (repo *Repository) DeleteIncomeActual(ctx context.Context, year int, month 
 	`, year, month)
 	if err != nil {
 		return fmt.Errorf("delete finance income actual: %w", err)
+	}
+	return nil
+}
+
+func (repo *Repository) GetFinanceSettings(ctx context.Context) (domain.FinanceSettings, error) {
+	hasIncomeSettings := false
+	salaryAmount := domain.ZeroMoney()
+	bonusPercent := domain.ZeroPercent()
+
+	var salaryKopecks int64
+	var bonusBasisPoints int64
+	err := repo.pool.QueryRow(ctx, `
+		SELECT salary_kopecks, bonus_percent_basis_points
+		FROM finance_settings
+		WHERE id = TRUE
+	`).Scan(&salaryKopecks, &bonusBasisPoints)
+	switch {
+	case err == nil:
+		hasIncomeSettings = true
+		salaryAmount = domain.MustMoneyFromKopecks(salaryKopecks)
+		bonusPercent = domain.MustPercentFromBasisPoints(bonusBasisPoints)
+	case errors.Is(err, pgx.ErrNoRows):
+	default:
+		return domain.FinanceSettings{}, fmt.Errorf("get finance settings: %w", err)
+	}
+
+	rows, err := repo.pool.Query(ctx, `
+		SELECT category, percent_basis_points
+		FROM finance_expense_limit_settings
+		ORDER BY category
+	`)
+	if err != nil {
+		return domain.FinanceSettings{}, fmt.Errorf("list finance expense limit settings: %w", err)
+	}
+	defer rows.Close()
+
+	percents := map[domain.ExpenseCategory]domain.Percent{}
+	for rows.Next() {
+		var categoryCode string
+		var basisPoints int64
+		if err := rows.Scan(&categoryCode, &basisPoints); err != nil {
+			return domain.FinanceSettings{}, err
+		}
+		category, err := domain.ParseExpenseCategory(categoryCode)
+		if err != nil {
+			return domain.FinanceSettings{}, err
+		}
+		percent, err := domain.NewPercentFromBasisPoints(basisPoints)
+		if err != nil {
+			return domain.FinanceSettings{}, err
+		}
+		percents[category] = percent
+	}
+	if err := rows.Err(); err != nil {
+		return domain.FinanceSettings{}, fmt.Errorf("list finance expense limit settings rows: %w", err)
+	}
+
+	settings, err := domain.NewFinanceSettings(hasIncomeSettings, salaryAmount, bonusPercent, percents)
+	if err != nil {
+		return domain.FinanceSettings{}, err
+	}
+	return settings, nil
+}
+
+func (repo *Repository) SaveFinanceSettings(ctx context.Context, settings domain.FinanceSettings) error {
+	tx, err := repo.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin finance settings transaction: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	if settings.HasIncomeSettings {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO finance_settings (id, salary_kopecks, bonus_percent_basis_points)
+			VALUES (TRUE, $1, $2)
+			ON CONFLICT (id) DO UPDATE SET
+				salary_kopecks = EXCLUDED.salary_kopecks,
+				bonus_percent_basis_points = EXCLUDED.bonus_percent_basis_points
+		`, settings.SalaryAmount.Kopecks(), settings.BonusPercent.BasisPoints())
+	} else {
+		_, err = tx.Exec(ctx, `DELETE FROM finance_settings WHERE id = TRUE`)
+	}
+	if err != nil {
+		return fmt.Errorf("upsert finance settings: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM finance_expense_limit_settings`); err != nil {
+		return fmt.Errorf("clear finance expense limit settings: %w", err)
+	}
+
+	percents := settings.ExpenseLimitPercents()
+	for _, category := range domain.ExpenseCategories() {
+		percent, ok := percents[category.Code]
+		if !ok {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO finance_expense_limit_settings (category, percent_basis_points)
+			VALUES ($1, $2)
+		`, string(category.Code), percent.BasisPoints()); err != nil {
+			return fmt.Errorf("insert finance expense limit setting: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit finance settings transaction: %w", err)
 	}
 	return nil
 }

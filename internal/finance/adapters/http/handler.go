@@ -20,6 +20,8 @@ type Service interface {
 	SaveExpense(ctx context.Context, year int, month int, input application.SaveExpenseActualInput) (domain.MonthlyExpenseActual, error)
 	ListIncome(ctx context.Context, year int) (application.IncomeYear, error)
 	SaveIncome(ctx context.Context, year int, month int, input application.SaveIncomeActualInput) (domain.MonthlyIncomeActual, error)
+	ListSettings(ctx context.Context) (domain.FinanceSettings, error)
+	SaveSettings(ctx context.Context, input application.SaveFinanceSettingsInput) (domain.FinanceSettings, error)
 }
 
 type Handler struct {
@@ -34,6 +36,8 @@ func NewRouter(service Service) http.Handler {
 	r.Put("/expenses/{year}/{month}", handler.saveExpense)
 	r.Get("/income", handler.listIncome)
 	r.Put("/income/{year}/{month}", handler.saveIncome)
+	r.Get("/settings", handler.getSettings)
+	r.Put("/settings", handler.saveSettings)
 
 	return r
 }
@@ -136,6 +140,51 @@ func (handler Handler) saveIncome(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, incomeMonthDTO(actual))
 }
 
+func (handler Handler) getSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := handler.service.ListSettings(r.Context())
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeData(w, http.StatusOK, settingsDTO(settings))
+}
+
+func (handler Handler) saveSettings(w http.ResponseWriter, r *http.Request) {
+	var request updateSettingsRequest
+	if !decodeRequest(w, r, &request) {
+		return
+	}
+
+	salaryAmount, err := parseOptionalMoney(request.SalaryAmount)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	bonusPercent, err := parseOptionalPercent(request.BonusPercent)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	expenseLimitPercents, err := categoryPercents(request.ExpenseLimitPercents)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	settings, err := handler.service.SaveSettings(r.Context(), application.SaveFinanceSettingsInput{
+		SalaryAmount:         salaryAmount,
+		BonusPercent:         bonusPercent,
+		ExpenseLimitPercents: expenseLimitPercents,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeData(w, http.StatusOK, settingsDTO(settings))
+}
+
 type updateExpenseRequest struct {
 	CategoryAmounts map[string]string `json:"category_amounts"`
 }
@@ -144,6 +193,12 @@ type updateIncomeRequest struct {
 	SalaryAmount string `json:"salary_amount"`
 	BonusPercent string `json:"bonus_percent"`
 	TotalAmount  string `json:"total_amount"`
+}
+
+type updateSettingsRequest struct {
+	SalaryAmount         string            `json:"salary_amount"`
+	BonusPercent         string            `json:"bonus_percent"`
+	ExpenseLimitPercents map[string]string `json:"expense_limit_percents"`
 }
 
 type categoryResponse struct {
@@ -182,6 +237,13 @@ type incomeYearResponse struct {
 	Months                    []incomeMonthResponse `json:"months"`
 	AnnualTotalAmount         string                `json:"annual_total_amount"`
 	AverageMonthlyTotalAmount string                `json:"average_monthly_total_amount"`
+}
+
+type financeSettingsResponse struct {
+	Currency             string            `json:"currency"`
+	SalaryAmount         *string           `json:"salary_amount,omitempty"`
+	BonusPercent         *string           `json:"bonus_percent,omitempty"`
+	ExpenseLimitPercents map[string]string `json:"expense_limit_percents"`
 }
 
 type responseEnvelope struct {
@@ -251,6 +313,25 @@ func categoryAmounts(raw map[string]string) (map[domain.ExpenseCategory]domain.M
 	return amounts, nil
 }
 
+func categoryPercents(raw map[string]string) (map[domain.ExpenseCategory]domain.Percent, error) {
+	percents := map[domain.ExpenseCategory]domain.Percent{}
+	for key, value := range raw {
+		if value == "" {
+			continue
+		}
+		category, err := domain.ParseExpenseCategory(key)
+		if err != nil {
+			return nil, err
+		}
+		percent, err := domain.ParsePercent(value)
+		if err != nil {
+			return nil, err
+		}
+		percents[category] = percent
+	}
+	return percents, nil
+}
+
 func parseOptionalMoney(value string) (domain.Money, error) {
 	if value == "" {
 		return domain.ZeroMoney(), nil
@@ -315,6 +396,24 @@ func incomeMonthDTO(month domain.MonthlyIncomeActual) incomeMonthResponse {
 	}
 }
 
+func settingsDTO(settings domain.FinanceSettings) financeSettingsResponse {
+	var salaryAmount *string
+	var bonusPercent *string
+	if settings.HasIncomeSettings {
+		salary := settings.SalaryAmount.Decimal()
+		bonus := settings.BonusPercent.Decimal()
+		salaryAmount = &salary
+		bonusPercent = &bonus
+	}
+
+	return financeSettingsResponse{
+		Currency:             "RUB",
+		SalaryAmount:         salaryAmount,
+		BonusPercent:         bonusPercent,
+		ExpenseLimitPercents: percentMapDTO(settings.ExpenseLimitPercents()),
+	}
+}
+
 func categoryDTOs() []categoryResponse {
 	categories := domain.ExpenseCategories()
 	response := make([]categoryResponse, 0, len(categories))
@@ -324,6 +423,18 @@ func categoryDTOs() []categoryResponse {
 			Label:          category.Label,
 			Classification: string(category.Classification),
 		})
+	}
+	return response
+}
+
+func percentMapDTO(percents map[domain.ExpenseCategory]domain.Percent) map[string]string {
+	response := map[string]string{}
+	for _, category := range domain.ExpenseCategories() {
+		percent, ok := percents[category.Code]
+		if !ok {
+			continue
+		}
+		response[string(category.Code)] = percent.Decimal()
 	}
 	return response
 }

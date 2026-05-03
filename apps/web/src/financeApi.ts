@@ -1,9 +1,11 @@
 import type {
   FinanceExpenseCategoryAmounts,
+  FinanceExpenseCategoryPercents,
   FinanceExpenseMonth,
   FinanceExpensesYear,
   FinanceIncomeMonth,
-  FinanceIncomeYear
+  FinanceIncomeYear,
+  FinanceSettings
 } from "./types";
 
 type DataEnvelope<T> = {
@@ -25,6 +27,12 @@ export type FinanceIncomePayload = {
   salary_amount: string;
   bonus_percent: string;
   total_amount: string;
+};
+
+export type FinanceSettingsPayload = {
+  salary_amount: string;
+  bonus_percent: string;
+  expense_limit_percents: Partial<FinanceExpenseCategoryPercents>;
 };
 
 export class FinanceApiError extends Error {
@@ -61,6 +69,17 @@ export class FinanceApi {
 
   saveIncomeMonth(year: number, month: number, payload: FinanceIncomePayload): Promise<FinanceIncomeMonth> {
     return this.request<FinanceIncomeMonth>(`/api/v1/finance/income/${year}/${month}`, {
+      method: "PUT",
+      body: JSON.stringify(payload)
+    });
+  }
+
+  getSettings(): Promise<FinanceSettings> {
+    return this.request<FinanceSettings>("/api/v1/finance/settings");
+  }
+
+  saveSettings(payload: FinanceSettingsPayload): Promise<FinanceSettings> {
+    return this.request<FinanceSettings>("/api/v1/finance/settings", {
       method: "PUT",
       body: JSON.stringify(payload)
     });

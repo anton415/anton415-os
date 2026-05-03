@@ -102,6 +102,64 @@ func TestIncomeListSaveAndValidation(t *testing.T) {
 	}
 }
 
+func TestSettingsSaveListAndValidation(t *testing.T) {
+	router := newTestRouter()
+
+	emptyResponse := performRequest(router, http.MethodGet, "/settings", "")
+	if emptyResponse.Code != http.StatusOK {
+		t.Fatalf("empty settings status = %d, want %d; body=%s", emptyResponse.Code, http.StatusOK, emptyResponse.Body.String())
+	}
+	empty := decodeData[financeSettingsResponse](t, emptyResponse)
+	if empty.SalaryAmount != nil || len(empty.ExpenseLimitPercents) != 0 {
+		t.Fatalf("empty settings = %+v, want no income settings and empty limits", empty)
+	}
+
+	saveResponse := performRequest(router, http.MethodPut, "/settings", `{
+		"salary_amount":"200000.00",
+		"bonus_percent":"25.00",
+		"expense_limit_percents":{
+			"restaurants":"10.00",
+			"groceries":"",
+			"education":"5.50"
+		}
+	}`)
+	if saveResponse.Code != http.StatusOK {
+		t.Fatalf("save settings status = %d, want %d; body=%s", saveResponse.Code, http.StatusOK, saveResponse.Body.String())
+	}
+	saved := decodeData[financeSettingsResponse](t, saveResponse)
+	if saved.SalaryAmount == nil || *saved.SalaryAmount != "200000.00" {
+		t.Fatalf("saved salary = %v, want 200000.00", saved.SalaryAmount)
+	}
+	if saved.BonusPercent == nil || *saved.BonusPercent != "25.00" {
+		t.Fatalf("saved bonus = %v, want 25.00", saved.BonusPercent)
+	}
+	if saved.ExpenseLimitPercents["restaurants"] != "10.00" || saved.ExpenseLimitPercents["education"] != "5.50" {
+		t.Fatalf("saved limits = %+v, want restaurants and education", saved.ExpenseLimitPercents)
+	}
+	if _, ok := saved.ExpenseLimitPercents["groceries"]; ok {
+		t.Fatalf("saved limits = %+v, did not expect blank groceries value", saved.ExpenseLimitPercents)
+	}
+
+	listResponse := performRequest(router, http.MethodGet, "/settings", "")
+	if listResponse.Code != http.StatusOK {
+		t.Fatalf("list settings status = %d, want %d; body=%s", listResponse.Code, http.StatusOK, listResponse.Body.String())
+	}
+	listed := decodeData[financeSettingsResponse](t, listResponse)
+	if listed.SalaryAmount == nil || *listed.SalaryAmount != "200000.00" || listed.ExpenseLimitPercents["restaurants"] != "10.00" {
+		t.Fatalf("listed settings = %+v, want persisted salary and restaurant limit", listed)
+	}
+
+	invalidCategoryResponse := performRequest(router, http.MethodPut, "/settings", `{"expense_limit_percents":{"unknown":"1.00"}}`)
+	if invalidCategoryResponse.Code != http.StatusBadRequest {
+		t.Fatalf("invalid category status = %d, want %d", invalidCategoryResponse.Code, http.StatusBadRequest)
+	}
+
+	invalidPercentResponse := performRequest(router, http.MethodPut, "/settings", `{"expense_limit_percents":{"restaurants":"1.001"}}`)
+	if invalidPercentResponse.Code != http.StatusBadRequest {
+		t.Fatalf("invalid percent status = %d, want %d", invalidPercentResponse.Code, http.StatusBadRequest)
+	}
+}
+
 func performRequest(router http.Handler, method string, target string, body string) *httptest.ResponseRecorder {
 	response := httptest.NewRecorder()
 	requestBody := bytes.NewBufferString(body)
@@ -127,19 +185,21 @@ func oversizedExpenseBody() string {
 
 func newTestRouter() http.Handler {
 	store := newMemoryStore()
-	service := application.NewService(application.Dependencies{Expenses: store, Income: store})
+	service := application.NewService(application.Dependencies{Expenses: store, Income: store, Settings: store})
 	return NewRouter(service)
 }
 
 type memoryStore struct {
 	expenses map[[2]int]domain.MonthlyExpenseActual
 	income   map[[2]int]domain.MonthlyIncomeActual
+	settings domain.FinanceSettings
 }
 
 func newMemoryStore() *memoryStore {
 	return &memoryStore{
 		expenses: map[[2]int]domain.MonthlyExpenseActual{},
 		income:   map[[2]int]domain.MonthlyIncomeActual{},
+		settings: domain.EmptyFinanceSettings(),
 	}
 }
 
@@ -180,5 +240,14 @@ func (store *memoryStore) UpsertIncomeActual(_ context.Context, actual domain.Mo
 
 func (store *memoryStore) DeleteIncomeActual(_ context.Context, year int, month int) error {
 	delete(store.income, [2]int{year, month})
+	return nil
+}
+
+func (store *memoryStore) GetFinanceSettings(_ context.Context) (domain.FinanceSettings, error) {
+	return store.settings, nil
+}
+
+func (store *memoryStore) SaveFinanceSettings(_ context.Context, settings domain.FinanceSettings) error {
+	store.settings = settings
 	return nil
 }

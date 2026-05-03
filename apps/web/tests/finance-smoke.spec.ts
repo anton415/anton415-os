@@ -30,15 +30,24 @@ test("finance renders settings, expense limits, and income pages with mocked API
   await page.goto("/finance/settings");
   await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible();
   await expect(page.locator('[data-finance-income-setting="salary_amount"]')).toHaveValue("0,00");
+  await expect(page.getByRole("button", { name: "Сохранить настройки" })).toBeVisible();
 
   await page.locator('[data-finance-income-setting="salary_amount"]').fill("100 000,00");
   await page.locator('[data-finance-income-setting="bonus_percent"]').fill("0,00");
   await page.locator('[data-finance-limit-percent="restaurants"]').fill("1,00");
+  await page.locator('[data-finance-limit-percent="groceries"]').fill("2,00");
+  await page.locator('[data-finance-limit-percent="entertainment"]').fill("1,00");
   await expect(page.locator('[data-finance-income-calculated="total_amount"]')).toHaveValue("100 000,00");
   await expect(page.locator('[data-finance-limit-amount="restaurants"]')).toContainText("1 000,00");
+  await expect(page.locator('[data-finance-limit-amount="entertainment"]')).toContainText("12 000,00");
+
+  await page.getByRole("button", { name: "Сохранить настройки" }).click();
+  await page.reload();
+  await expect(page.locator('[data-finance-limit-percent="restaurants"]')).toHaveValue("1,00");
+  await expect(page.locator('[data-finance-limit-percent="groceries"]')).toHaveValue("2,00");
 
   await page.getByRole("link", { name: "Расходы" }).click();
-  await expect(page.getByRole("button", { name: "Сохранить расходы" })).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.getByRole("button", { name: "Сохранить" })).toHaveCSS("background-color", "rgb(255, 255, 255)");
   await expect(page.locator(".finance-average-row")).toContainText("Среднее в месяц");
 
   const restaurantInput = page.locator('form[data-finance-expense-month="1"] input[name="restaurants"]');
@@ -67,6 +76,11 @@ test("finance renders settings, expense limits, and income pages with mocked API
 });
 
 async function mockFinanceApi(page: Page) {
+  let savedSettings = {
+    currency: "RUB",
+    expense_limit_percents: {}
+  };
+
   await page.route("http://localhost:8080/health", async (route) => {
     await route.fulfill({
       contentType: "application/json",
@@ -95,6 +109,25 @@ async function mockFinanceApi(page: Page) {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({ data: [{ id: "email", name: "Email link", kind: "email" }] })
+    });
+  });
+
+  await page.route("http://localhost:8080/api/v1/finance/settings", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ data: savedSettings })
+      });
+      return;
+    }
+
+    savedSettings = {
+      currency: "RUB",
+      ...(await route.request().postDataJSON())
+    };
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ data: savedSettings })
     });
   });
 

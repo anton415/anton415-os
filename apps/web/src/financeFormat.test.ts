@@ -7,6 +7,7 @@ import {
   divideDecimalAmount,
   expenseLimitStatus,
   formatRussianMoneyAmount,
+  multiplyDecimalAmount,
   normalizeDecimalInput
 } from "./financeFormat";
 
@@ -40,5 +41,10 @@ describe("financeFormat", () => {
   it("divides decimal amounts in kopecks", () => {
     expect(divideDecimalAmount("1500.00", 12)).toBe("125.00");
     expect(divideDecimalAmount("2500.00", 12)).toBe("208.33");
+  });
+
+  it("multiplies decimal amounts in kopecks", () => {
+    expect(multiplyDecimalAmount("250000.00", 12)).toBe("3000000.00");
+    expect(multiplyDecimalAmount("bad", 12)).toBe("0.00");
   });
 });

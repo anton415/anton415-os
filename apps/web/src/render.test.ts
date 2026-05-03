@@ -428,7 +428,7 @@ describe("renderApp todo", () => {
         settings: {
           salary_amount: "200000.00",
           bonus_percent: "25.00",
-          expense_limit_percents: { restaurants: "10.00" }
+          expense_limit_percents: { restaurants: "10.00", entertainment: "1.00" }
         },
         expenses: financeExpensesYear(),
         income: financeIncomeYear()
@@ -443,6 +443,7 @@ describe("renderApp todo", () => {
     expect(root.querySelector<HTMLInputElement>('[data-finance-income-calculated="total_amount"]')?.value).toBe("250 000,00");
     expect(root.querySelector<HTMLInputElement>('[data-finance-limit-percent="restaurants"]')?.value).toBe("10,00");
     expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="restaurants"]')?.value).toBe("25 000,00");
+    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="entertainment"]')?.value).toBe("30 000,00");
 
     const salaryInput = root.querySelector<HTMLInputElement>('[data-finance-income-setting="salary_amount"]')!;
     salaryInput.value = "300 000,00";
@@ -450,7 +451,13 @@ describe("renderApp todo", () => {
 
     expect(root.querySelector<HTMLInputElement>('[data-finance-income-calculated="total_amount"]')?.value).toBe("375 000,00");
     expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="restaurants"]')?.value).toBe("37 500,00");
+    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="entertainment"]')?.value).toBe("45 000,00");
     expect(options.onChangeFinanceSettings).toHaveBeenCalled();
+
+    const settingsForm = root.querySelector<HTMLFormElement>("#finance-settings-form")!;
+    settingsForm.dispatchEvent(new Event("submit", { bubbles: true }));
+
+    expect(options.onSaveFinanceSettings).toHaveBeenCalledWith(settingsForm);
   });
 });
 
@@ -472,6 +479,7 @@ function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
     onRefreshFinance: vi.fn(),
     onChangeFinanceYear: vi.fn(),
     onChangeFinanceSettings: vi.fn(),
+    onSaveFinanceSettings: vi.fn(),
     onSaveFinanceExpenseYear: vi.fn(),
     onSaveFinanceIncomeYear: vi.fn(),
     onSaveFinanceExpenseMonth: vi.fn(),

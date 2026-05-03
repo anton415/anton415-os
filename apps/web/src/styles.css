@@ -1359,6 +1359,11 @@ p {
   padding: 12px;
 }
 
+.finance-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .finance-income-settings {
   display: flex;
   flex-wrap: wrap;

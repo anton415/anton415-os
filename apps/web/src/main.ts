@@ -1,7 +1,7 @@
 import "./styles.css";
 
 import { AuthApi } from "./authApi";
-import { FinanceApi } from "./financeApi";
+import { FinanceApi, type FinanceSettingsPayload } from "./financeApi";
 import { normalizeDecimalInput } from "./financeFormat";
 import { fetchHealth } from "./health";
 import { renderApp } from "./render";
@@ -93,6 +93,9 @@ function render() {
     },
     onChangeFinanceSettings: (form) => {
       financeState = { ...financeState, settings: financeSettingsPayload(new FormData(form)) };
+    },
+    onSaveFinanceSettings: (form) => {
+      void saveFinanceSettings(form);
     },
     onSaveFinanceExpenseYear: (forms) => {
       void saveFinanceExpenseYear(forms);
@@ -233,17 +236,24 @@ async function refreshFinance() {
 
   try {
     if (currentPath === "/finance/income") {
-      const income = await financeApi.listIncome(financeState.year);
-      financeState = { ...financeState, loading: false, income, error: undefined };
+      const [settings, income] = await Promise.all([
+        financeApi.getSettings(),
+        financeApi.listIncome(financeState.year)
+      ]);
+      financeState = { ...financeState, loading: false, settings, income, error: undefined };
     } else if (currentPath === "/finance/settings") {
-      const [expenses, income] = await Promise.all([
+      const [settings, expenses, income] = await Promise.all([
+        financeApi.getSettings(),
         financeApi.listExpenses(financeState.year),
         financeApi.listIncome(financeState.year)
       ]);
-      financeState = { ...financeState, loading: false, expenses, income, error: undefined };
+      financeState = { ...financeState, loading: false, settings, expenses, income, error: undefined };
     } else {
-      const expenses = await financeApi.listExpenses(financeState.year);
-      financeState = { ...financeState, loading: false, expenses, error: undefined };
+      const [settings, expenses] = await Promise.all([
+        financeApi.getSettings(),
+        financeApi.listExpenses(financeState.year)
+      ]);
+      financeState = { ...financeState, loading: false, settings, expenses, error: undefined };
     }
   } catch (error) {
     if (isUnauthorized(error)) {
@@ -468,6 +478,22 @@ async function saveFinanceIncomeYear(forms: HTMLFormElement[]) {
   }
 }
 
+async function saveFinanceSettings(form: HTMLFormElement) {
+  const payload = financeSettingsPayload(new FormData(form));
+
+  financeState = { ...financeState, settings: payload, saving: true, formError: undefined };
+  render();
+
+  try {
+    const settings = await financeApi.saveSettings(payload);
+    financeState = { ...financeState, settings, saving: false, formError: undefined };
+    await refreshFinance();
+  } catch (error) {
+    financeState = { ...financeState, saving: false, formError: errorMessage(error) };
+    render();
+  }
+}
+
 function navigate(path: string) {
   const nextPath = routeFromPath(path);
   if (currentPath !== nextPath) {
@@ -592,14 +618,17 @@ function financeIncomePayload(formData: FormData) {
   };
 }
 
-function financeSettingsPayload(formData: FormData): FinanceState["settings"] {
+function financeSettingsPayload(formData: FormData): FinanceSettingsPayload {
   const expenseLimitPercents: Partial<FinanceExpenseCategoryPercents> = {};
   for (const [key, value] of formData.entries()) {
     if (!key.startsWith("limit_percent_")) {
       continue;
     }
     const category = key.replace("limit_percent_", "") as keyof FinanceExpenseCategoryPercents;
-    expenseLimitPercents[category] = normalizedDecimalString(value) ?? "0.00";
+    const normalizedValue = normalizedDecimalString(value);
+    if (normalizedValue !== null) {
+      expenseLimitPercents[category] = normalizedValue;
+    }
   }
 
   return {

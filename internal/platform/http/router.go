@@ -90,6 +90,7 @@ func NewRouter(deps Dependencies) http.Handler {
 		financeService := financeapp.NewService(financeapp.Dependencies{
 			Expenses: financeRepository,
 			Income:   financeRepository,
+			Settings: financeRepository,
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(authhttp.SessionMiddleware(authService, authConfig))

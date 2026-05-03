@@ -7,6 +7,7 @@ import {
   expenseLimitStatus,
   formatRussianDecimal,
   formatRussianMoneyAmount,
+  multiplyDecimalAmount,
   normalizeDecimalInputOrRaw
 } from "./financeFormat";
 import type {
@@ -53,6 +54,7 @@ type RenderOptions = {
   onRefreshFinance: () => void;
   onChangeFinanceYear: (year: number) => void;
   onChangeFinanceSettings: (form: HTMLFormElement) => void;
+  onSaveFinanceSettings: (form: HTMLFormElement) => void;
   onSaveFinanceExpenseYear: (forms: HTMLFormElement[]) => void;
   onSaveFinanceIncomeYear: (forms: HTMLFormElement[]) => void;
   onSaveFinanceExpenseMonth: (month: number, form: HTMLFormElement) => void;
@@ -288,10 +290,10 @@ function renderFinanceYearRow(state: FinanceState, saveLabel?: string): string {
 function renderFinanceExpenses(state: FinanceState): string {
   const expenses = state.expenses;
   if (state.loading && !expenses) {
-    return `<section class="finance-table-shell finance-expense-shell">${renderFinanceYearRow(state, "Сохранить расходы")}<p class="empty-state">Загружаю расходы...</p></section>`;
+    return `<section class="finance-table-shell finance-expense-shell">${renderFinanceYearRow(state, "Сохранить")}<p class="empty-state">Загружаю расходы...</p></section>`;
   }
   if (!expenses) {
-    return `<section class="finance-table-shell finance-expense-shell">${renderFinanceYearRow(state, "Сохранить расходы")}<p class="empty-state">Данные о расходах не загружены.</p></section>`;
+    return `<section class="finance-table-shell finance-expense-shell">${renderFinanceYearRow(state, "Сохранить")}<p class="empty-state">Данные о расходах не загружены.</p></section>`;
   }
   const monthlyIncomeAmount = calculateIncomeAmount(financeSettingsSalaryAmount(state), financeSettingsBonusPercent(state));
   const categoryLimitAmounts = financeExpenseCategoryLimitAmounts(expenses.categories, state, monthlyIncomeAmount);
@@ -304,7 +306,7 @@ function renderFinanceExpenses(state: FinanceState): string {
     </section>
 
     <section class="finance-table-shell finance-expense-shell" aria-label="Расходы по месяцам">
-      ${renderFinanceYearRow(state, "Сохранить расходы")}
+      ${renderFinanceYearRow(state, "Сохранить")}
       <div class="finance-expense-header">
         <span>Месяц</span>
         ${expenses.categories.map((category) => `<span>${escapeHTML(financeCategoryLabel(category))}</span>`).join("")}
@@ -397,10 +399,10 @@ function financeExpenseCategoryLimitAmounts(
 function renderFinanceIncome(state: FinanceState): string {
   const income = state.income;
   if (state.loading && !income) {
-    return `<section class="finance-table-shell finance-income-shell">${renderFinanceYearRow(state, "Сохранить доходы")}<p class="empty-state">Загружаю доходы...</p></section>`;
+    return `<section class="finance-table-shell finance-income-shell">${renderFinanceYearRow(state, "Сохранить")}<p class="empty-state">Загружаю доходы...</p></section>`;
   }
   if (!income) {
-    return `<section class="finance-table-shell finance-income-shell">${renderFinanceYearRow(state, "Сохранить доходы")}<p class="empty-state">Данные о доходах не загружены.</p></section>`;
+    return `<section class="finance-table-shell finance-income-shell">${renderFinanceYearRow(state, "Сохранить")}<p class="empty-state">Данные о доходах не загружены.</p></section>`;
   }
   const salaryAmount = financeSettingsSalaryAmount(state);
   const bonusPercent = financeSettingsBonusPercent(state);
@@ -412,7 +414,7 @@ function renderFinanceIncome(state: FinanceState): string {
     </section>
 
     <section class="finance-table-shell finance-income-shell" aria-label="Доходы по месяцам">
-      ${renderFinanceYearRow(state, "Сохранить доходы")}
+      ${renderFinanceYearRow(state, "Сохранить")}
       <div class="finance-income-header">
         <span>Месяц</span>
         <span>Общий доход</span>
@@ -462,6 +464,9 @@ function renderFinanceSettings(state: FinanceState): string {
       <form class="finance-settings-form" id="finance-settings-form">
         ${renderFinanceIncomeSettings(salaryAmount, bonusPercent, calculatedIncomeAmount)}
         ${renderFinanceLimitSettings(expenses.categories, state, calculatedIncomeAmount)}
+        <div class="finance-settings-actions">
+          <button class="finance-year-save" type="submit" ${state.saving ? "disabled" : ""} aria-label="Сохранить настройки" title="Сохранить настройки">&#10003; Сохранить</button>
+        </div>
       </form>
     </section>
   `;
@@ -515,7 +520,7 @@ function renderFinanceLimitSettings(
       <div class="finance-limit-header">
         <span>Категория</span>
         <span>% дохода</span>
-        <span>Лимит</span>
+        <span>Лимит / цель</span>
       </div>
       ${categories.map((category) => renderFinanceLimitRow(category, state, calculatedIncomeAmount)).join("")}
     </section>
@@ -523,8 +528,9 @@ function renderFinanceLimitSettings(
 }
 
 function renderFinanceLimitRow(category: FinanceExpenseCategory, state: FinanceState, calculatedIncomeAmount: string): string {
-  const percent = state.settings.expense_limit_percents[category.code] ?? "0.00";
-  const limitAmount = calculatePercentAmount(calculatedIncomeAmount, percent);
+  const percent = state.settings.expense_limit_percents[category.code] ?? "";
+  const limitAmount = percent ? calculatePercentAmount(financeLimitBaseAmount(category.code, calculatedIncomeAmount), percent) : "0.00";
+  const label = financeLimitValueLabel(category);
   return `
     <label class="finance-limit-row">
       <span class="finance-month-label">${escapeHTML(financeCategoryLabel(category))}</span>
@@ -534,7 +540,7 @@ function renderFinanceLimitRow(category: FinanceExpenseCategory, state: FinanceS
         inputmode="decimal"
         pattern="[0-9 ]+([,.][0-9]{1,2})?"
         value="${escapeAttr(formatRussianDecimal(percent))}"
-        aria-label="Лимит ${escapeAttr(financeCategoryLabel(category))}, процент дохода"
+        aria-label="${escapeAttr(label)} ${escapeAttr(financeCategoryLabel(category))}, процент дохода"
       >
       <output data-finance-limit-amount="${category.code}">${escapeHTML(formatRussianMoneyAmount(limitAmount))}</output>
     </label>
@@ -547,6 +553,18 @@ function financeSettingsSalaryAmount(state: FinanceState): string {
 
 function financeSettingsBonusPercent(state: FinanceState): string {
   return state.settings.bonus_percent ?? (state.income ? financeIncomeSettingValue(state.income.months, "bonus_percent") : "0.00");
+}
+
+function financeLimitBaseAmount(categoryCode: string, monthlyIncomeAmount: string): string {
+  return financeLimitUsesAnnualIncome(categoryCode) ? multiplyDecimalAmount(monthlyIncomeAmount, 12) : monthlyIncomeAmount;
+}
+
+function financeLimitUsesAnnualIncome(categoryCode: string): boolean {
+  return categoryCode === "entertainment" || categoryCode === "education" || categoryCode === "investments";
+}
+
+function financeLimitValueLabel(category: FinanceExpenseCategory): string {
+  return category.code === "investments" ? "Цель" : "Лимит";
 }
 
 function financeIncomeSettingValue(months: FinanceIncomeMonth[], key: "salary_amount" | "bonus_percent"): string {
@@ -1533,6 +1551,7 @@ function bindFinanceSettings(root: HTMLElement, options: RenderOptions) {
     settingsForm.addEventListener("submit", (event) => {
       event.preventDefault();
       updateSettings();
+      options.onSaveFinanceSettings(settingsForm);
     });
   }
 
@@ -1556,7 +1575,7 @@ function updateFinanceSettingsCalculations(root: HTMLElement) {
     }
     const output = root.querySelector<HTMLOutputElement>(`[data-finance-limit-amount="${code}"]`);
     if (output) {
-      output.value = formatRussianMoneyAmount(calculatePercentAmount(incomeAmount, input.value));
+      output.value = formatRussianMoneyAmount(calculatePercentAmount(financeLimitBaseAmount(code, incomeAmount), input.value));
     }
   });
 }
