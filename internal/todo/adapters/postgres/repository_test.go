@@ -89,6 +89,30 @@ func TestListTasksQueryOverdueSearchAndSort(t *testing.T) {
 	}
 }
 
+func TestListTasksQueryExplicitSortKeepsDoneTasksLast(t *testing.T) {
+	projectID := int64(7)
+
+	query, args := listTasksQuery(application.TaskListFilter{
+		ProjectID: &projectID,
+		Sort:      application.TaskSortPriority,
+		Direction: application.SortDirectionDesc,
+	})
+
+	doneIndex := strings.Index(query, "CASE WHEN status = 'done' THEN 1 ELSE 0 END ASC")
+	priorityIndex := strings.Index(query, priorityRankSQL()+" DESC")
+	if doneIndex == -1 || priorityIndex == -1 || doneIndex > priorityIndex {
+		t.Fatalf("query = %q, expected done tasks to sort last before priority ordering", query)
+	}
+	for _, expected := range []string{"project_id = $1", "id DESC"} {
+		if !strings.Contains(query, expected) {
+			t.Fatalf("query = %q, expected %q", query, expected)
+		}
+	}
+	if !reflect.DeepEqual(args, []any{int64(7)}) {
+		t.Fatalf("args = %#v, want project id arg", args)
+	}
+}
+
 func TestListTasksQueryUpcomingAndInboxFilters(t *testing.T) {
 	today := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
 

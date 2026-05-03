@@ -271,6 +271,41 @@ func TestServiceFiltersOverdueFlaggedSearchAndSort(t *testing.T) {
 	_ = tomorrowTask
 }
 
+func TestServiceSortsCompletedTasksLastForExplicitSorts(t *testing.T) {
+	store := newMemoryStore()
+	now := time.Date(2026, 4, 23, 10, 30, 0, 0, time.UTC)
+	service := NewService(Dependencies{
+		Projects: store,
+		Tasks:    store,
+		Now:      func() time.Time { return now },
+		Location: time.UTC,
+	})
+
+	project, err := service.CreateProject(context.Background(), CreateProjectInput{Name: "Work"})
+	if err != nil {
+		t.Fatalf("CreateProject() error = %v", err)
+	}
+
+	low := domain.TaskPriorityLow
+	medium := domain.TaskPriorityMedium
+	high := domain.TaskPriorityHigh
+	activeLow, _ := service.CreateTask(context.Background(), CreateTaskInput{ProjectID: &project.ID, Title: "Active low", Priority: low})
+	doneHigh, _ := service.CreateTask(context.Background(), CreateTaskInput{ProjectID: &project.ID, Title: "Done high", Status: domain.TaskStatusDone, Priority: high})
+	activeMedium, _ := service.CreateTask(context.Background(), CreateTaskInput{ProjectID: &project.ID, Title: "Active medium", Priority: medium})
+
+	projectTasks, err := service.ListTasks(context.Background(), ListTasksInput{
+		ProjectID: &project.ID,
+		Sort:      TaskSortPriority,
+		Direction: SortDirectionDesc,
+	})
+	if err != nil {
+		t.Fatalf("ListTasks(project priority sort) error = %v", err)
+	}
+	if got := taskIDs(projectTasks); !slices.Equal(got, []int64{activeMedium.ID, activeLow.ID, doneHigh.ID}) {
+		t.Fatalf("project priority ids = %v, want active tasks before completed task", got)
+	}
+}
+
 func TestServiceProjectCRUDAndDeleteConflict(t *testing.T) {
 	service := newTestService()
 	ctx := context.Background()

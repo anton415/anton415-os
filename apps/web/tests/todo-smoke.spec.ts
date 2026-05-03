@@ -93,6 +93,13 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.getByRole("button", { name: "Завершить Buy milk" }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toHaveCount(0);
 
+  await page.getByRole("button", { name: "Все", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
+  const allTitles = await page.locator(".task-item h2").evaluateAll((headings) =>
+    headings.map((heading) => (heading.textContent ?? "").replace(/[⚑!]/g, "").trim())
+  );
+  expect(allTitles.at(-1)).toBe("Buy milk");
+
   await page.getByRole("button", { name: "Готово", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Создать задачу" })).toHaveCount(0);
@@ -320,6 +327,11 @@ function filterTasks(tasks: Task[], params: URLSearchParams): Task[] {
 }
 
 function compareTasks(left: Task, right: Task, sort: string, direction: string): number {
+  const doneRank = (task: Task) => (task.status === "done" ? 1 : 0);
+  const doneCompare = doneRank(left) - doneRank(right);
+  if (doneCompare !== 0) {
+    return doneCompare;
+  }
   const multiplier = direction === "desc" && sort !== "smart" ? -1 : 1;
   const priorityRank = (task: Task) => ({ none: 0, low: 1, medium: 2, high: 3 })[task.priority];
   if (sort === "priority") {

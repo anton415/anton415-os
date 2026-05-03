@@ -308,16 +308,17 @@ func orderByClause(filter application.TaskListFilter) string {
 	if filter.Direction == application.SortDirectionDesc && sortMode != application.TaskSortSmart {
 		direction = "DESC"
 	}
+	doneLastPrefix := "CASE WHEN status = 'done' THEN 1 ELSE 0 END ASC, "
 
 	switch sortMode {
 	case application.TaskSortDue:
-		return "\n\t\tORDER BY due_date " + direction + " NULLS LAST, due_time " + direction + " NULLS LAST, id " + direction + "\n\t"
+		return "\n\t\tORDER BY " + doneLastPrefix + "due_date " + direction + " NULLS LAST, due_time " + direction + " NULLS LAST, id " + direction + "\n\t"
 	case application.TaskSortCreated:
-		return "\n\t\tORDER BY created_at " + direction + ", id " + direction + "\n\t"
+		return "\n\t\tORDER BY " + doneLastPrefix + "created_at " + direction + ", id " + direction + "\n\t"
 	case application.TaskSortTitle:
-		return "\n\t\tORDER BY lower(title) " + direction + ", id " + direction + "\n\t"
+		return "\n\t\tORDER BY " + doneLastPrefix + "lower(title) " + direction + ", id " + direction + "\n\t"
 	case application.TaskSortPriority:
-		return "\n\t\tORDER BY " + priorityRankSQL() + " " + direction + ", id " + direction + "\n\t"
+		return "\n\t\tORDER BY " + doneLastPrefix + priorityRankSQL() + " " + direction + ", id " + direction + "\n\t"
 	default:
 		return `
 		ORDER BY

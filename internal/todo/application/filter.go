@@ -176,6 +176,9 @@ func sortTasks(tasks []domain.Task, filter TaskListFilter) {
 	}
 
 	slices.SortStableFunc(tasks, func(left, right domain.Task) int {
+		if result := cmp.Compare(doneRank(left.Status), doneRank(right.Status)); result != 0 {
+			return result
+		}
 		result := compareTasks(left, right, sortMode)
 		if direction == SortDirectionDesc && sortMode != TaskSortSmart {
 			result = -result
