@@ -361,14 +361,17 @@ describe("renderApp todo", () => {
     expect(root.querySelector(".finance-tabs a.active")?.textContent).toBe("Расходы");
     expect(root.querySelector('[data-route="/finance/settings"]')?.textContent).toBe("Настройки");
     expect(root.textContent).toContain("Итого за год");
-    expect(root.textContent).toContain("2 500,00 ₽");
+    expect(root.textContent).toContain("2 500 ₽");
     expect(root.querySelector(".finance-expense-header")?.textContent).not.toContain("Сохранить");
+    expect(root.querySelector(".finance-expense-header")?.textContent).toMatch(/Расходы\s*Итого/);
+    expect(root.querySelector(".finance-limit-amount-row")?.textContent).toContain("Лимит");
     expect(root.querySelector('[data-finance-expense-month="1"] button')).toBeNull();
-    expect(root.querySelector<HTMLInputElement>('[data-finance-expense-month="4"] input[name="restaurants"]')?.value).toBe("1 500,00");
-    expect(root.querySelector<HTMLInputElement>('[data-finance-expense-month="4"] input[name="investments"]')?.value).toBe("1 000,00");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-expense-month="1"] input[name="restaurants"]')?.value).toBe("");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-expense-month="4"] input[name="restaurants"]')?.value).toBe("1 500");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-expense-month="4"] input[name="investments"]')?.value).toBe("1 000");
     expect(root.querySelector('[data-finance-expense-month="4"] label.limit-over input[name="restaurants"]')).not.toBeNull();
     expect(root.querySelector(".finance-average-row")?.textContent).toContain("Среднее в месяц");
-    expect(root.querySelector(".finance-average-row")?.textContent).toContain("125,00");
+    expect(root.querySelector(".finance-average-row")?.textContent).toContain("125");
 
     root.querySelector<HTMLInputElement>('[data-finance-expense-month="4"] input[name="restaurants"]')!.value = "1 700,00";
     root.querySelector<HTMLButtonElement>("#save-finance-year")?.click();
@@ -397,7 +400,7 @@ describe("renderApp todo", () => {
     expect(root.querySelector(".finance-tabs a.active")?.textContent).toBe("Доходы");
     expect(root.textContent).toContain("Доход за год");
     expect(root.textContent).not.toContain("Заполнено месяцев");
-    expect(root.textContent).toContain("250 000,00 ₽");
+    expect(root.textContent).toContain("250 000 ₽");
     expect(root.querySelector(".finance-year-toolbar")).toBeNull();
     expect(root.querySelector(".finance-income-settings")).toBeNull();
     expect(root.querySelector(".finance-income-header")?.textContent).toContain("Общий доход");
@@ -407,7 +410,8 @@ describe("renderApp todo", () => {
     expect(root.querySelector('[data-finance-income-month="4"] button')).toBeNull();
     expect(root.querySelector<HTMLInputElement>('[data-finance-income-month="4"] label input[name="salary_amount"]')).toBeNull();
     expect(root.querySelector<HTMLInputElement>('[data-finance-income-month="4"] label input[name="bonus_percent"]')).toBeNull();
-    expect(root.querySelector<HTMLInputElement>('[data-finance-income-month="4"] input[name="total_amount"]')?.value).toBe("250 000,00");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-income-month="1"] input[name="total_amount"]')?.value).toBe("");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-income-month="4"] input[name="total_amount"]')?.value).toBe("250 000");
 
     root.querySelector<HTMLInputElement>('#finance-year-form input[name="year"]')!.value = "2027";
     root.querySelector<HTMLFormElement>("#finance-year-form")?.dispatchEvent(new Event("submit", { bubbles: true }));
@@ -428,7 +432,7 @@ describe("renderApp todo", () => {
         settings: {
           salary_amount: "200000.00",
           bonus_percent: "25.00",
-          expense_limit_percents: { restaurants: "10.00", entertainment: "1.00" }
+          expense_limit_percents: { restaurants: "10.00", groceries: "89.00", entertainment: "1.00" }
         },
         expenses: financeExpensesYear(),
         income: financeIncomeYear()
@@ -438,20 +442,25 @@ describe("renderApp todo", () => {
     renderApp(root, options);
 
     expect(root.querySelector(".finance-tabs a.active")?.textContent).toBe("Настройки");
-    expect(root.querySelector<HTMLInputElement>('[data-finance-income-setting="salary_amount"]')?.value).toBe("200 000,00");
-    expect(root.querySelector<HTMLInputElement>('[data-finance-income-setting="bonus_percent"]')?.value).toBe("25,00");
-    expect(root.querySelector<HTMLInputElement>('[data-finance-income-calculated="total_amount"]')?.value).toBe("250 000,00");
-    expect(root.querySelector<HTMLInputElement>('[data-finance-limit-percent="restaurants"]')?.value).toBe("10,00");
-    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="restaurants"]')?.value).toBe("25 000,00");
-    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="entertainment"]')?.value).toBe("30 000,00");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-income-setting="salary_amount"]')?.value).toBe("200 000");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-income-setting="bonus_percent"]')?.value).toBe("25");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-income-calculated="total_amount"]')?.value).toBe("250 000");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-limit-percent="restaurants"]')?.value).toBe("10");
+    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="restaurants"]')?.value).toBe("25 000");
+    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="entertainment"]')?.value).toBe("30 000");
+    expect(root.querySelector("[data-finance-limit-allocation]")?.textContent).toContain("100 из 100%");
+    expect(root.textContent).toContain("Лимиты в месяц");
+    expect(root.textContent).toContain("Лимиты в год");
+    expect(root.textContent).toContain("Цель инвестиций");
+    expect(root.querySelector(".finance-income-settings button[type='submit']")).not.toBeNull();
 
     const salaryInput = root.querySelector<HTMLInputElement>('[data-finance-income-setting="salary_amount"]')!;
-    salaryInput.value = "300 000,00";
+    salaryInput.value = "300 000";
     salaryInput.dispatchEvent(new Event("input", { bubbles: true }));
 
-    expect(root.querySelector<HTMLInputElement>('[data-finance-income-calculated="total_amount"]')?.value).toBe("375 000,00");
-    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="restaurants"]')?.value).toBe("37 500,00");
-    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="entertainment"]')?.value).toBe("45 000,00");
+    expect(root.querySelector<HTMLInputElement>('[data-finance-income-calculated="total_amount"]')?.value).toBe("375 000");
+    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="restaurants"]')?.value).toBe("37 500");
+    expect(root.querySelector<HTMLOutputElement>('[data-finance-limit-amount="entertainment"]')?.value).toBe("45 000");
     expect(options.onChangeFinanceSettings).toHaveBeenCalled();
 
     const settingsForm = root.querySelector<HTMLFormElement>("#finance-settings-form")!;
@@ -546,15 +555,15 @@ function financeState(overrides: Partial<FinanceState> = {}): FinanceState {
 
 function financeExpensesYear(overrides: Partial<FinanceExpensesYear> = {}): FinanceExpensesYear {
   const categories = [
-    { code: "restaurants" as const, label: "Restaurants", classification: "expense" as const },
-    { code: "groceries" as const, label: "Groceries", classification: "expense" as const },
-    { code: "personal" as const, label: "Personal", classification: "expense" as const },
-    { code: "utilities" as const, label: "Utilities", classification: "expense" as const },
-    { code: "transport" as const, label: "Transport", classification: "expense" as const },
-    { code: "gifts" as const, label: "Gifts", classification: "expense" as const },
-    { code: "investments" as const, label: "Investments", classification: "transfer" as const },
-    { code: "entertainment" as const, label: "Entertainment", classification: "expense" as const },
-    { code: "education" as const, label: "Education", classification: "expense" as const }
+    { code: "restaurants" as const, label: "Restaurants", classification: "expense" as const, limit_period: "monthly" as const, limit_kind: "limit" as const },
+    { code: "groceries" as const, label: "Groceries", classification: "expense" as const, limit_period: "monthly" as const, limit_kind: "limit" as const },
+    { code: "personal" as const, label: "Personal", classification: "expense" as const, limit_period: "monthly" as const, limit_kind: "limit" as const },
+    { code: "utilities" as const, label: "Utilities", classification: "expense" as const, limit_period: "monthly" as const, limit_kind: "limit" as const },
+    { code: "transport" as const, label: "Transport", classification: "expense" as const, limit_period: "monthly" as const, limit_kind: "limit" as const },
+    { code: "gifts" as const, label: "Gifts", classification: "expense" as const, limit_period: "monthly" as const, limit_kind: "limit" as const },
+    { code: "investments" as const, label: "Investments", classification: "transfer" as const, limit_period: "annual" as const, limit_kind: "investment_goal" as const },
+    { code: "entertainment" as const, label: "Entertainment", classification: "expense" as const, limit_period: "annual" as const, limit_kind: "limit" as const },
+    { code: "education" as const, label: "Education", classification: "expense" as const, limit_period: "annual" as const, limit_kind: "limit" as const }
   ];
   const zeroAmounts = {
     restaurants: "0.00",

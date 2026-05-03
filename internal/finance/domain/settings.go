@@ -22,11 +22,19 @@ func NewFinanceSettings(
 	expenseLimitPercents map[ExpenseCategory]Percent,
 ) (FinanceSettings, error) {
 	percents := map[ExpenseCategory]Percent{}
+	totalBasisPoints := int64(0)
 	for category, percent := range expenseLimitPercents {
-		if !category.Valid() {
+		if !category.Valid() || !category.SupportsLimit() {
 			return FinanceSettings{}, ErrInvalidExpenseCategory
 		}
+		if percent.IsZero() {
+			continue
+		}
 		percents[category] = percent
+		totalBasisPoints += percent.BasisPoints()
+	}
+	if totalBasisPoints != 0 && totalBasisPoints != 10000 {
+		return FinanceSettings{}, ErrInvalidExpenseLimitTotal
 	}
 
 	return FinanceSettings{

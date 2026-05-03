@@ -205,6 +205,8 @@ type categoryResponse struct {
 	Code           string `json:"code"`
 	Label          string `json:"label"`
 	Classification string `json:"classification"`
+	LimitPeriod    string `json:"limit_period,omitempty"`
+	LimitKind      string `json:"limit_kind,omitempty"`
 }
 
 type expenseMonthResponse struct {
@@ -418,10 +420,14 @@ func categoryDTOs() []categoryResponse {
 	categories := domain.ExpenseCategories()
 	response := make([]categoryResponse, 0, len(categories))
 	for _, category := range categories {
+		limitPeriod, _ := category.Code.LimitPeriod()
+		limitKind, _ := category.Code.LimitKind()
 		response = append(response, categoryResponse{
 			Code:           string(category.Code),
 			Label:          category.Label,
 			Classification: string(category.Classification),
+			LimitPeriod:    string(limitPeriod),
+			LimitKind:      string(limitKind),
 		})
 	}
 	return response
@@ -467,6 +473,8 @@ func writeError(w http.ResponseWriter, err error) {
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "money amount must be a non-negative RUB decimal with up to 2 digits")
 	case errors.Is(err, domain.ErrInvalidPercent):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "percent must be a non-negative decimal with up to 2 digits")
+	case errors.Is(err, domain.ErrInvalidExpenseLimitTotal):
+		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "expense limits must add up to exactly 100 percent")
 	default:
 		slog.Error("finance handler error", slog.String("error", err.Error()))
 		writeErrorResponse(w, http.StatusInternalServerError, "internal_error", "internal server error")

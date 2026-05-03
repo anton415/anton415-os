@@ -4,6 +4,13 @@ All notable changes to anton415 Hub are summarized here. Releases follow the sha
 
 ## Unreleased
 
+### Finance
+
+- Finished the personal finance workflow polish from issue #32: separated limit categories by monthly, annual, and investment-goal usage.
+- Removed noisy `0.00` prefill from empty finance inputs while keeping exact kopeck storage and API payload normalization.
+- Rounded finance summary amounts to whole rubles by default and kept fractional values visible in editable fields when they exist.
+- Added 100% limit allocation validation, limit amount rows, income/expense highlighting, and investment-goal progress coloring.
+
 ### Platform
 
 - Renamed the product and repository identity from the previous OS-oriented name to anton415 Hub.

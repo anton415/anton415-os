@@ -6,16 +6,30 @@ import {
   currencyLabel,
   divideDecimalAmount,
   expenseLimitStatus,
+  formatRussianDecimalInput,
   formatRussianMoneyAmount,
+  formatRussianMoneyInput,
+  isLimitAllocationValid,
+  limitAllocationPercent,
   multiplyDecimalAmount,
-  normalizeDecimalInput
+  normalizeDecimalInput,
+  targetProgressStatus
 } from "./financeFormat";
 
 describe("financeFormat", () => {
-  it("formats money by Russian display rules", () => {
-    expect(formatRussianMoneyAmount("200000.00")).toBe("200 000,00");
-    expect(formatRussianMoneyAmount("2500000.50")).toBe("2 500 000,50");
+  it("formats money summaries as rounded whole rubles", () => {
+    expect(formatRussianMoneyAmount("200000.00")).toBe("200 000");
+    expect(formatRussianMoneyAmount("2500000.50")).toBe("2 500 001");
     expect(currencyLabel("RUB")).toBe("₽");
+  });
+
+  it("formats money and percent inputs without noisy zero fractions", () => {
+    expect(formatRussianMoneyInput("0.00")).toBe("");
+    expect(formatRussianMoneyInput("200000.00")).toBe("200 000");
+    expect(formatRussianMoneyInput("2500000.50")).toBe("2 500 000,50");
+    expect(formatRussianDecimalInput("0.00")).toBe("");
+    expect(formatRussianDecimalInput("15.50")).toBe("15,50");
+    expect(formatRussianDecimalInput("10.00")).toBe("10");
   });
 
   it("normalizes Russian decimal input for API payloads", () => {
@@ -36,6 +50,20 @@ describe("financeFormat", () => {
     expect(expenseLimitStatus("80,00", "100,00")).toBe("near");
     expect(expenseLimitStatus("100,01", "100,00")).toBe("over");
     expect(expenseLimitStatus("1,00", "0,00")).toBe("none");
+  });
+
+  it("classifies progress towards income and investment targets", () => {
+    expect(targetProgressStatus("0,00", "100,00")).toBe("none");
+    expect(targetProgressStatus("50,00", "100,00")).toBe("over");
+    expect(targetProgressStatus("80,00", "100,00")).toBe("near");
+    expect(targetProgressStatus("100,00", "100,00")).toBe("safe");
+  });
+
+  it("checks limit allocation totals", () => {
+    expect(limitAllocationPercent(["10", "15,50", undefined])).toBe("25.50");
+    expect(isLimitAllocationValid("0.00")).toBe(true);
+    expect(isLimitAllocationValid("99.99")).toBe(false);
+    expect(isLimitAllocationValid("100.00")).toBe(true);
   });
 
   it("divides decimal amounts in kopecks", () => {

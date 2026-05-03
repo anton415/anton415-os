@@ -1359,11 +1359,6 @@ p {
   padding: 12px;
 }
 
-.finance-settings-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .finance-income-settings {
   display: flex;
   flex-wrap: wrap;
@@ -1384,6 +1379,10 @@ p {
   width: 190px;
 }
 
+.finance-income-settings .finance-year-save {
+  align-self: end;
+}
+
 .finance-income-settings input {
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -1402,6 +1401,40 @@ p {
   border-radius: 8px;
   overflow: hidden;
   background: #ffffff;
+}
+
+.finance-limit-allocation {
+  border-bottom: 1px solid #eaecf0;
+  padding: 10px 12px;
+  color: #344054;
+  background: #ffffff;
+  font-weight: 850;
+}
+
+.finance-limit-allocation.allocation-ok {
+  color: #047857;
+  background: #ecfdf5;
+}
+
+.finance-limit-allocation.allocation-error {
+  color: #b42318;
+  background: #fef2f2;
+}
+
+.finance-limit-group {
+  display: grid;
+}
+
+.finance-limit-group + .finance-limit-group {
+  border-top: 1px solid #dce1e8;
+}
+
+.finance-limit-group-title {
+  padding: 10px 12px;
+  color: #172033;
+  background: #eef1f5;
+  font-size: 0.86rem;
+  font-weight: 850;
 }
 
 .finance-limit-header,
@@ -1492,6 +1525,21 @@ p {
   text-align: right;
 }
 
+.finance-limit-amount-row {
+  color: #344054;
+  background: #f0fdf4;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.finance-limit-amount-row span {
+  text-align: right;
+}
+
+.finance-limit-amount-row span:first-child {
+  text-align: left;
+}
+
 .finance-money-field,
 .finance-percent-field {
   display: block;
@@ -1532,6 +1580,15 @@ p {
 .finance-money-field.limit-over input {
   border-color: #fca5a5;
   background: #fef2f2;
+}
+
+.finance-money-field.transfer input {
+  border-color: #ddd6fe;
+}
+
+.finance-money-field.transfer.limit-safe input {
+  border-color: #86efac;
+  background: #ecfdf5;
 }
 
 @media (max-width: 980px) {

@@ -2,7 +2,7 @@ import "./styles.css";
 
 import { AuthApi } from "./authApi";
 import { FinanceApi, type FinanceSettingsPayload } from "./financeApi";
-import { normalizeDecimalInput } from "./financeFormat";
+import { isLimitAllocationValid, limitAllocationPercent, normalizeDecimalInput } from "./financeFormat";
 import { fetchHealth } from "./health";
 import { renderApp } from "./render";
 import { TodoApi } from "./todoApi";
@@ -480,6 +480,16 @@ async function saveFinanceIncomeYear(forms: HTMLFormElement[]) {
 
 async function saveFinanceSettings(form: HTMLFormElement) {
   const payload = financeSettingsPayload(new FormData(form));
+  const allocationPercent = limitAllocationPercent(Object.values(payload.expense_limit_percents));
+  if (!isLimitAllocationValid(allocationPercent)) {
+    financeState = {
+      ...financeState,
+      settings: payload,
+      formError: "Лимиты должны быть распределены ровно на 100% дохода."
+    };
+    render();
+    return;
+  }
 
   financeState = { ...financeState, settings: payload, saving: true, formError: undefined };
   render();

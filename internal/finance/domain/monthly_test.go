@@ -32,6 +32,18 @@ func TestMonthlyExpenseActualFillsCategoriesAndComputesTotals(t *testing.T) {
 	}
 }
 
+func TestExpenseCategoriesExposeLimitPolicies(t *testing.T) {
+	period, ok := ExpenseCategoryRestaurants.LimitPeriod()
+	if !ok || period != ExpenseLimitPeriodMonthly {
+		t.Fatalf("restaurants limit period = %q, %v; want monthly true", period, ok)
+	}
+
+	kind, ok := ExpenseCategoryInvestments.LimitKind()
+	if !ok || kind != ExpenseLimitKindInvestmentGoal {
+		t.Fatalf("investments limit kind = %q, %v; want investment goal true", kind, ok)
+	}
+}
+
 func TestMonthlyActualValidation(t *testing.T) {
 	_, err := NewMonthlyExpenseActual(0, 4, nil)
 	if !errors.Is(err, ErrInvalidYear) {

@@ -120,7 +120,7 @@ func TestSettingsSaveListAndValidation(t *testing.T) {
 		"expense_limit_percents":{
 			"restaurants":"10.00",
 			"groceries":"",
-			"education":"5.50"
+			"education":"90.00"
 		}
 	}`)
 	if saveResponse.Code != http.StatusOK {
@@ -133,7 +133,7 @@ func TestSettingsSaveListAndValidation(t *testing.T) {
 	if saved.BonusPercent == nil || *saved.BonusPercent != "25.00" {
 		t.Fatalf("saved bonus = %v, want 25.00", saved.BonusPercent)
 	}
-	if saved.ExpenseLimitPercents["restaurants"] != "10.00" || saved.ExpenseLimitPercents["education"] != "5.50" {
+	if saved.ExpenseLimitPercents["restaurants"] != "10.00" || saved.ExpenseLimitPercents["education"] != "90.00" {
 		t.Fatalf("saved limits = %+v, want restaurants and education", saved.ExpenseLimitPercents)
 	}
 	if _, ok := saved.ExpenseLimitPercents["groceries"]; ok {
@@ -157,6 +157,11 @@ func TestSettingsSaveListAndValidation(t *testing.T) {
 	invalidPercentResponse := performRequest(router, http.MethodPut, "/settings", `{"expense_limit_percents":{"restaurants":"1.001"}}`)
 	if invalidPercentResponse.Code != http.StatusBadRequest {
 		t.Fatalf("invalid percent status = %d, want %d", invalidPercentResponse.Code, http.StatusBadRequest)
+	}
+
+	invalidTotalResponse := performRequest(router, http.MethodPut, "/settings", `{"expense_limit_percents":{"restaurants":"10.00"}}`)
+	if invalidTotalResponse.Code != http.StatusBadRequest {
+		t.Fatalf("invalid total status = %d, want %d", invalidTotalResponse.Code, http.StatusBadRequest)
 	}
 }
 

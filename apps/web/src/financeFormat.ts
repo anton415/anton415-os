@@ -1,10 +1,33 @@
 export function formatRussianMoneyAmount(value: string): string {
-  return formatRussianDecimal(value);
+  const minorUnits = decimalInputToMinorUnits(value);
+  return minorUnits === undefined ? value : formatRussianWholeRubles(minorUnits);
+}
+
+export function formatRussianMoneyInput(value: string): string {
+  const minorUnits = decimalInputToMinorUnits(value);
+  if (minorUnits === undefined) {
+    return value;
+  }
+  if (minorUnits === 0n) {
+    return "";
+  }
+  return formatRussianMinorUnitsValue(minorUnits, { hideZeroFraction: true });
+}
+
+export function formatRussianDecimalInput(value: string): string {
+  const minorUnits = decimalInputToMinorUnits(value);
+  if (minorUnits === undefined) {
+    return value;
+  }
+  if (minorUnits === 0n) {
+    return "";
+  }
+  return formatRussianMinorUnitsValue(minorUnits, { hideZeroFraction: true });
 }
 
 export function formatRussianDecimal(value: string): string {
   const minorUnits = decimalInputToMinorUnits(value);
-  return minorUnits === undefined ? value : formatRussianMinorUnits(minorUnits);
+  return minorUnits === undefined ? value : formatRussianMinorUnitsValue(minorUnits, { hideZeroFraction: false });
 }
 
 export function normalizeDecimalInput(value: string): string | undefined {
@@ -59,6 +82,41 @@ export function expenseLimitStatus(amount: string, limit: string): ExpenseLimitS
   return "safe";
 }
 
+export function targetProgressStatus(amount: string, target: string): ExpenseLimitStatus {
+  const amountKopecks = decimalInputToMinorUnits(amount);
+  const targetKopecks = decimalInputToMinorUnits(target);
+  if (amountKopecks === undefined || targetKopecks === undefined || amountKopecks === 0n || targetKopecks === 0n) {
+    return "none";
+  }
+  if (amountKopecks >= targetKopecks) {
+    return "safe";
+  }
+  if (amountKopecks * 100n >= targetKopecks * 80n) {
+    return "near";
+  }
+
+  return "over";
+}
+
+export function limitAllocationPercent(values: Iterable<string | undefined>): string {
+  let total = 0n;
+  for (const value of values) {
+    if (!value) {
+      continue;
+    }
+    const percentBasisPoints = decimalInputToMinorUnits(value);
+    if (percentBasisPoints !== undefined) {
+      total += percentBasisPoints;
+    }
+  }
+  return formatApiMinorUnits(total);
+}
+
+export function isLimitAllocationValid(totalPercent: string): boolean {
+  const basisPoints = decimalInputToMinorUnits(totalPercent);
+  return basisPoints === 0n || basisPoints === 10000n;
+}
+
 export function divideDecimalAmount(value: string, divisor: number): string {
   const minorUnits = decimalInputToMinorUnits(value);
   if (minorUnits === undefined || divisor <= 0 || !Number.isInteger(divisor)) {
@@ -103,8 +161,16 @@ function formatApiMinorUnits(value: bigint): string {
   return `${whole}.${fraction}`;
 }
 
-function formatRussianMinorUnits(value: bigint): string {
+function formatRussianMinorUnitsValue(value: bigint, options: { hideZeroFraction: boolean }): string {
   const whole = (value / 100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
   const fraction = (value % 100n).toString().padStart(2, "0");
+  if (options.hideZeroFraction && fraction === "00") {
+    return whole;
+  }
   return `${whole},${fraction}`;
+}
+
+function formatRussianWholeRubles(value: bigint): string {
+  const wholeRubles = ((value + 50n) / 100n).toString();
+  return wholeRubles.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }

@@ -49,11 +49,15 @@ export const financeExpenseCategoryCodes = [
 
 export type FinanceExpenseCategoryCode = (typeof financeExpenseCategoryCodes)[number];
 export type FinanceCategoryClassification = "expense" | "transfer";
+export type FinanceExpenseLimitPeriod = "monthly" | "annual";
+export type FinanceExpenseLimitKind = "limit" | "investment_goal";
 
 export type FinanceExpenseCategory = {
   code: FinanceExpenseCategoryCode;
   label: string;
   classification: FinanceCategoryClassification;
+  limit_period?: FinanceExpenseLimitPeriod;
+  limit_kind?: FinanceExpenseLimitKind;
 };
 
 export type FinanceExpenseCategoryAmounts = Record<FinanceExpenseCategoryCode, string>;

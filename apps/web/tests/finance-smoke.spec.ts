@@ -1,15 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const categories = [
-  { code: "restaurants", label: "Restaurants", classification: "expense" },
-  { code: "groceries", label: "Groceries", classification: "expense" },
-  { code: "personal", label: "Personal", classification: "expense" },
-  { code: "utilities", label: "Utilities", classification: "expense" },
-  { code: "transport", label: "Transport", classification: "expense" },
-  { code: "gifts", label: "Gifts", classification: "expense" },
-  { code: "investments", label: "Investments", classification: "transfer" },
-  { code: "entertainment", label: "Entertainment", classification: "expense" },
-  { code: "education", label: "Education", classification: "expense" }
+  { code: "restaurants", label: "Restaurants", classification: "expense", limit_period: "monthly", limit_kind: "limit" },
+  { code: "groceries", label: "Groceries", classification: "expense", limit_period: "monthly", limit_kind: "limit" },
+  { code: "personal", label: "Personal", classification: "expense", limit_period: "monthly", limit_kind: "limit" },
+  { code: "utilities", label: "Utilities", classification: "expense", limit_period: "monthly", limit_kind: "limit" },
+  { code: "transport", label: "Transport", classification: "expense", limit_period: "monthly", limit_kind: "limit" },
+  { code: "gifts", label: "Gifts", classification: "expense", limit_period: "monthly", limit_kind: "limit" },
+  { code: "investments", label: "Investments", classification: "transfer", limit_period: "annual", limit_kind: "investment_goal" },
+  { code: "entertainment", label: "Entertainment", classification: "expense", limit_period: "annual", limit_kind: "limit" },
+  { code: "education", label: "Education", classification: "expense", limit_period: "annual", limit_kind: "limit" }
 ] as const;
 
 const zeroAmounts = {
@@ -29,22 +29,24 @@ test("finance renders settings, expense limits, and income pages with mocked API
 
   await page.goto("/finance/settings");
   await expect(page.getByRole("link", { name: "Настройки" })).toBeVisible();
-  await expect(page.locator('[data-finance-income-setting="salary_amount"]')).toHaveValue("0,00");
+  await expect(page.locator('[data-finance-income-setting="salary_amount"]')).toHaveValue("");
   await expect(page.getByRole("button", { name: "Сохранить настройки" })).toBeVisible();
 
-  await page.locator('[data-finance-income-setting="salary_amount"]').fill("100 000,00");
-  await page.locator('[data-finance-income-setting="bonus_percent"]').fill("0,00");
-  await page.locator('[data-finance-limit-percent="restaurants"]').fill("1,00");
-  await page.locator('[data-finance-limit-percent="groceries"]').fill("2,00");
-  await page.locator('[data-finance-limit-percent="entertainment"]').fill("1,00");
-  await expect(page.locator('[data-finance-income-calculated="total_amount"]')).toHaveValue("100 000,00");
-  await expect(page.locator('[data-finance-limit-amount="restaurants"]')).toContainText("1 000,00");
-  await expect(page.locator('[data-finance-limit-amount="entertainment"]')).toContainText("12 000,00");
+  await page.locator('[data-finance-income-setting="salary_amount"]').fill("100 000");
+  await page.locator('[data-finance-income-setting="bonus_percent"]').fill("0");
+  await page.locator('[data-finance-limit-percent="restaurants"]').fill("1");
+  await page.locator('[data-finance-limit-percent="groceries"]').fill("2");
+  await page.locator('[data-finance-limit-percent="personal"]').fill("96");
+  await page.locator('[data-finance-limit-percent="entertainment"]').fill("1");
+  await expect(page.locator('[data-finance-income-calculated="total_amount"]')).toHaveValue("100 000");
+  await expect(page.locator('[data-finance-limit-amount="restaurants"]')).toContainText("1 000");
+  await expect(page.locator('[data-finance-limit-amount="entertainment"]')).toContainText("12 000");
+  await expect(page.locator("[data-finance-limit-allocation]")).toContainText("100 из 100%");
 
   await page.getByRole("button", { name: "Сохранить настройки" }).click();
   await page.reload();
-  await expect(page.locator('[data-finance-limit-percent="restaurants"]')).toHaveValue("1,00");
-  await expect(page.locator('[data-finance-limit-percent="groceries"]')).toHaveValue("2,00");
+  await expect(page.locator('[data-finance-limit-percent="restaurants"]')).toHaveValue("1");
+  await expect(page.locator('[data-finance-limit-percent="groceries"]')).toHaveValue("2");
 
   await page.getByRole("link", { name: "Расходы" }).click();
   await expect(page.getByRole("button", { name: "Сохранить" })).toHaveCSS("background-color", "rgb(255, 255, 255)");
@@ -52,13 +54,13 @@ test("finance renders settings, expense limits, and income pages with mocked API
 
   const restaurantInput = page.locator('form[data-finance-expense-month="1"] input[name="restaurants"]');
   const restaurantField = page.locator('form[data-finance-expense-month="1"] label.finance-money-field:has(input[name="restaurants"])');
-  await restaurantInput.fill("500,00");
+  await restaurantInput.fill("500");
   await expect(restaurantField).toHaveClass(/limit-safe/);
-  await restaurantInput.fill("900,00");
+  await restaurantInput.fill("900");
   await expect(restaurantField).toHaveClass(/limit-near/);
-  await restaurantInput.fill("1 200,00");
+  await restaurantInput.fill("1 200");
   await expect(restaurantField).toHaveClass(/limit-over/);
-  await restaurantInput.fill("0,00");
+  await restaurantInput.fill("");
   await expect(restaurantField).not.toHaveClass(/limit-/);
 
   await page.getByRole("link", { name: "Доходы" }).click();

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/anton415/anton415-hub/internal/finance/domain"
@@ -125,7 +126,7 @@ func TestServiceSavesAndListsFinanceSettings(t *testing.T) {
 		BonusPercent: domain.MustPercentFromBasisPoints(2500),
 		ExpenseLimitPercents: map[domain.ExpenseCategory]domain.Percent{
 			domain.ExpenseCategoryRestaurants: domain.MustPercentFromBasisPoints(1000),
-			domain.ExpenseCategoryEducation:   domain.MustPercentFromBasisPoints(550),
+			domain.ExpenseCategoryEducation:   domain.MustPercentFromBasisPoints(9000),
 		},
 	})
 	if err != nil {
@@ -150,8 +151,27 @@ func TestServiceSavesAndListsFinanceSettings(t *testing.T) {
 	if got := percents[domain.ExpenseCategoryRestaurants].Decimal(); got != "10.00" {
 		t.Fatalf("restaurants limit = %s, want 10.00", got)
 	}
-	if got := percents[domain.ExpenseCategoryEducation].Decimal(); got != "5.50" {
-		t.Fatalf("education limit = %s, want 5.50", got)
+	if got := percents[domain.ExpenseCategoryEducation].Decimal(); got != "90.00" {
+		t.Fatalf("education limit = %s, want 90.00", got)
+	}
+}
+
+func TestServiceRejectsPartialExpenseLimitAllocation(t *testing.T) {
+	store := newMemoryStore()
+	service := NewService(Dependencies{Expenses: store, Income: store, Settings: store})
+
+	_, err := service.SaveSettings(context.Background(), SaveFinanceSettingsInput{
+		SalaryAmount: domain.MustMoneyFromKopecks(20000000),
+		BonusPercent: domain.MustPercentFromBasisPoints(2500),
+		ExpenseLimitPercents: map[domain.ExpenseCategory]domain.Percent{
+			domain.ExpenseCategoryRestaurants: domain.MustPercentFromBasisPoints(1000),
+		},
+	})
+	if err == nil {
+		t.Fatal("SaveSettings() error = nil, want invalid expense limit total")
+	}
+	if !errors.Is(err, domain.ErrInvalidExpenseLimitTotal) {
+		t.Fatalf("SaveSettings() error = %v, want ErrInvalidExpenseLimitTotal", err)
 	}
 }
 
