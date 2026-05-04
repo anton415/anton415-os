@@ -659,6 +659,7 @@ function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
     sidebarCollapsed: false,
     authState: authState(),
     healthState: { kind: "online", payload: healthPayload() },
+    homeState: homeState(),
     financeState: financeState(),
     todoState: todoState(),
     onNavigate: vi.fn(),
@@ -666,6 +667,7 @@ function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
     onLogout: vi.fn(),
     onRefreshHealth: vi.fn(),
     onToggleSidebar: vi.fn(),
+    onRefreshHome: vi.fn(),
     onRefreshTodo: vi.fn(),
     onRefreshFinance: vi.fn(),
     onChangeFinanceYear: vi.fn(),
@@ -735,6 +737,21 @@ function financeState(overrides: Partial<FinanceState> = {}): FinanceState {
     settings: {
       expense_limit_percents: {}
     },
+    ...overrides
+  };
+}
+
+function homeState(overrides: Partial<RenderOptions["homeState"]> = {}): RenderOptions["homeState"] {
+  return {
+    loading: false,
+    year: 2026,
+    settings: {
+      expense_limit_percents: {}
+    },
+    projects: [],
+    todayTasks: [],
+    overdueTasks: [],
+    flaggedTasks: [],
     ...overrides
   };
 }

@@ -175,6 +175,19 @@ export type TodoState = {
   projectFormError?: string;
 };
 
+export type HomeState = {
+  loading: boolean;
+  year: number;
+  settings: FinanceSettings;
+  projects: TodoProject[];
+  todayTasks: TodoTask[];
+  overdueTasks: TodoTask[];
+  flaggedTasks: TodoTask[];
+  expenses?: FinanceExpensesYear;
+  income?: FinanceIncomeYear;
+  error?: string;
+};
+
 export type TodoTaskPayload = {
   project_id: number | null;
   parent_task_id: number | null;
