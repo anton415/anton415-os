@@ -28,12 +28,9 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 	return &Repository{pool: pool}
 }
 
-func (repo *Repository) ListProjects(ctx context.Context) ([]domain.Project, error) {
-	rows, err := repo.pool.Query(ctx, `
-		SELECT id, name, start_date, end_date, created_at, updated_at
-		FROM todo_projects
-		ORDER BY lower(name), id
-	`)
+func (repo *Repository) ListProjects(ctx context.Context, filter application.ProjectListFilter) ([]domain.Project, error) {
+	query, args := listProjectsQuery(filter)
+	rows, err := repo.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("list todo projects: %w", err)
 	}
@@ -56,7 +53,7 @@ func (repo *Repository) ListProjects(ctx context.Context) ([]domain.Project, err
 
 func (repo *Repository) GetProject(ctx context.Context, id int64) (domain.Project, error) {
 	project, err := scanProject(repo.pool.QueryRow(ctx, `
-		SELECT id, name, start_date, end_date, created_at, updated_at
+		SELECT id, name, start_date, end_date, archived, created_at, updated_at
 		FROM todo_projects
 		WHERE id = $1
 	`, id))
@@ -71,10 +68,10 @@ func (repo *Repository) GetProject(ctx context.Context, id int64) (domain.Projec
 
 func (repo *Repository) CreateProject(ctx context.Context, project domain.Project) (domain.Project, error) {
 	created, err := scanProject(repo.pool.QueryRow(ctx, `
-		INSERT INTO todo_projects (name, start_date, end_date, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING id, name, start_date, end_date, created_at, updated_at
-	`, project.Name, nullableDate(project.StartDate), nullableDate(project.EndDate), project.CreatedAt, project.UpdatedAt))
+		INSERT INTO todo_projects (name, start_date, end_date, archived, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id, name, start_date, end_date, archived, created_at, updated_at
+	`, project.Name, nullableDate(project.StartDate), nullableDate(project.EndDate), project.Archived, project.CreatedAt, project.UpdatedAt))
 	if err != nil {
 		return domain.Project{}, fmt.Errorf("create todo project: %w", err)
 	}
@@ -87,10 +84,11 @@ func (repo *Repository) UpdateProject(ctx context.Context, project domain.Projec
 		SET name = $2,
 		    start_date = $3,
 		    end_date = $4,
-		    updated_at = $5
+		    archived = $5,
+		    updated_at = $6
 		WHERE id = $1
-		RETURNING id, name, start_date, end_date, created_at, updated_at
-	`, project.ID, project.Name, nullableDate(project.StartDate), nullableDate(project.EndDate), project.UpdatedAt))
+		RETURNING id, name, start_date, end_date, archived, created_at, updated_at
+	`, project.ID, project.Name, nullableDate(project.StartDate), nullableDate(project.EndDate), project.Archived, project.UpdatedAt))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Project{}, application.ErrNotFound
 	}
@@ -101,18 +99,33 @@ func (repo *Repository) UpdateProject(ctx context.Context, project domain.Projec
 }
 
 func (repo *Repository) DeleteProject(ctx context.Context, id int64) error {
-	tag, err := repo.pool.Exec(ctx, `
+	tx, err := repo.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin delete todo project: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM todo_tasks
+		WHERE project_id = $1
+	`, id); err != nil {
+		return fmt.Errorf("delete todo project tasks: %w", err)
+	}
+
+	tag, err := tx.Exec(ctx, `
 		DELETE FROM todo_projects
 		WHERE id = $1
 	`, id)
-	if isPostgresCode(err, foreignKeyViolation) {
-		return application.ErrProjectHasTasks
-	}
 	if err != nil {
 		return fmt.Errorf("delete todo project: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return application.ErrNotFound
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete todo project: %w", err)
 	}
 	return nil
 }
@@ -250,11 +263,38 @@ func (repo *Repository) DeleteTask(ctx context.Context, id int64) error {
 	return nil
 }
 
+func listProjectsQuery(filter application.ProjectListFilter) (string, []any) {
+	query := strings.Builder{}
+	query.WriteString(`
+		SELECT id, name, start_date, end_date, archived, created_at, updated_at
+		FROM todo_projects
+	`)
+
+	conditions := []string{}
+	args := []any{}
+	if filter.Archived != nil {
+		args = append(args, *filter.Archived)
+		conditions = append(conditions, fmt.Sprintf("archived = $%d", len(args)))
+	} else if !filter.IncludeArchived {
+		conditions = append(conditions, "archived = false")
+	}
+
+	if len(conditions) > 0 {
+		query.WriteString(" WHERE ")
+		query.WriteString(strings.Join(conditions, " AND "))
+	}
+	query.WriteString(`
+		ORDER BY lower(name), id
+	`)
+	return query.String(), args
+}
+
 func listTasksQuery(filter application.TaskListFilter) (string, []any) {
 	query := strings.Builder{}
 	query.WriteString(`
-		SELECT id, project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
-		FROM todo_tasks
+		SELECT t.id, t.project_id, t.title, t.notes, t.url, t.status, t.due_date, t.due_time, t.repeat_frequency, t.repeat_interval, t.repeat_until, t.flagged, t.priority, t.created_at, t.updated_at, t.completed_at
+		FROM todo_tasks t
+		LEFT JOIN todo_projects p ON p.id = t.project_id
 	`)
 
 	conditions := []string{}
@@ -286,6 +326,8 @@ func listTasksQuery(filter application.TaskListFilter) (string, []any) {
 	}
 	if filter.ProjectID != nil {
 		conditions = append(conditions, "project_id = "+addArg(*filter.ProjectID))
+	} else {
+		conditions = append(conditions, "(project_id IS NULL OR p.archived = false)")
 	}
 	if strings.TrimSpace(filter.Query) != "" {
 		queryArg := addArg("%" + strings.ToLower(strings.TrimSpace(filter.Query)) + "%")
@@ -315,13 +357,13 @@ func orderByClause(filter application.TaskListFilter) string {
 
 	switch sortMode {
 	case application.TaskSortDue:
-		return "\n\t\tORDER BY " + doneLastPrefix + "due_date " + direction + " NULLS LAST, due_time " + direction + " NULLS LAST, id " + direction + "\n\t"
+		return "\n\t\tORDER BY " + doneLastPrefix + "due_date " + direction + " NULLS LAST, due_time " + direction + " NULLS LAST, t.id " + direction + "\n\t"
 	case application.TaskSortCreated:
-		return "\n\t\tORDER BY " + doneLastPrefix + "created_at " + direction + ", id " + direction + "\n\t"
+		return "\n\t\tORDER BY " + doneLastPrefix + "t.created_at " + direction + ", t.id " + direction + "\n\t"
 	case application.TaskSortTitle:
-		return "\n\t\tORDER BY " + doneLastPrefix + "lower(title) " + direction + ", id " + direction + "\n\t"
+		return "\n\t\tORDER BY " + doneLastPrefix + "lower(title) " + direction + ", t.id " + direction + "\n\t"
 	case application.TaskSortPriority:
-		return "\n\t\tORDER BY " + doneLastPrefix + priorityRankSQL() + " " + direction + ", id " + direction + "\n\t"
+		return "\n\t\tORDER BY " + doneLastPrefix + priorityRankSQL() + " " + direction + ", t.id " + direction + "\n\t"
 	default:
 		return `
 		ORDER BY
@@ -330,8 +372,8 @@ func orderByClause(filter application.TaskListFilter) string {
 			due_time NULLS LAST,
 			` + priorityRankSQL() + ` DESC,
 			flagged DESC,
-			created_at DESC,
-			id DESC
+			t.created_at DESC,
+			t.id DESC
 	`
 	}
 }
@@ -350,7 +392,7 @@ func scanProject(row rowScanner) (domain.Project, error) {
 		startDate pgtype.Date
 		endDate   pgtype.Date
 	)
-	if err := row.Scan(&project.ID, &project.Name, &startDate, &endDate, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	if err := row.Scan(&project.ID, &project.Name, &startDate, &endDate, &project.Archived, &project.CreatedAt, &project.UpdatedAt); err != nil {
 		return domain.Project{}, err
 	}
 	project.StartDate = datePtr(startDate)

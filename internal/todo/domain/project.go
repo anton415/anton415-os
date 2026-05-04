@@ -10,6 +10,7 @@ type Project struct {
 	Name      string
 	StartDate *time.Time
 	EndDate   *time.Time
+	Archived  bool
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }
@@ -29,6 +30,7 @@ func NewProject(name string, startDate *time.Time, endDate *time.Time, now time.
 		Name:      name,
 		StartDate: startDate,
 		EndDate:   endDate,
+		Archived:  false,
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
@@ -50,6 +52,18 @@ func UpdateProject(project Project, name string, startDate *time.Time, endDate *
 	project.EndDate = endDate
 	project.UpdatedAt = now
 	return project, nil
+}
+
+func ArchiveProject(project Project, now time.Time) Project {
+	project.Archived = true
+	project.UpdatedAt = now
+	return project
+}
+
+func RestoreProject(project Project, now time.Time) Project {
+	project.Archived = false
+	project.UpdatedAt = now
+	return project
 }
 
 func validDateRange(startDate *time.Time, endDate *time.Time) bool {

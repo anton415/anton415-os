@@ -19,9 +19,11 @@ import (
 )
 
 type Service interface {
-	ListProjects(ctx context.Context) ([]domain.Project, error)
+	ListProjects(ctx context.Context, input application.ListProjectsInput) ([]domain.Project, error)
 	CreateProject(ctx context.Context, input application.CreateProjectInput) (domain.Project, error)
 	UpdateProject(ctx context.Context, id int64, input application.UpdateProjectInput) (domain.Project, error)
+	ArchiveProject(ctx context.Context, id int64) (domain.Project, error)
+	RestoreProject(ctx context.Context, id int64) (domain.Project, error)
 	DeleteProject(ctx context.Context, id int64) error
 	ListTasks(ctx context.Context, input application.ListTasksInput) ([]domain.Task, error)
 	CreateTask(ctx context.Context, input application.CreateTaskInput) (domain.Task, error)
@@ -40,6 +42,8 @@ func NewRouter(service Service) http.Handler {
 	r.Get("/projects", handler.listProjects)
 	r.Post("/projects", handler.createProject)
 	r.Patch("/projects/{id}", handler.updateProject)
+	r.Patch("/projects/{id}/archive", handler.archiveProject)
+	r.Patch("/projects/{id}/restore", handler.restoreProject)
 	r.Delete("/projects/{id}", handler.deleteProject)
 
 	r.Get("/tasks", handler.listTasks)
@@ -51,7 +55,13 @@ func NewRouter(service Service) http.Handler {
 }
 
 func (handler Handler) listProjects(w http.ResponseWriter, r *http.Request) {
-	projects, err := handler.service.ListProjects(r.Context())
+	input, err := listProjectsInput(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	projects, err := handler.service.ListProjects(r.Context(), input)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -111,6 +121,36 @@ func (handler Handler) updateProject(w http.ResponseWriter, r *http.Request) {
 		StartDate: startDate,
 		EndDate:   endDate,
 	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeData(w, http.StatusOK, projectDTO(project))
+}
+
+func (handler Handler) archiveProject(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+
+	project, err := handler.service.ArchiveProject(r.Context(), id)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	writeData(w, http.StatusOK, projectDTO(project))
+}
+
+func (handler Handler) restoreProject(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+
+	project, err := handler.service.RestoreProject(r.Context(), id)
 	if err != nil {
 		writeError(w, err)
 		return
@@ -271,6 +311,7 @@ type projectResponse struct {
 	Name      string  `json:"name"`
 	StartDate *string `json:"start_date"`
 	EndDate   *string `json:"end_date"`
+	Archived  bool    `json:"archived"`
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
 }
@@ -292,6 +333,28 @@ type taskResponse struct {
 	CreatedAt       string  `json:"created_at"`
 	UpdatedAt       string  `json:"updated_at"`
 	CompletedAt     *string `json:"completed_at"`
+}
+
+func listProjectsInput(r *http.Request) (application.ListProjectsInput, error) {
+	query := r.URL.Query()
+	input := application.ListProjectsInput{}
+
+	if includeArchivedValue := strings.TrimSpace(query.Get("include_archived")); includeArchivedValue != "" {
+		includeArchived, err := strconv.ParseBool(includeArchivedValue)
+		if err != nil {
+			return application.ListProjectsInput{}, application.ErrInvalidFilter
+		}
+		input.IncludeArchived = includeArchived
+	}
+	if archivedValue := strings.TrimSpace(query.Get("archived")); archivedValue != "" {
+		archived, err := strconv.ParseBool(archivedValue)
+		if err != nil {
+			return application.ListProjectsInput{}, application.ErrInvalidFilter
+		}
+		input.Archived = &archived
+	}
+
+	return input, nil
 }
 
 func listTasksInput(r *http.Request) (application.ListTasksInput, error) {
@@ -452,6 +515,7 @@ func projectDTO(project domain.Project) projectResponse {
 		Name:      project.Name,
 		StartDate: formatDatePtr(project.StartDate),
 		EndDate:   formatDatePtr(project.EndDate),
+		Archived:  project.Archived,
 		CreatedAt: formatTimestamp(project.CreatedAt),
 		UpdatedAt: formatTimestamp(project.UpdatedAt),
 	}
@@ -509,7 +573,7 @@ func writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, application.ErrNotFound):
 		writeErrorResponse(w, http.StatusNotFound, "not_found", "todo resource was not found")
 	case errors.Is(err, application.ErrProjectHasTasks):
-		writeErrorResponse(w, http.StatusConflict, "project_has_tasks", "delete or move the project's tasks before deleting the project")
+		writeErrorResponse(w, http.StatusConflict, "project_has_tasks", "project still has tasks")
 	default:
 		slog.Error("todo handler error", slog.String("error", err.Error()))
 		writeErrorResponse(w, http.StatusInternalServerError, "internal_error", "internal server error")

@@ -141,6 +141,80 @@ describe("renderApp todo", () => {
     expect(options.onSaveProject).toHaveBeenCalledWith(root.querySelector("#project-settings-form"));
   });
 
+  it("keeps archived projects behind an explicit archive section", () => {
+    const options = optionsForTodo({
+      todoState: todoState({
+        projects: [
+          project({ id: 2, name: "Work" }),
+          project({ id: 3, name: "Old", archived: true })
+        ]
+      })
+    });
+
+    renderApp(root, options);
+
+    expect(root.textContent).toContain("Work");
+    expect(root.textContent).not.toContain("Old");
+    expect(root.querySelector("[data-toggle-archived-projects]")?.textContent?.trim()).toBe("Показать (1)");
+    root.querySelector<HTMLButtonElement>("[data-toggle-archived-projects]")?.click();
+    root.querySelector<HTMLButtonElement>('[data-archive-project-id="2"]')?.click();
+
+    expect(options.onToggleArchivedProjects).toHaveBeenCalled();
+    expect(options.onArchiveProject).toHaveBeenCalledWith(2);
+
+    const openOptions = optionsForTodo({
+      todoState: todoState({
+        showArchivedProjects: true,
+        projects: [
+          project({ id: 2, name: "Work" }),
+          project({ id: 3, name: "Old", archived: true })
+        ]
+      })
+    });
+
+    renderApp(root, openOptions);
+
+    expect(root.textContent).toContain("Old");
+    root.querySelector<HTMLButtonElement>('[data-restore-project-id="3"]')?.click();
+
+    expect(openOptions.onRestoreProject).toHaveBeenCalledWith(3);
+  });
+
+  it("keeps archived projects out of task project choices unless selected", () => {
+    renderApp(
+      root,
+      optionsForTodo({
+        todoState: todoState({
+          projects: [
+            project({ id: 2, name: "Work" }),
+            project({ id: 3, name: "Old", archived: true })
+          ]
+        })
+      })
+    );
+
+    const newTaskSelect = root.querySelector<HTMLSelectElement>('#task-settings-panel select[name="project_id"]');
+    expect([...newTaskSelect!.options].map((option) => option.textContent)).toEqual(["Входящие", "Work"]);
+
+    renderApp(
+      root,
+      optionsForTodo({
+        todoState: todoState({
+          editingTaskId: 7,
+          projects: [
+            project({ id: 2, name: "Work" }),
+            project({ id: 3, name: "Old", archived: true })
+          ],
+          tasks: [task({ id: 7, title: "Archived task", project_id: 3 })]
+        })
+      })
+    );
+
+    const existingTaskSelect = root.querySelector<HTMLSelectElement>('#task-settings-form select[name="project_id"]');
+    expect([...existingTaskSelect!.options].map((option) => option.textContent)).toEqual(["Входящие", "Work", "Old"]);
+    expect(existingTaskSelect?.value).toBe("3");
+  });
+
   it("keeps advanced task fields in a task settings drawer", () => {
     renderApp(root, optionsForTodo());
 
@@ -552,6 +626,7 @@ function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
     onSaveFinanceIncomeMonth: vi.fn(),
     onToggleTodoPanel: vi.fn(),
     onToggleTodoSearchPanel: vi.fn(),
+    onToggleArchivedProjects: vi.fn(),
     onChangeTodoQuery: vi.fn(),
     onSelectTodoScope: vi.fn(),
     onEditTask: vi.fn(),
@@ -562,6 +637,8 @@ function optionsForTodo(overrides: Partial<RenderOptions> = {}): RenderOptions {
     onEditProject: vi.fn(),
     onCancelProjectEdit: vi.fn(),
     onSaveProject: vi.fn(),
+    onArchiveProject: vi.fn(),
+    onRestoreProject: vi.fn(),
     onDeleteProject: vi.fn(),
     ...overrides
   };
@@ -676,6 +753,7 @@ function project(overrides: Partial<TodoProject> = {}): TodoProject {
     name: "Home",
     start_date: null,
     end_date: null,
+    archived: false,
     created_at: "2026-04-23T10:00:00Z",
     updated_at: "2026-04-23T10:00:00Z",
     ...overrides
