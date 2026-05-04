@@ -14,6 +14,7 @@ type Task = {
   project_id: number | null;
   title: string;
   notes: string | null;
+  url: string | null;
   status: "todo" | "in_progress" | "done";
   due_date: string | null;
   due_time: string | null;
@@ -47,11 +48,18 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.getByRole("button", { name: "Настройки задачи Existing task" }).click();
   await page.locator('#task-settings-form input[name="title"]').fill("Existing task updated");
   await page.locator('#task-settings-form textarea[name="notes"]').fill("from panel");
+  await page.locator('#task-settings-form input[name="url"]').fill("example.com/existing");
   await page.getByRole("button", { name: "Сохранить" }).click();
   await expect(page.getByRole("heading", { name: "Existing task updated" })).toBeVisible();
   await expect(page.getByText("from panel")).toBeVisible();
+  await expect(page.getByRole("link", { name: "https://example.com/existing" })).toHaveAttribute("href", "https://example.com/existing");
   await expect(page.getByRole("button", { name: "Edit Existing task updated" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Delete Existing task updated" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Настройки задачи Existing task updated" }).click();
+  await page.locator('#task-settings-form input[name="url"]').fill("");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await expect(page.getByRole("link", { name: "https://example.com/existing" })).toHaveCount(0);
 
   await page.locator('form#task-form input[name="title"]').fill("Buy milk");
   await expect(page.locator('form#task-form textarea[name="notes"]')).toHaveCount(0);
@@ -59,6 +67,7 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await expect(page.locator('form#task-form input[name="due_date"]')).toHaveCount(0);
   await page.locator('form#task-form [data-open-task-settings]').click();
   await page.locator('#task-settings-panel textarea[name="notes"]').fill("2%");
+  await page.locator('#task-settings-panel input[name="url"]').fill("https://example.com/a/very/long/milk/path?source=todo");
   await page.locator('#task-settings-panel input[name="due_date"]').fill(localDateInputValue(new Date()));
   await page.locator('#task-settings-panel input[name="due_time"]').fill("09:30");
   await page.locator('#task-settings-panel select[name="priority"]').selectOption("high");
@@ -68,6 +77,7 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
 
   await expect(page.getByRole("heading", { name: "Buy milk" })).toBeVisible();
   await expect(page.getByText("2%")).toBeVisible();
+  await expect(page.getByRole("link", { name: "https://example.com/a/very/long/milk/path?source=todo" })).toBeVisible();
   await expect(page.locator(".task-meta dd", { hasText: /^Высокий$/ })).toBeVisible();
 
   await page.locator('form#task-form input[name="title"]').fill("Pay rent");
@@ -164,6 +174,7 @@ async function mockTodoApi(page: Page) {
       project_id: null,
       title: "Existing task",
       notes: null,
+      url: null,
       status: "todo",
       due_date: null,
       due_time: null,
@@ -181,6 +192,7 @@ async function mockTodoApi(page: Page) {
       project_id: null,
       title: "Overdue task",
       notes: null,
+      url: null,
       status: "todo",
       due_date: yesterday,
       due_time: null,
@@ -252,6 +264,7 @@ async function mockTodoApi(page: Page) {
       expect(payload.status).toBeUndefined();
       if (payload.title === "Buy milk") {
         expect(payload.notes).toBe("2%");
+        expect(payload.url).toBe("https://example.com/a/very/long/milk/path?source=todo");
         expect(payload.due_time).toBe("09:30");
         expect(payload.flagged).toBe(true);
         expect(payload.priority).toBe("high");
@@ -261,6 +274,7 @@ async function mockTodoApi(page: Page) {
         project_id: payload.project_id ?? null,
         title: String(payload.title ?? ""),
         notes: payload.notes ?? null,
+        url: normalizeTaskURL(payload.url),
         status: payload.status ?? "todo",
         due_date: payload.due_date ?? null,
         due_time: payload.due_time ?? null,
@@ -298,6 +312,9 @@ async function mockTodoApi(page: Page) {
 
     if (request.method() === "PATCH") {
       const payload = (await request.postDataJSON()) as Partial<Task>;
+      if ("url" in payload) {
+        payload.url = normalizeTaskURL(payload.url);
+      }
       Object.assign(task, payload, {
         updated_at: now,
         completed_at: payload.status === "done" ? now : payload.status ? null : task.completed_at
@@ -350,11 +367,22 @@ function filterTasks(tasks: Task[], params: URLSearchParams): Task[] {
     if (projectID && task.project_id !== Number(projectID)) {
       return false;
     }
-    if (query && !`${task.title} ${task.notes ?? ""}`.toLowerCase().includes(query)) {
+    if (query && !`${task.title} ${task.notes ?? ""} ${task.url ?? ""}`.toLowerCase().includes(query)) {
       return false;
     }
     return true;
   }).sort((left, right) => compareTasks(left, right, sort, direction));
+}
+
+function normalizeTaskURL(value: string | null | undefined): string | null {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.startsWith("//")) {
+    return `https:${trimmed}`;
+  }
+  return trimmed.includes("://") ? trimmed : `https://${trimmed}`;
 }
 
 function compareTasks(left: Task, right: Task, sort: string, direction: string): number {

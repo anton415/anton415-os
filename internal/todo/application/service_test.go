@@ -74,11 +74,13 @@ func TestServiceUpdatesNullableTaskFields(t *testing.T) {
 		t.Fatalf("CreateProject() error = %v", err)
 	}
 	notes := "  Draft release notes  "
+	taskURL := "  docs.example.com/releases/42  "
 	dueDate := time.Date(2026, 4, 24, 18, 30, 0, 0, time.UTC)
 	task, err := service.CreateTask(ctx, CreateTaskInput{
 		ProjectID: &project.ID,
 		Title:     "Release",
 		Notes:     &notes,
+		URL:       &taskURL,
 		DueDate:   &dueDate,
 	})
 	if err != nil {
@@ -88,6 +90,7 @@ func TestServiceUpdatesNullableTaskFields(t *testing.T) {
 	task, err = service.UpdateTask(ctx, task.ID, UpdateTaskInput{
 		ProjectID: OptionalInt64{Set: true, Value: nil},
 		Notes:     OptionalString{Set: true, Value: nil},
+		URL:       OptionalString{Set: true, Value: nil},
 		DueDate:   OptionalDate{Set: true, Value: nil},
 	})
 	if err != nil {
@@ -98,6 +101,9 @@ func TestServiceUpdatesNullableTaskFields(t *testing.T) {
 	}
 	if task.Notes != nil {
 		t.Fatalf("Notes = %v, want nil", task.Notes)
+	}
+	if task.URL != nil {
+		t.Fatalf("URL = %v, want nil", task.URL)
 	}
 	if task.DueDate != nil {
 		t.Fatalf("DueDate = %v, want nil", task.DueDate)
@@ -232,7 +238,8 @@ func TestServiceFiltersOverdueFlaggedSearchAndSort(t *testing.T) {
 	low := domain.TaskPriorityLow
 	high := domain.TaskPriorityHigh
 	overdueDateTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Alpha old", DueDate: &yesterday})
-	overdueTimeTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Milk today", DueDate: &today, DueTime: &pastTime, Flagged: true, Priority: high})
+	milkURL := "https://recipes.example.com/milk"
+	overdueTimeTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Milk today", URL: &milkURL, DueDate: &today, DueTime: &pastTime, Flagged: true, Priority: high})
 	futureTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Beta later", DueDate: &today, DueTime: &futureTime, Priority: low})
 	tomorrowTask, _ := service.CreateTask(context.Background(), CreateTaskInput{Title: "Gamma tomorrow", DueDate: &tomorrow})
 
@@ -258,6 +265,14 @@ func TestServiceFiltersOverdueFlaggedSearchAndSort(t *testing.T) {
 	}
 	if got := taskIDs(searchTasks); !slices.Equal(got, []int64{overdueTimeTask.ID}) {
 		t.Fatalf("search ids = %v, want [%d]", got, overdueTimeTask.ID)
+	}
+
+	urlSearchTasks, err := service.ListTasks(context.Background(), ListTasksInput{Query: "recipes.example.com"})
+	if err != nil {
+		t.Fatalf("ListTasks(url search) error = %v", err)
+	}
+	if got := taskIDs(urlSearchTasks); !slices.Equal(got, []int64{overdueTimeTask.ID}) {
+		t.Fatalf("url search ids = %v, want [%d]", got, overdueTimeTask.ID)
 	}
 
 	priorityTasks, err := service.ListTasks(context.Background(), ListTasksInput{Sort: TaskSortPriority, Direction: SortDirectionDesc})

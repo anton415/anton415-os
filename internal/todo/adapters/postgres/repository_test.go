@@ -76,6 +76,7 @@ func TestListTasksQueryOverdueSearchAndSort(t *testing.T) {
 		"due_time IS NOT NULL AND due_time < $2::time",
 		"lower(title) LIKE $3",
 		"lower(coalesce(notes, '')) LIKE $3",
+		"lower(coalesce(url, '')) LIKE $3",
 		"CASE priority WHEN 'high' THEN 3",
 		"DESC",
 	} {

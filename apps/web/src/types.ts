@@ -135,6 +135,7 @@ export type TodoTask = {
   project_id: number | null;
   title: string;
   notes: string | null;
+  url: string | null;
   status: TodoTaskStatus;
   due_date: string | null;
   due_time: string | null;
@@ -174,6 +175,7 @@ export type TodoTaskPayload = {
   project_id: number | null;
   title: string;
   notes: string | null;
+  url: string | null;
   status?: TodoTaskStatus;
   due_date: string | null;
   due_time: string | null;

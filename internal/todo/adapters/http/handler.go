@@ -174,6 +174,7 @@ func (handler Handler) createTask(w http.ResponseWriter, r *http.Request) {
 		ProjectID:       request.ProjectID,
 		Title:           request.Title,
 		Notes:           request.Notes,
+		URL:             request.URL,
 		Status:          domain.TaskStatus(request.Status),
 		DueDate:         dueDate,
 		DueTime:         request.DueTime,
@@ -241,6 +242,7 @@ type createTaskRequest struct {
 	ProjectID       *int64  `json:"project_id"`
 	Title           string  `json:"title"`
 	Notes           *string `json:"notes"`
+	URL             *string `json:"url"`
 	Status          string  `json:"status"`
 	DueDate         *string `json:"due_date"`
 	DueTime         *string `json:"due_time"`
@@ -278,6 +280,7 @@ type taskResponse struct {
 	ProjectID       *int64  `json:"project_id"`
 	Title           string  `json:"title"`
 	Notes           *string `json:"notes"`
+	URL             *string `json:"url"`
 	Status          string  `json:"status"`
 	DueDate         *string `json:"due_date"`
 	DueTime         *string `json:"due_time"`
@@ -321,7 +324,7 @@ func listTasksInput(r *http.Request) (application.ListTasksInput, error) {
 }
 
 func updateTaskInput(raw map[string]json.RawMessage) (application.UpdateTaskInput, error) {
-	if field, ok := unknownField(raw, "project_id", "title", "notes", "status", "due_date", "due_time", "repeat_frequency", "repeat_interval", "repeat_until", "flagged", "priority"); ok {
+	if field, ok := unknownField(raw, "project_id", "title", "notes", "url", "status", "due_date", "due_time", "repeat_frequency", "repeat_interval", "repeat_until", "flagged", "priority"); ok {
 		return application.UpdateTaskInput{}, fmt.Errorf("%w: unknown field %q", application.ErrInvalidFilter, field)
 	}
 
@@ -346,6 +349,13 @@ func updateTaskInput(raw map[string]json.RawMessage) (application.UpdateTaskInpu
 			return application.UpdateTaskInput{}, err
 		}
 		input.Notes = application.OptionalString{Set: true, Value: notes}
+	}
+	if value, ok := raw["url"]; ok {
+		taskURL, err := nullableString(value)
+		if err != nil {
+			return application.UpdateTaskInput{}, err
+		}
+		input.URL = application.OptionalString{Set: true, Value: taskURL}
 	}
 	if value, ok := raw["status"]; ok {
 		status, err := requiredString(value)
@@ -453,6 +463,7 @@ func taskDTO(task domain.Task) taskResponse {
 		ProjectID:       task.ProjectID,
 		Title:           task.Title,
 		Notes:           task.Notes,
+		URL:             task.URL,
 		Status:          string(task.Status),
 		DueDate:         formatDatePtr(task.DueDate),
 		DueTime:         task.DueTime,
@@ -491,6 +502,8 @@ func writeError(w http.ResponseWriter, err error) {
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task repeat is invalid")
 	case errors.Is(err, domain.ErrInvalidTaskPriority):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task priority must be none, low, medium, or high")
+	case errors.Is(err, domain.ErrInvalidTaskURL):
+		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task url must be an http or https URL")
 	case errors.Is(err, application.ErrInvalidFilter):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "todo filter is invalid")
 	case errors.Is(err, application.ErrNotFound):

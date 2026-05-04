@@ -833,9 +833,11 @@ p {
   right: 0;
   display: grid;
   width: min(420px, 100vw);
-  min-height: 100vh;
+  height: 100vh;
   align-content: start;
   gap: 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border-left: 1px solid #dce1e8;
   padding: 22px;
   background: #ffffff;
@@ -1110,10 +1112,27 @@ p {
 }
 
 .task-meta dd {
+  max-width: min(100%, 34rem);
   margin: 0;
   color: #667085;
   font-size: 0.86rem;
   font-weight: 600;
+}
+
+.task-url-link,
+.task-url-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.task-url-link {
+  color: #155eef;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .task-actions {

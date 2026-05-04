@@ -54,16 +54,17 @@ trap cleanup EXIT
 curl -fsS \
   -H "Content-Type: application/json" \
   -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
-  -d '{"title":"Integration smoke task","notes":"created by smoke","due_date":null,"project_id":null}' \
+  -d '{"title":"Integration smoke task","notes":"created by smoke","url":"example.com/integration-smoke","due_date":null,"project_id":null}' \
   "${API_BASE_URL}/api/v1/todo/tasks" > "${create_response}"
 
 task_id="$(node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).data.id))" < "${create_response}")"
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const task=JSON.parse(d).data; if(task.url !== 'https://example.com/integration-smoke') process.exit(1)})" < "${create_response}"
 
 curl -fsS \
   -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
   "${API_BASE_URL}/api/v1/todo/tasks?view=inbox" > "${list_response}"
 
-node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(!body.data.some((task)=>task.id===Number(process.argv[1]))) process.exit(1)})" "${task_id}" < "${list_response}"
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(!body.data.some((task)=>task.id===Number(process.argv[1]) && task.url === 'https://example.com/integration-smoke')) process.exit(1)})" "${task_id}" < "${list_response}"
 
 curl -fsS \
   -X DELETE \

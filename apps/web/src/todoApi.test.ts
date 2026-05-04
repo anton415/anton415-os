@@ -83,6 +83,7 @@ describe("TodoApi", () => {
       project_id: null,
       title: "",
       notes: null,
+      url: null,
       due_date: null,
       due_time: null,
       repeat_frequency: "none",

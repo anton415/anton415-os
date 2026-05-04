@@ -137,7 +137,11 @@ func taskMatchesFilter(task domain.Task, filter TaskListFilter) bool {
 		if task.Notes != nil {
 			notes = strings.ToLower(*task.Notes)
 		}
-		if !strings.Contains(title, query) && !strings.Contains(notes, query) {
+		taskURL := ""
+		if task.URL != nil {
+			taskURL = strings.ToLower(*task.URL)
+		}
+		if !strings.Contains(title, query) && !strings.Contains(notes, query) && !strings.Contains(taskURL, query) {
 			return false
 		}
 	}

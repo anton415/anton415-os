@@ -21,7 +21,7 @@ func TestTaskCreateListAndValidation(t *testing.T) {
 	router := newTestRouter()
 
 	createResponse := httptest.NewRecorder()
-	router.ServeHTTP(createResponse, httptest.NewRequest(http.MethodPost, "/tasks", bytes.NewBufferString(`{"title":"  Buy milk  ","due_date":"2026-04-23","due_time":"09:30","repeat_frequency":"daily","repeat_interval":2,"repeat_until":"2026-04-30","flagged":true,"priority":"high"}`)))
+	router.ServeHTTP(createResponse, httptest.NewRequest(http.MethodPost, "/tasks", bytes.NewBufferString(`{"title":"  Buy milk  ","url":"example.com/list","due_date":"2026-04-23","due_time":"09:30","repeat_frequency":"daily","repeat_interval":2,"repeat_until":"2026-04-30","flagged":true,"priority":"high"}`)))
 	if createResponse.Code != http.StatusCreated {
 		t.Fatalf("create status = %d, want %d; body=%s", createResponse.Code, http.StatusCreated, createResponse.Body.String())
 	}
@@ -34,6 +34,9 @@ func TestTaskCreateListAndValidation(t *testing.T) {
 	}
 	if created.Data.Title != "Buy milk" {
 		t.Fatalf("created title = %q, want Buy milk", created.Data.Title)
+	}
+	if created.Data.URL == nil || *created.Data.URL != "https://example.com/list" {
+		t.Fatalf("created URL = %v, want normalized URL", created.Data.URL)
 	}
 	if created.Data.DueTime == nil || *created.Data.DueTime != "09:30" || created.Data.RepeatFrequency != "daily" || created.Data.RepeatInterval != 2 || !created.Data.Flagged || created.Data.Priority != "high" {
 		t.Fatalf("created schedule fields = %+v, want due time/repeat/flag/priority", created.Data)
@@ -156,14 +159,23 @@ func TestTaskUpdateClearsNullableFieldsAndRejectsBadInput(t *testing.T) {
 		router,
 		http.MethodPost,
 		"/tasks",
-		fmt.Sprintf(`{"title":"Plan","project_id":%d,"notes":" Notes ","due_date":"2026-04-24"}`, project.ID),
+		fmt.Sprintf(`{"title":"Plan","project_id":%d,"notes":" Notes ","url":"https://example.com/plan","due_date":"2026-04-24"}`, project.ID),
 	)
 	if createTaskResponse.Code != http.StatusCreated {
 		t.Fatalf("create task status = %d, want %d", createTaskResponse.Code, http.StatusCreated)
 	}
 	task := decodeData[taskResponse](t, createTaskResponse)
 
-	clearResponse := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", task.ID), `{"project_id":null,"notes":null,"due_date":null,"due_time":null}`)
+	updateURLResponse := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", task.ID), `{"url":"docs.example.com/plan-v2"}`)
+	if updateURLResponse.Code != http.StatusOK {
+		t.Fatalf("update url status = %d, want %d; body=%s", updateURLResponse.Code, http.StatusOK, updateURLResponse.Body.String())
+	}
+	updatedURLTask := decodeData[taskResponse](t, updateURLResponse)
+	if updatedURLTask.URL == nil || *updatedURLTask.URL != "https://docs.example.com/plan-v2" {
+		t.Fatalf("updated URL = %v, want normalized URL", updatedURLTask.URL)
+	}
+
+	clearResponse := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", task.ID), `{"project_id":null,"notes":null,"url":null,"due_date":null,"due_time":null}`)
 	if clearResponse.Code != http.StatusOK {
 		t.Fatalf("clear task status = %d, want %d; body=%s", clearResponse.Code, http.StatusOK, clearResponse.Body.String())
 	}
@@ -173,6 +185,9 @@ func TestTaskUpdateClearsNullableFieldsAndRejectsBadInput(t *testing.T) {
 	}
 	if cleared.Notes != nil {
 		t.Fatalf("Notes = %v, want nil", cleared.Notes)
+	}
+	if cleared.URL != nil {
+		t.Fatalf("URL = %v, want nil", cleared.URL)
 	}
 	if cleared.DueDate != nil {
 		t.Fatalf("DueDate = %v, want nil", cleared.DueDate)
@@ -186,6 +201,7 @@ func TestTaskUpdateClearsNullableFieldsAndRejectsBadInput(t *testing.T) {
 		"invalid repeat":     `{"repeat_frequency":"daily","repeat_interval":0}`,
 		"invalid status":     `{"status":"blocked"}`,
 		"invalid project id": `{"project_id":0}`,
+		"invalid url":        `{"url":"javascript:alert(1)"}`,
 	}
 	for label, body := range invalidRequests {
 		response := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", task.ID), body)

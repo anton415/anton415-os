@@ -2,8 +2,10 @@ package domain
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
+	"unicode"
 )
 
 type TaskStatus string
@@ -69,6 +71,7 @@ type Task struct {
 	ProjectID       *int64
 	Title           string
 	Notes           *string
+	URL             *string
 	Status          TaskStatus
 	DueDate         *time.Time
 	DueTime         *string
@@ -86,6 +89,7 @@ type NewTaskInput struct {
 	ProjectID       *int64
 	Title           string
 	Notes           *string
+	URL             *string
 	Status          TaskStatus
 	DueDate         *time.Time
 	DueTime         *string
@@ -117,6 +121,10 @@ func NewTask(input NewTaskInput, now time.Time) (Task, error) {
 		return Task{}, ErrInvalidTaskPriority
 	}
 
+	taskURL, err := NormalizeOptionalURL(input.URL)
+	if err != nil {
+		return Task{}, err
+	}
 	dueDate := NormalizeDate(input.DueDate)
 	dueTime, err := NormalizeDueTime(input.DueTime)
 	if err != nil {
@@ -136,6 +144,7 @@ func NewTask(input NewTaskInput, now time.Time) (Task, error) {
 		ProjectID:       input.ProjectID,
 		Title:           title,
 		Notes:           NormalizeOptionalText(input.Notes),
+		URL:             taskURL,
 		Status:          TaskStatusTodo,
 		DueDate:         dueDate,
 		DueTime:         dueTime,
@@ -172,6 +181,16 @@ func (task *Task) Rename(title string, now time.Time) error {
 func (task *Task) SetNotes(notes *string, now time.Time) {
 	task.Notes = NormalizeOptionalText(notes)
 	task.UpdatedAt = now
+}
+
+func (task *Task) SetURL(taskURL *string, now time.Time) error {
+	normalized, err := NormalizeOptionalURL(taskURL)
+	if err != nil {
+		return err
+	}
+	task.URL = normalized
+	task.UpdatedAt = now
+	return nil
 }
 
 func (task *Task) SetProject(projectID *int64, now time.Time) {
@@ -343,6 +362,52 @@ func NormalizeOptionalText(value *string) *string {
 		return nil
 	}
 	return &trimmed
+}
+
+func NormalizeOptionalURL(value *string) (*string, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	trimmed := strings.TrimSpace(*value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	if strings.IndexFunc(trimmed, unicode.IsSpace) != -1 {
+		return nil, ErrInvalidTaskURL
+	}
+
+	candidate := trimmed
+	if strings.HasPrefix(candidate, "//") {
+		candidate = "https:" + candidate
+	} else if !strings.Contains(candidate, "://") {
+		if hasSchemeLikePrefix(candidate) {
+			return nil, ErrInvalidTaskURL
+		}
+		candidate = "https://" + candidate
+	}
+
+	parsed, err := url.Parse(candidate)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidTaskURL, err)
+	}
+	scheme := strings.ToLower(parsed.Scheme)
+	if (scheme != "http" && scheme != "https") || parsed.Hostname() == "" {
+		return nil, ErrInvalidTaskURL
+	}
+
+	normalized := parsed.String()
+	return &normalized, nil
+}
+
+func hasSchemeLikePrefix(value string) bool {
+	delimiter := len(value)
+	for _, marker := range []string{"/", "?", "#"} {
+		if index := strings.Index(value, marker); index >= 0 && index < delimiter {
+			delimiter = index
+		}
+	}
+	return strings.Contains(value[:delimiter], ":")
 }
 
 func NormalizeDate(value *time.Time) *time.Time {

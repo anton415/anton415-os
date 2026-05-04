@@ -102,6 +102,7 @@ type CreateTaskInput struct {
 	ProjectID       *int64
 	Title           string
 	Notes           *string
+	URL             *string
 	Status          domain.TaskStatus
 	DueDate         *time.Time
 	DueTime         *string
@@ -156,6 +157,7 @@ type UpdateTaskInput struct {
 	ProjectID       OptionalInt64
 	Title           OptionalString
 	Notes           OptionalString
+	URL             OptionalString
 	Status          OptionalTaskStatus
 	DueDate         OptionalDate
 	DueTime         OptionalString
@@ -183,6 +185,7 @@ func (service *Service) CreateTask(ctx context.Context, input CreateTaskInput) (
 		ProjectID:       input.ProjectID,
 		Title:           input.Title,
 		Notes:           input.Notes,
+		URL:             input.URL,
 		Status:          input.Status,
 		DueDate:         input.DueDate,
 		DueTime:         input.DueTime,
@@ -222,6 +225,11 @@ func (service *Service) UpdateTask(ctx context.Context, id int64, input UpdateTa
 	}
 	if input.Notes.Set {
 		task.SetNotes(input.Notes.Value, now)
+	}
+	if input.URL.Set {
+		if err := task.SetURL(input.URL.Value, now); err != nil {
+			return domain.Task{}, err
+		}
 	}
 	if input.DueDate.Set {
 		task.SetDueDate(input.DueDate.Value, now)
