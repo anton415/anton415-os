@@ -10,4 +10,5 @@ var (
 	ErrInvalidTaskSchedule  = errors.New("task schedule is invalid")
 	ErrInvalidTaskRepeat    = errors.New("task repeat is invalid")
 	ErrInvalidTaskPriority  = errors.New("task priority is invalid")
+	ErrInvalidTaskURL       = errors.New("task url is invalid")
 )

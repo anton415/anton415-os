@@ -34,15 +34,41 @@ describe("renderApp todo", () => {
       optionsForTodo({
         todoState: todoState({
           projects: [project({ id: 2, name: "Home & Work" })],
-          tasks: [task({ id: 1, project_id: 2, title: "<script>alert(1)</script>", notes: "Use <b>milk</b>" })]
+          tasks: [task({ id: 1, project_id: 2, title: "<script>alert(1)</script>", notes: "Use <b>milk</b>", url: "https://example.com/?q=<tag>" })]
         })
       })
     );
 
     expect(root.textContent).toContain("<script>alert(1)</script>");
     expect(root.textContent).toContain("Use <b>milk</b>");
+    expect(root.textContent).toContain("https://example.com/?q=<tag>");
     expect(root.innerHTML).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    expect(root.innerHTML).toContain("https://example.com/?q=&lt;tag&gt;");
     expect(root.querySelector("script")).toBeNull();
+  });
+
+  it("renders task URLs as safe external links only for http URLs", () => {
+    renderApp(
+      root,
+      optionsForTodo({
+        todoState: todoState({
+          tasks: [
+            task({ id: 1, title: "Spec", url: "https://example.com/a/very/long/path?x=1" }),
+            task({ id: 2, title: "Unsafe", url: "javascript:alert(1)" })
+          ]
+        })
+      })
+    );
+
+    const link = root.querySelector<HTMLAnchorElement>(".task-url-link");
+    const unsafe = root.querySelector('[data-edit-task-id="2"]')?.closest(".task-item");
+
+    expect(link?.href).toBe("https://example.com/a/very/long/path?x=1");
+    expect(link?.target).toBe("_blank");
+    expect(link?.rel).toContain("noopener");
+    expect(link?.rel).toContain("noreferrer");
+    expect(unsafe?.querySelector(".task-url-link")).toBeNull();
+    expect(unsafe?.textContent).toContain("javascript:alert(1)");
   });
 
   it("renders CSP-compatible swatches without inline style attributes", () => {
@@ -131,6 +157,7 @@ describe("renderApp todo", () => {
     expect(form?.querySelector<HTMLSelectElement>('select[name="project_id"]')).toBeNull();
     expect(form?.querySelector<HTMLInputElement>('input[name="due_date"]')).toBeNull();
     expect(panel?.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')?.getAttribute("form")).toBe("task-form");
+    expect(panel?.querySelector<HTMLInputElement>('input[name="url"]')?.getAttribute("form")).toBe("task-form");
     expect(panel?.querySelector<HTMLSelectElement>('select[name="project_id"]')?.getAttribute("form")).toBe("task-form");
     expect(panel?.querySelector<HTMLInputElement>('input[name="due_date"]')?.getAttribute("form")).toBe("task-form");
     expect(panel?.querySelector<HTMLInputElement>('input[name="due_time"]')?.getAttribute("form")).toBe("task-form");
@@ -144,6 +171,7 @@ describe("renderApp todo", () => {
     expect(panel?.hasAttribute("hidden")).toBe(false);
 
     panel!.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')!.value = "Details live here";
+    panel!.querySelector<HTMLInputElement>('input[name="url"]')!.value = "example.com/details";
     panel!.querySelector<HTMLSelectElement>('select[name="project_id"]')!.value = "";
     panel!.querySelector<HTMLInputElement>('input[name="due_date"]')!.value = "2026-04-28";
     panel!.querySelector<HTMLInputElement>('input[name="due_time"]')!.value = "09:30";
@@ -152,6 +180,7 @@ describe("renderApp todo", () => {
     const formData = new FormData(form!);
 
     expect(formData.get("notes")).toBe("Details live here");
+    expect(formData.get("url")).toBe("example.com/details");
     expect(formData.get("project_id")).toBe("");
     expect(formData.get("due_date")).toBe("2026-04-28");
     expect(formData.get("due_time")).toBe("09:30");
@@ -246,7 +275,7 @@ describe("renderApp todo", () => {
       todoState: todoState({
         scope: { kind: "view", view: "completed" },
         editingTaskId: 2,
-        tasks: [task({ id: 2, title: "Paid bill", notes: "Already paid", status: "done" })]
+        tasks: [task({ id: 2, title: "Paid bill", notes: "Already paid", url: "https://example.com/bill", status: "done" })]
       })
     });
 
@@ -258,6 +287,7 @@ describe("renderApp todo", () => {
     expect(settingsForm).not.toBeNull();
     expect(settingsForm?.querySelector<HTMLInputElement>('input[name="title"]')?.value).toBe("Paid bill");
     expect(settingsForm?.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')?.value).toBe("Already paid");
+    expect(settingsForm?.querySelector<HTMLInputElement>('input[name="url"]')?.value).toBe("https://example.com/bill");
     expect(settingsForm?.querySelector<HTMLButtonElement>('[data-delete-current-task-id="2"]')).not.toBeNull();
     expect(root.querySelector('select[name="status"]')).toBeNull();
 
@@ -658,6 +688,7 @@ function task(overrides: Partial<TodoTask> = {}): TodoTask {
     project_id: null,
     title: "Task",
     notes: null,
+    url: null,
     status: "todo",
     due_date: null,
     due_time: null,

@@ -142,7 +142,7 @@ func (repo *Repository) ListTasks(ctx context.Context, filter application.TaskLi
 
 func (repo *Repository) GetTask(ctx context.Context, id int64) (domain.Task, error) {
 	task, err := scanTask(repo.pool.QueryRow(ctx, `
-		SELECT id, project_id, title, notes, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+		SELECT id, project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 		FROM todo_tasks
 		WHERE id = $1
 	`, id))
@@ -158,14 +158,15 @@ func (repo *Repository) GetTask(ctx context.Context, id int64) (domain.Task, err
 func (repo *Repository) CreateTask(ctx context.Context, task domain.Task) (domain.Task, error) {
 	created, err := scanTask(repo.pool.QueryRow(ctx, `
 		INSERT INTO todo_tasks (
-			project_id, title, notes, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+			project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-		RETURNING id, project_id, title, notes, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		RETURNING id, project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 	`,
 		nullableInt64(task.ProjectID),
 		task.Title,
 		nullableString(task.Notes),
+		nullableString(task.URL),
 		task.Status,
 		nullableDate(task.DueDate),
 		nullableTimeOfDay(task.DueTime),
@@ -193,23 +194,25 @@ func (repo *Repository) UpdateTask(ctx context.Context, task domain.Task) (domai
 		SET project_id = $2,
 		    title = $3,
 		    notes = $4,
-		    status = $5,
-		    due_date = $6,
-		    due_time = $7,
-		    repeat_frequency = $8,
-		    repeat_interval = $9,
-		    repeat_until = $10,
-		    flagged = $11,
-		    priority = $12,
-		    updated_at = $13,
-		    completed_at = $14
+		    url = $5,
+		    status = $6,
+		    due_date = $7,
+		    due_time = $8,
+		    repeat_frequency = $9,
+		    repeat_interval = $10,
+		    repeat_until = $11,
+		    flagged = $12,
+		    priority = $13,
+		    updated_at = $14,
+		    completed_at = $15
 		WHERE id = $1
-		RETURNING id, project_id, title, notes, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+		RETURNING id, project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 	`,
 		task.ID,
 		nullableInt64(task.ProjectID),
 		task.Title,
 		nullableString(task.Notes),
+		nullableString(task.URL),
 		task.Status,
 		nullableDate(task.DueDate),
 		nullableTimeOfDay(task.DueTime),
@@ -250,7 +253,7 @@ func (repo *Repository) DeleteTask(ctx context.Context, id int64) error {
 func listTasksQuery(filter application.TaskListFilter) (string, []any) {
 	query := strings.Builder{}
 	query.WriteString(`
-		SELECT id, project_id, title, notes, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+		SELECT id, project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 		FROM todo_tasks
 	`)
 
@@ -286,7 +289,7 @@ func listTasksQuery(filter application.TaskListFilter) (string, []any) {
 	}
 	if strings.TrimSpace(filter.Query) != "" {
 		queryArg := addArg("%" + strings.ToLower(strings.TrimSpace(filter.Query)) + "%")
-		conditions = append(conditions, "(lower(title) LIKE "+queryArg+" OR lower(coalesce(notes, '')) LIKE "+queryArg+")")
+		conditions = append(conditions, "(lower(title) LIKE "+queryArg+" OR lower(coalesce(notes, '')) LIKE "+queryArg+" OR lower(coalesce(url, '')) LIKE "+queryArg+")")
 	}
 
 	if len(conditions) > 0 {
@@ -360,6 +363,7 @@ func scanTask(row rowScanner) (domain.Task, error) {
 		task        domain.Task
 		projectID   pgtype.Int8
 		notes       pgtype.Text
+		taskURL     pgtype.Text
 		status      string
 		dueDate     pgtype.Date
 		dueTime     pgtype.Time
@@ -374,6 +378,7 @@ func scanTask(row rowScanner) (domain.Task, error) {
 		&projectID,
 		&task.Title,
 		&notes,
+		&taskURL,
 		&status,
 		&dueDate,
 		&dueTime,
@@ -404,6 +409,7 @@ func scanTask(row rowScanner) (domain.Task, error) {
 
 	task.ProjectID = int64Ptr(projectID)
 	task.Notes = stringPtr(notes)
+	task.URL = stringPtr(taskURL)
 	task.Status = taskStatus
 	task.DueDate = datePtr(dueDate)
 	task.DueTime = timeOfDayPtr(dueTime)

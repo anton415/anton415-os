@@ -588,6 +588,7 @@ function taskPayload(formData: FormData): TodoTaskPayload {
   const dueDate = optionalString(formData.get("due_date"));
   const dueTime = optionalString(formData.get("due_time"));
   const notes = optionalString(formData.get("notes"));
+  const taskURL = optionalString(formData.get("url"));
   const repeatFrequency = repeatFrequencyValue(formData.get("repeat_frequency"));
   const repeatInterval = optionalNumber(formData.get("repeat_interval")) ?? 1;
   const repeatUntil = optionalString(formData.get("repeat_until"));
@@ -596,6 +597,7 @@ function taskPayload(formData: FormData): TodoTaskPayload {
     project_id: projectID ?? null,
     title: String(formData.get("title") ?? ""),
     notes,
+    url: taskURL,
     due_date: dueDate,
     due_time: dueTime,
     repeat_frequency: repeatFrequency,

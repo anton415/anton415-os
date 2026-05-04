@@ -1041,6 +1041,7 @@ function renderTaskForm(state: TodoState): string {
             projects: state.projects,
             selectedProjectID,
             notes: "",
+            url: "",
             dueDate,
             dueTime: "",
             repeatFrequency: "none",
@@ -1058,6 +1059,7 @@ function renderNewTaskSettingsPanel(values: {
   projects: TodoProject[];
   selectedProjectID: number | null;
   notes: string;
+  url: string;
   dueDate: string;
   dueTime: string;
   repeatFrequency: TodoRepeatFrequency;
@@ -1087,6 +1089,10 @@ function renderNewTaskSettingsPanel(values: {
         <label>
           <span>Заметки</span>
           <textarea form="task-form" name="notes" rows="3" placeholder="Заметки">${escapeHTML(values.notes)}</textarea>
+        </label>
+        <label>
+          <span>URL</span>
+          <input form="task-form" name="url" type="text" inputmode="url" value="${escapeAttr(values.url)}" placeholder="https://example.com">
         </label>
         <div class="settings-form-grid">
           <label>
@@ -1175,6 +1181,10 @@ function renderExistingTaskSettingsPanel(state: TodoState): string {
         <label>
           <span>Заметки</span>
           <textarea name="notes" rows="3" placeholder="Заметки">${escapeHTML(task.notes ?? "")}</textarea>
+        </label>
+        <label>
+          <span>URL</span>
+          <input name="url" type="text" inputmode="url" value="${escapeAttr(task.url ?? "")}" placeholder="https://example.com">
         </label>
         <div class="settings-form-grid">
           <label>
@@ -1301,6 +1311,7 @@ function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean
   const markers = taskMarkers(task);
   const metaItems = [
     project ? `<div><dt>Проект</dt><dd>${escapeHTML(project.name)}</dd></div>` : "",
+    task.url ? `<div><dt>URL</dt><dd>${renderTaskURL(task.url)}</dd></div>` : "",
     task.due_date ? `<div><dt>Срок</dt><dd>${escapeHTML(taskDueLabel(task))}</dd></div>` : "",
     task.repeat_frequency !== "none" ? `<div><dt>Повтор</dt><dd>${escapeHTML(repeatLabel(task))}</dd></div>` : "",
     task.priority !== "none" ? `<div><dt>Приоритет</dt><dd>${escapeHTML(priorityLabel(task.priority))}</dd></div>` : ""
@@ -1351,6 +1362,23 @@ function taskDueLabel(task: TodoTask): string {
     return "Без даты";
   }
   return task.due_time ? `${task.due_date} ${task.due_time}` : task.due_date;
+}
+
+function renderTaskURL(taskURL: string): string {
+  const safeURL = safeTaskURL(taskURL);
+  if (!safeURL) {
+    return `<span class="task-url-text">${escapeHTML(taskURL)}</span>`;
+  }
+  return `<a class="task-url-link" href="${escapeAttr(safeURL)}" target="_blank" rel="noopener noreferrer">${escapeHTML(taskURL)}</a>`;
+}
+
+function safeTaskURL(taskURL: string): string | null {
+  try {
+    const parsed = new URL(taskURL);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+  } catch {
+    return null;
+  }
 }
 
 function repeatLabel(task: TodoTask): string {
