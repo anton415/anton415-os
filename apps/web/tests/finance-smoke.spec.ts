@@ -49,7 +49,7 @@ test("finance renders settings, expense limits, and income pages with mocked API
   await expect(page.locator('[data-finance-limit-percent="groceries"]')).toHaveValue("2");
 
   await page.getByRole("link", { name: "Расходы" }).click();
-  await expect(page.getByRole("button", { name: "Сохранить" })).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(page.getByRole("button", { name: "Сохранить" })).toHaveCSS("background-color", "rgb(31, 94, 255)");
   await expect(page.locator(".finance-average-row")).toContainText("Среднее в месяц");
 
   const restaurantInput = page.locator('form[data-finance-expense-month="1"] input[name="restaurants"]');

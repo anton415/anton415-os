@@ -108,7 +108,7 @@ describe("renderApp todo", () => {
 
     const form = root.querySelector<HTMLFormElement>("#project-form");
 
-    expect(form?.classList.contains("project-row")).toBe(true);
+    expect(form?.classList.contains("project-row")).toBe(false);
     expect(form?.querySelector<HTMLInputElement>('input[name="name"]')?.placeholder).toBe("Новый проект");
     expect(form?.querySelector<HTMLInputElement>('input[name="project_id"]')).toBeNull();
     expect(form?.querySelector<HTMLInputElement>('input[name="start_date"]')).toBeNull();
@@ -136,11 +136,31 @@ describe("renderApp todo", () => {
     expect(root.querySelector<HTMLInputElement>("#project-settings-form input[name='start_date']")?.value).toBe("2026-04-01");
     expect(root.querySelector<HTMLInputElement>("#project-settings-form input[name='end_date']")?.value).toBe("2026-04-30");
 
+    root.querySelector<HTMLButtonElement>('[data-archive-project-id="2"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-delete-project-id="2"]')?.click();
     root.querySelector<HTMLButtonElement>("#cancel-project-edit-secondary")?.click();
     root.querySelector<HTMLFormElement>("#project-settings-form")?.dispatchEvent(new Event("submit", { bubbles: true }));
 
+    expect(options.onArchiveProject).toHaveBeenCalledWith(2);
+    expect(options.onDeleteProject).toHaveBeenCalledWith(2);
     expect(options.onCancelProjectEdit).toHaveBeenCalled();
     expect(options.onSaveProject).toHaveBeenCalledWith(root.querySelector("#project-settings-form"));
+  });
+
+  it("shows restore action in archived project settings", () => {
+    const options = optionsForTodo({
+      todoState: todoState({
+        editingProjectId: 3,
+        projects: [project({ id: 3, name: "Old", archived: true })]
+      })
+    });
+
+    renderApp(root, options);
+
+    expect(root.querySelector<HTMLButtonElement>('[data-archive-project-id="3"]')).toBeNull();
+    root.querySelector<HTMLButtonElement>('[data-restore-project-id="3"]')?.click();
+
+    expect(options.onRestoreProject).toHaveBeenCalledWith(3);
   });
 
   it("keeps archived projects behind an explicit archive section", () => {
@@ -159,10 +179,11 @@ describe("renderApp todo", () => {
     expect(root.textContent).not.toContain("Old");
     expect(root.querySelector("[data-toggle-archived-projects]")?.textContent?.trim()).toBe("Показать (1)");
     root.querySelector<HTMLButtonElement>("[data-toggle-archived-projects]")?.click();
-    root.querySelector<HTMLButtonElement>('[data-archive-project-id="2"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-edit-project-id="2"]')?.click();
 
     expect(options.onToggleArchivedProjects).toHaveBeenCalled();
-    expect(options.onArchiveProject).toHaveBeenCalledWith(2);
+    expect(options.onEditProject).toHaveBeenCalledWith(2);
+    expect(root.querySelector<HTMLButtonElement>('[data-archive-project-id="2"]')).toBeNull();
 
     const openOptions = optionsForTodo({
       todoState: todoState({
@@ -177,9 +198,10 @@ describe("renderApp todo", () => {
     renderApp(root, openOptions);
 
     expect(root.textContent).toContain("Old");
-    root.querySelector<HTMLButtonElement>('[data-restore-project-id="3"]')?.click();
+    root.querySelector<HTMLButtonElement>('[data-edit-project-id="3"]')?.click();
 
-    expect(openOptions.onRestoreProject).toHaveBeenCalledWith(3);
+    expect(openOptions.onEditProject).toHaveBeenCalledWith(3);
+    expect(root.querySelector<HTMLButtonElement>('[data-restore-project-id="3"]')).toBeNull();
   });
 
   it("keeps archived projects out of task project choices unless selected", () => {

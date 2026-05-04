@@ -148,8 +148,8 @@ function renderHomePage(options: RenderOptions): string {
   return `
     <header class="topbar">
       <div>
-        <p class="eyebrow">Шаг 3 Todo v1</p>
-        <h1>Платформенная оболочка</h1>
+        <p class="eyebrow">anton415 Hub</p>
+        <h1>Рабочая система</h1>
       </div>
       <div class="topbar-actions">
         ${renderSidebarToggle(options)}
@@ -183,7 +183,7 @@ function renderTodoPage(options: RenderOptions): string {
   return `
     <header class="topbar">
       <div>
-        <p class="eyebrow">Задачи v1</p>
+        <p class="eyebrow">Рабочие списки</p>
         <h1>Задачи</h1>
       </div>
       <div class="topbar-actions">
@@ -258,7 +258,7 @@ function renderFinancePage(options: RenderOptions): string {
   return `
     <header class="topbar">
       <div>
-        <p class="eyebrow">Финансы v1</p>
+        <p class="eyebrow">Месячный обзор</p>
         <h1>Финансы</h1>
       </div>
       <div class="topbar-actions">
@@ -849,23 +849,24 @@ function moduleAccentClass(modulePath: string): string {
 
 function renderProjectForm(state: TodoState): string {
   return `
-    <form class="project-row project-form" id="project-form">
+    <form class="project-form" id="project-form">
       <label class="project-name-field">
         <span class="visually-hidden">Название</span>
         <input name="name" type="text" value="" placeholder="Новый проект" autocomplete="off" required>
       </label>
-      <label class="project-parent-field">
-        <span class="visually-hidden">Родительский проект</span>
-        <select name="parent_project_id" aria-label="Родительский проект">
-          <option value="">Без родителя</option>
-          ${renderProjectOptions(state.projects, null, { includeArchived: false })}
-        </select>
-      </label>
-      <span class="project-form-actions">
-        <button class="icon-button small project-save-button" type="submit" ${state.saving ? "disabled" : ""} aria-label="Создать проект" title="Создать проект">
-          +
-        </button>
-      </span>
+      <button class="icon-button small project-save-button" type="submit" ${state.saving ? "disabled" : ""} aria-label="Создать проект" title="Создать проект">
+        +
+      </button>
+      <details class="project-parent-field">
+        <summary>Родитель</summary>
+        <label>
+          <span class="visually-hidden">Родительский проект</span>
+          <select name="parent_project_id" aria-label="Родительский проект">
+            <option value="">Без родителя</option>
+            ${renderProjectOptions(state.projects, null, { includeArchived: false })}
+          </select>
+        </label>
+      </details>
       ${state.editingProjectId === undefined && state.projectFormError ? `<p class="form-error">${escapeHTML(state.projectFormError)}</p>` : ""}
     </form>
   `;
@@ -926,14 +927,8 @@ function renderProjectTreeNode(node: ProjectTreeNode, state: TodoState, depth: n
           ${projectPeriod(project)}
           ${project.archived ? `<small>Архив</small>` : ""}
         </button>
-        <span>
+        <span class="project-row-actions">
           <button class="icon-button small" type="button" data-edit-project-id="${project.id}" aria-label="Настройки проекта ${escapeAttr(project.name)}" title="Настройки проекта">&#9881;</button>
-          ${
-            project.archived
-              ? `<button class="icon-button small" type="button" data-restore-project-id="${project.id}" aria-label="Вернуть проект ${escapeAttr(project.name)}" title="Вернуть проект">&#8634;</button>`
-              : `<button class="icon-button small" type="button" data-archive-project-id="${project.id}" aria-label="Архивировать проект ${escapeAttr(project.name)}" title="Архивировать проект">&#8681;</button>`
-          }
-          <button class="icon-button small danger" type="button" data-delete-project-id="${project.id}" aria-label="Удалить ${escapeAttr(project.name)}" title="Удалить проект">&#8722;</button>
         </span>
       </div>
       ${node.children.length > 0 ? `<ul class="project-tree-children">${node.children.map((child) => renderProjectTreeNode(child, state, depth + 1)).join("")}</ul>` : ""}
@@ -2069,23 +2064,23 @@ function monthLabel(month: number): string {
 function financeCategoryLabel(category: FinanceExpenseCategory): string {
   switch (category.code) {
     case "restaurants":
-      return "Рестораны";
+      return "Рестор.";
     case "groceries":
       return "Продукты";
     case "personal":
       return "Личное";
     case "utilities":
-      return "Коммунальные";
+      return "Коммун.";
     case "transport":
-      return "Транспорт";
+      return "Трансп.";
     case "gifts":
       return "Подарки";
     case "investments":
-      return "Инвестиции";
+      return "Инвест.";
     case "entertainment":
-      return "Развлечения";
+      return "Развлеч.";
     case "education":
-      return "Образование";
+      return "Образов.";
     default:
       return category.label;
   }

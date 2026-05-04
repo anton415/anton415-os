@@ -131,17 +131,19 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.getByRole("button", { name: "Сегодня", exact: true }).click();
   await expect(page.locator('#task-settings-panel input[name="due_date"]')).toHaveValue(localDateInputValue(new Date()));
 
-  await page.getByRole("button", { name: "Архивировать проект Home" }).click();
-  await expect(page.getByRole("button", { name: "Вернуть проект Home" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Архивировать проект Home" })).toHaveCount(0);
-  await page.getByRole("button", { name: "Вернуть проект Home" }).click();
-  await expect(page.getByRole("button", { name: "Архивировать проект Home" })).toBeVisible();
+  await page.getByRole("button", { name: "Настройки проекта Home" }).click();
+  await page.locator('#project-settings-form [data-archive-project-id="1"]').click();
+  await expect(page.locator('#project-settings-form [data-archive-project-id="1"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "Настройки проекта Home" }).click();
+  await page.locator('#project-settings-form [data-restore-project-id="1"]').click();
+  await page.getByRole("button", { name: "Настройки проекта Home" }).click();
+  await expect(page.locator('#project-settings-form [data-archive-project-id="1"]')).toBeVisible();
 
   page.once("dialog", async (dialog) => {
     expect(dialog.message()).toContain("все его задачи");
     await dialog.accept();
   });
-  await page.getByRole("button", { name: "Удалить Home" }).click();
+  await page.locator('#project-settings-form [data-delete-project-id="1"]').click();
   await expect(page.getByText("Активных проектов нет.")).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 800 });
