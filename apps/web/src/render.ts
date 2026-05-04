@@ -24,6 +24,7 @@ import type {
   FinanceIncomeMonth,
   FinanceState,
   HealthState,
+  HomeState,
   TodoProject,
   TodoRepeatFrequency,
   TodoScope,
@@ -57,6 +58,7 @@ type RenderOptions = {
   sidebarCollapsed: boolean;
   authState: AuthState;
   healthState: HealthState;
+  homeState: HomeState;
   financeState: FinanceState;
   todoState: TodoState;
   onNavigate: (path: string) => void;
@@ -64,6 +66,7 @@ type RenderOptions = {
   onLogout: () => void;
   onRefreshHealth: () => void;
   onToggleSidebar: () => void;
+  onRefreshHome: () => void;
   onRefreshTodo: () => void;
   onRefreshFinance: () => void;
   onChangeFinanceYear: (year: number) => void;
@@ -145,33 +148,198 @@ export function renderApp(root: HTMLElement, options: RenderOptions) {
 }
 
 function renderHomePage(options: RenderOptions): string {
+  const state = options.homeState;
   return `
-    <header class="topbar">
+    <header class="topbar daily-command">
       <div>
-        <p class="eyebrow">anton415 Hub</p>
-        <h1>Рабочая система</h1>
+        <p class="eyebrow">Daily Center</p>
+        <h1>Сегодня</h1>
       </div>
       <div class="topbar-actions">
         ${renderSidebarToggle(options)}
         ${renderAuthBadge(options.authState)}
         ${renderHealthBadge(options.healthState)}
+        <button class="icon-button" type="button" id="refresh-home" aria-label="Обновить Daily Center" title="Обновить Daily Center">
+          &#8635;
+        </button>
       </div>
     </header>
 
-    <section class="status-panel" aria-live="polite">
-      <div>
-        <p class="section-label">Связь с backend</p>
-        ${renderHealthDetails(options.healthState, options.apiBaseUrl)}
-      </div>
-      <button class="icon-button" type="button" id="refresh-health" aria-label="Обновить статус backend" title="Обновить статус backend">
-        &#8635;
-      </button>
-    </section>
+    ${state.error ? `<div class="inline-error" role="alert">${escapeHTML(state.error)}</div>` : ""}
 
-    <section class="module-grid" aria-label="Продуктовые модули">
-      ${renderModuleCards()}
+    <section class="daily-grid" aria-label="Ежедневный центр">
+      <section class="daily-panel daily-focus-panel" aria-label="Фокус дня">
+        <div class="panel-title-row">
+          <div>
+            <p class="section-label">Фокус</p>
+            <h2>Что требует внимания</h2>
+          </div>
+          <a class="secondary-button" href="/todo" data-route="/todo">Все задачи</a>
+        </div>
+        ${renderHomeFocus(state)}
+      </section>
+
+      <section class="daily-panel daily-money-panel" aria-label="Финансовый срез">
+        <div class="panel-title-row">
+          <div>
+            <p class="section-label">Деньги</p>
+            <h2>${escapeHTML(String(state.year))}</h2>
+          </div>
+          <a class="secondary-button" href="/finance/expenses" data-route="/finance/expenses">Финансы</a>
+        </div>
+        ${renderHomeFinanceSnapshot(state)}
+      </section>
+
+      <section class="daily-panel daily-actions-panel" aria-label="Быстрые действия">
+        <div class="panel-title-row">
+          <div>
+            <p class="section-label">Действия</p>
+            <h2>Открыть рабочую область</h2>
+          </div>
+        </div>
+        <div class="quick-action-list">
+          <a class="quick-action primary" href="/todo" data-route="/todo">
+            <span>Новая задача</span>
+            <small>Открыть Todo и добавить в поток</small>
+          </a>
+          <a class="quick-action" href="/finance/expenses" data-route="/finance/expenses">
+            <span>Внести расходы</span>
+            <small>Месячная таблица расходов</small>
+          </a>
+          <a class="quick-action" href="/finance/income" data-route="/finance/income">
+            <span>Проверить доходы</span>
+            <small>Факт дохода по месяцам</small>
+          </a>
+          <a class="quick-action" href="/finance/settings" data-route="/finance/settings">
+            <span>Настроить лимиты</span>
+            <small>Оклад, премия и распределение</small>
+          </a>
+        </div>
+      </section>
+
+      <section class="daily-panel daily-system-panel" aria-live="polite">
+        <div class="panel-title-row">
+          <div>
+            <p class="section-label">Система</p>
+            <h2>Связь и модули</h2>
+          </div>
+          <button class="icon-button" type="button" id="refresh-health" aria-label="Обновить статус backend" title="Обновить статус backend">
+            &#8635;
+          </button>
+        </div>
+        <div class="daily-health-card">
+          ${renderHealthDetails(options.healthState, options.apiBaseUrl)}
+        </div>
+        <div class="module-grid compact" aria-label="Продуктовые модули">
+          ${renderModuleCards()}
+        </div>
+      </section>
     </section>
   `;
+}
+
+function renderHomeFocus(state: HomeState): string {
+  if (state.loading && state.todayTasks.length === 0 && state.overdueTasks.length === 0 && state.flaggedTasks.length === 0) {
+    return `<p class="empty-state">Собираю задачи дня...</p>`;
+  }
+
+  const tasks = uniqueHomeTasks([...state.overdueTasks, ...state.todayTasks, ...state.flaggedTasks]).slice(0, 6);
+  if (tasks.length === 0) {
+    return `
+      <div class="home-empty">
+        <strong>Нет срочных задач</strong>
+        <span>Daily Center будет показывать просроченные, сегодняшние и отмеченные задачи.</span>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="home-task-stack">
+      ${tasks.map((task) => renderHomeTaskPreview(task, state.projects)).join("")}
+    </div>
+    <div class="home-focus-strip" aria-label="Сводка задач">
+      ${renderHomeCount("Сегодня", state.todayTasks.length, "todo")}
+      ${renderHomeCount("Просрочено", state.overdueTasks.length, "danger")}
+      ${renderHomeCount("С флагом", state.flaggedTasks.length, "warning")}
+    </div>
+  `;
+}
+
+function renderHomeTaskPreview(task: TodoTask, projects: TodoProject[]): string {
+  const project = projects.find((item) => item.id === task.project_id);
+  const due = task.due_date ? taskDueLabel(task) : "Без срока";
+  return `
+    <article class="home-task-preview">
+      <span class="home-task-status ${task.status === "done" ? "done" : ""}" aria-hidden="true"></span>
+      <div>
+        <h3>${taskMarkers(task)}${escapeHTML(task.title)}</h3>
+        <p>${project ? `${escapeHTML(project.name)} · ` : ""}${escapeHTML(due)}</p>
+      </div>
+    </article>
+  `;
+}
+
+function renderHomeCount(label: string, value: number, tone: "todo" | "danger" | "warning"): string {
+  return `
+    <div class="home-count home-count-${tone}">
+      <strong>${value}</strong>
+      <span>${escapeHTML(label)}</span>
+    </div>
+  `;
+}
+
+function renderHomeFinanceSnapshot(state: HomeState): string {
+  if (state.loading && !state.expenses && !state.income) {
+    return `<p class="empty-state">Собираю финансовый срез...</p>`;
+  }
+
+  if (!state.expenses && !state.income) {
+    return `
+      <div class="home-empty">
+        <strong>Финансы ещё не загружены</strong>
+        <span>Срез появится после ответа Finance API.</span>
+      </div>
+    `;
+  }
+
+  const currency = state.income?.currency ?? state.expenses?.currency ?? "";
+  const currentMonth = new Date().getMonth() + 1;
+  const monthExpenses = state.expenses?.months.find((month) => month.month === currentMonth);
+  const monthIncome = state.income?.months.find((month) => month.month === currentMonth);
+  const investmentAmount = state.expenses?.annual_totals_by_category.investments ?? "0.00";
+
+  return `
+    <div class="home-money-ledger">
+      ${renderHomeMoneyMetric("Доход за год", state.income?.annual_total_amount ?? "0.00", currency, "positive")}
+      ${renderHomeMoneyMetric("Расходы", state.expenses?.annual_spending_total_amount ?? "0.00", currency, "neutral")}
+      ${renderHomeMoneyMetric("Инвестиции", investmentAmount, currency, "positive")}
+    </div>
+    <div class="home-month-row">
+      <span>${escapeHTML(monthLabel(currentMonth))}</span>
+      <strong>${escapeHTML(formatRussianMoneyAmount(monthIncome?.total_amount ?? "0.00"))}</strong>
+      <strong>${escapeHTML(formatRussianMoneyAmount(monthExpenses?.spending_total_amount ?? "0.00"))}</strong>
+    </div>
+  `;
+}
+
+function renderHomeMoneyMetric(label: string, value: string, currency: string, tone: "positive" | "neutral"): string {
+  return `
+    <article class="home-money-metric ${tone}">
+      <span>${escapeHTML(label)}</span>
+      <strong>${escapeHTML(formatRussianMoneyAmount(value))}${currency ? ` ${escapeHTML(currencyLabel(currency))}` : ""}</strong>
+    </article>
+  `;
+}
+
+function uniqueHomeTasks(tasks: TodoTask[]): TodoTask[] {
+  const seen = new Set<number>();
+  return tasks.filter((task) => {
+    if (seen.has(task.id)) {
+      return false;
+    }
+    seen.add(task.id);
+    return true;
+  });
 }
 
 function renderTodoPage(options: RenderOptions): string {
@@ -785,18 +953,21 @@ function isFinancePath(path: AppPath): boolean {
 
 function renderModuleCards(): string {
   return productModules
-    .map(
-      (module) => `
-        <article class="module-card">
+    .map((module) => {
+      const implemented = module.state === "реализовано";
+      const tag = implemented ? "a" : "article";
+      const routeAttrs = implemented ? `href="${module.path}" data-route="${module.path}"` : "";
+      return `
+        <${tag} class="module-card ${implemented ? "implemented" : "placeholder"}" ${routeAttrs}>
           <div class="module-card-header">
             <span class="module-swatch ${moduleAccentClass(module.path)}"></span>
             <h2>${escapeHTML(module.name)}</h2>
           </div>
           <p>${escapeHTML(module.summary)}</p>
-          <span class="module-state">${escapeHTML(module.state ?? "не реализовано")}</span>
-        </article>
-      `
-    )
+          <span class="module-state">${escapeHTML(module.state ?? "скоро")}</span>
+        </${tag}>
+      `;
+    })
     .join("");
 }
 
@@ -1710,6 +1881,7 @@ function bindShellEvents(root: HTMLElement, options: RenderOptions) {
   root.querySelectorAll("[data-toggle-sidebar]").forEach((button) => {
     button.addEventListener("click", options.onToggleSidebar);
   });
+  root.querySelector("#refresh-home")?.addEventListener("click", options.onRefreshHome);
   root.querySelector("#refresh-health")?.addEventListener("click", options.onRefreshHealth);
   root.querySelector("#logout")?.addEventListener("click", options.onLogout);
   root.querySelector<HTMLFormElement>("#email-login-form")?.addEventListener("submit", (event) => {

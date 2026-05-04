@@ -13,6 +13,7 @@ import type {
   FinanceExpenseCategoryPercents,
   FinanceState,
   HealthState,
+  HomeState,
   TodoScope,
   TodoState,
   TodoTaskPayload,
@@ -46,6 +47,17 @@ let financeState: FinanceState = {
     expense_limit_percents: {}
   }
 };
+let homeState: HomeState = {
+  loading: false,
+  year: new Date().getFullYear(),
+  settings: {
+    expense_limit_percents: {}
+  },
+  projects: [],
+  todayTasks: [],
+  overdueTasks: [],
+  flaggedTasks: []
+};
 let todoState: TodoState = {
   loading: false,
   saving: false,
@@ -67,6 +79,7 @@ function render() {
     sidebarCollapsed,
     authState,
     healthState,
+    homeState,
     financeState,
     todoState,
     onNavigate: navigate,
@@ -88,6 +101,9 @@ function render() {
     },
     onRefreshFinance: () => {
       void refreshFinance();
+    },
+    onRefreshHome: () => {
+      void refreshHome();
     },
     onChangeFinanceYear: (year) => {
       financeState = { ...financeState, year, formError: undefined };
@@ -284,6 +300,63 @@ async function refreshFinance() {
   render();
 }
 
+async function refreshHome() {
+  if (currentPath !== "/") {
+    return;
+  }
+  if (authState.kind !== "authenticated") {
+    homeState = {
+      ...homeState,
+      loading: false,
+      projects: [],
+      todayTasks: [],
+      overdueTasks: [],
+      flaggedTasks: [],
+      expenses: undefined,
+      income: undefined
+    };
+    render();
+    return;
+  }
+
+  homeState = { ...homeState, loading: true, error: undefined };
+  render();
+
+  try {
+    const [projects, todayTasks, overdueTasks, flaggedTasks, settings, expenses, income] = await Promise.all([
+      todoApi.listProjects({ include_archived: true }),
+      todoApi.listTasks({ view: "today", status: "todo", sort: "smart", direction: "asc" }),
+      todoApi.listTasks({ view: "overdue", status: "todo", sort: "due", direction: "asc" }),
+      todoApi.listTasks({ view: "flagged", status: "todo", sort: "priority", direction: "desc" }),
+      financeApi.getSettings(),
+      financeApi.listExpenses(homeState.year),
+      financeApi.listIncome(homeState.year)
+    ]);
+    homeState = {
+      ...homeState,
+      loading: false,
+      settings,
+      projects,
+      todayTasks,
+      overdueTasks,
+      flaggedTasks,
+      expenses,
+      income,
+      error: undefined
+    };
+  } catch (error) {
+    if (isUnauthorized(error)) {
+      authState = {
+        kind: "unauthenticated",
+        providers: authState.providers,
+        message: "Сессия истекла. Войдите снова."
+      };
+    }
+    homeState = { ...homeState, loading: false, error: errorMessage(error) };
+  }
+  render();
+}
+
 async function startEmailLogin(form: HTMLFormElement) {
   const formData = new FormData(form);
   const email = String(formData.get("email") ?? "");
@@ -308,6 +381,15 @@ async function startEmailLogin(form: HTMLFormElement) {
 async function logout() {
   await authApi.logout().catch(() => undefined);
   authState = { kind: "unauthenticated", providers: authState.providers };
+  homeState = {
+    ...homeState,
+    projects: [],
+    todayTasks: [],
+    overdueTasks: [],
+    flaggedTasks: [],
+    expenses: undefined,
+    income: undefined
+  };
   todoState = { ...todoState, projects: [], tasks: [], editingTaskId: undefined };
   financeState = { ...financeState, expenses: undefined, income: undefined };
   render();
@@ -566,6 +648,9 @@ function navigate(path: string) {
     currentPath = nextPath;
   }
   render();
+  if (currentPath === "/") {
+    void refreshHome();
+  }
   if (currentPath === "/todo") {
     void refreshTodo();
   }
@@ -577,6 +662,9 @@ function navigate(path: string) {
 window.addEventListener("popstate", () => {
   currentPath = routeFromPath(window.location.pathname);
   render();
+  if (currentPath === "/") {
+    void refreshHome();
+  }
   if (currentPath === "/todo") {
     void refreshTodo();
   }
@@ -783,6 +871,9 @@ function authMessageFromLocation(): string | undefined {
 render();
 void refreshHealth();
 void refreshAuth().then(() => {
+  if (currentPath === "/") {
+    void refreshHome();
+  }
   if (currentPath === "/todo") {
     void refreshTodo();
   }
