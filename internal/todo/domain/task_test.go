@@ -126,6 +126,55 @@ func TestTaskScheduleValidationAndRepeatNextDate(t *testing.T) {
 	}
 }
 
+func TestTaskRepeatNextDateWeekdaysAndWeekends(t *testing.T) {
+	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+	friday := time.Date(2026, 4, 24, 0, 0, 0, 0, time.UTC)
+	sunday := time.Date(2026, 4, 26, 0, 0, 0, 0, time.UTC)
+
+	weekdayTask, err := NewTask(NewTaskInput{
+		Title:           "Workday habit",
+		DueDate:         &friday,
+		RepeatFrequency: RepeatFrequencyWeekdays,
+	}, now)
+	if err != nil {
+		t.Fatalf("NewTask(weekdays) error = %v", err)
+	}
+	if next := weekdayTask.NextRepeatDate(); next == nil || !next.Equal(time.Date(2026, 4, 27, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("weekday next = %v, want Monday 2026-04-27", next)
+	}
+
+	weekendTask, err := NewTask(NewTaskInput{
+		Title:           "Weekend habit",
+		DueDate:         &sunday,
+		RepeatFrequency: RepeatFrequencyWeekends,
+	}, now)
+	if err != nil {
+		t.Fatalf("NewTask(weekends) error = %v", err)
+	}
+	if next := weekendTask.NextRepeatDate(); next == nil || !next.Equal(time.Date(2026, 5, 2, 0, 0, 0, 0, time.UTC)) {
+		t.Fatalf("weekend next = %v, want Saturday 2026-05-02", next)
+	}
+}
+
+func TestTaskParentValidation(t *testing.T) {
+	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+	parentID := int64(42)
+
+	task, err := NewTask(NewTaskInput{ParentTaskID: &parentID, Title: "Subtask"}, now)
+	if err != nil {
+		t.Fatalf("NewTask(parent) error = %v", err)
+	}
+	if task.ParentTaskID == nil || *task.ParentTaskID != parentID {
+		t.Fatalf("ParentTaskID = %v, want %d", task.ParentTaskID, parentID)
+	}
+
+	zero := int64(0)
+	_, err = NewTask(NewTaskInput{ParentTaskID: &zero, Title: "Subtask"}, now)
+	if !errors.Is(err, ErrInvalidTaskParent) {
+		t.Fatalf("NewTask(zero parent) error = %v, want ErrInvalidTaskParent", err)
+	}
+}
+
 func TestTaskScheduleValidationRejectsInvalidCombinations(t *testing.T) {
 	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
 	dueTime := "10:00"

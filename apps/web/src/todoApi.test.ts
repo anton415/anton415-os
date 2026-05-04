@@ -119,6 +119,7 @@ describe("TodoApi", () => {
 
     const promise = api.createTask({
       project_id: null,
+      parent_task_id: null,
       title: "",
       notes: null,
       url: null,

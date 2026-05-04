@@ -28,16 +28,18 @@ func (status TaskStatus) Valid() bool {
 type RepeatFrequency string
 
 const (
-	RepeatFrequencyNone    RepeatFrequency = "none"
-	RepeatFrequencyDaily   RepeatFrequency = "daily"
-	RepeatFrequencyWeekly  RepeatFrequency = "weekly"
-	RepeatFrequencyMonthly RepeatFrequency = "monthly"
-	RepeatFrequencyYearly  RepeatFrequency = "yearly"
+	RepeatFrequencyNone     RepeatFrequency = "none"
+	RepeatFrequencyDaily    RepeatFrequency = "daily"
+	RepeatFrequencyWeekdays RepeatFrequency = "weekdays"
+	RepeatFrequencyWeekends RepeatFrequency = "weekends"
+	RepeatFrequencyWeekly   RepeatFrequency = "weekly"
+	RepeatFrequencyMonthly  RepeatFrequency = "monthly"
+	RepeatFrequencyYearly   RepeatFrequency = "yearly"
 )
 
 func (frequency RepeatFrequency) Valid() bool {
 	switch frequency {
-	case "", RepeatFrequencyNone, RepeatFrequencyDaily, RepeatFrequencyWeekly, RepeatFrequencyMonthly, RepeatFrequencyYearly:
+	case "", RepeatFrequencyNone, RepeatFrequencyDaily, RepeatFrequencyWeekdays, RepeatFrequencyWeekends, RepeatFrequencyWeekly, RepeatFrequencyMonthly, RepeatFrequencyYearly:
 		return true
 	default:
 		return false
@@ -69,6 +71,7 @@ func (priority TaskPriority) Valid() bool {
 type Task struct {
 	ID              int64
 	ProjectID       *int64
+	ParentTaskID    *int64
 	Title           string
 	Notes           *string
 	URL             *string
@@ -87,6 +90,7 @@ type Task struct {
 
 type NewTaskInput struct {
 	ProjectID       *int64
+	ParentTaskID    *int64
 	Title           string
 	Notes           *string
 	URL             *string
@@ -120,6 +124,9 @@ func NewTask(input NewTaskInput, now time.Time) (Task, error) {
 	if !priority.Valid() {
 		return Task{}, ErrInvalidTaskPriority
 	}
+	if !validOptionalID(input.ParentTaskID) {
+		return Task{}, ErrInvalidTaskParent
+	}
 
 	taskURL, err := NormalizeOptionalURL(input.URL)
 	if err != nil {
@@ -142,6 +149,7 @@ func NewTask(input NewTaskInput, now time.Time) (Task, error) {
 
 	task := Task{
 		ProjectID:       input.ProjectID,
+		ParentTaskID:    input.ParentTaskID,
 		Title:           title,
 		Notes:           NormalizeOptionalText(input.Notes),
 		URL:             taskURL,
@@ -196,6 +204,15 @@ func (task *Task) SetURL(taskURL *string, now time.Time) error {
 func (task *Task) SetProject(projectID *int64, now time.Time) {
 	task.ProjectID = projectID
 	task.UpdatedAt = now
+}
+
+func (task *Task) SetParentTask(parentTaskID *int64, now time.Time) error {
+	if !validOptionalID(parentTaskID) {
+		return ErrInvalidTaskParent
+	}
+	task.ParentTaskID = parentTaskID
+	task.UpdatedAt = now
+	return nil
 }
 
 func (task *Task) SetDueDate(dueDate *time.Time, now time.Time) {
@@ -303,6 +320,10 @@ func (task Task) NextRepeatDate() *time.Time {
 	switch task.RepeatFrequency {
 	case RepeatFrequencyDaily:
 		next = task.DueDate.AddDate(0, 0, interval)
+	case RepeatFrequencyWeekdays:
+		next = nextMatchingWeekday(*task.DueDate, interval)
+	case RepeatFrequencyWeekends:
+		next = nextMatchingWeekend(*task.DueDate, interval)
 	case RepeatFrequencyWeekly:
 		next = task.DueDate.AddDate(0, 0, 7*interval)
 	case RepeatFrequencyMonthly:
@@ -318,6 +339,37 @@ func (task Task) NextRepeatDate() *time.Time {
 		return nil
 	}
 	return &next
+}
+
+func nextMatchingWeekday(start time.Time, interval int) time.Time {
+	return nextMatchingDay(start, interval, func(candidate time.Time) bool {
+		weekday := candidate.Weekday()
+		return weekday >= time.Monday && weekday <= time.Friday
+	})
+}
+
+func nextMatchingWeekend(start time.Time, interval int) time.Time {
+	return nextMatchingDay(start, interval, func(candidate time.Time) bool {
+		weekday := candidate.Weekday()
+		return weekday == time.Saturday || weekday == time.Sunday
+	})
+}
+
+func nextMatchingDay(start time.Time, interval int, matches func(time.Time) bool) time.Time {
+	if interval <= 0 {
+		interval = 1
+	}
+
+	matchesLeft := interval
+	for candidate := start.AddDate(0, 0, 1); ; candidate = candidate.AddDate(0, 0, 1) {
+		if !matches(candidate) {
+			continue
+		}
+		matchesLeft--
+		if matchesLeft == 0 {
+			return candidate
+		}
+	}
 }
 
 func (task Task) ValidateSchedule() error {

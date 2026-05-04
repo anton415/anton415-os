@@ -635,6 +635,7 @@ function taskQuery(state: TodoState): TodoTaskQuery {
 
 function taskPayload(formData: FormData): TodoTaskPayload {
   const projectID = optionalNumber(formData.get("project_id"));
+  const parentTaskID = optionalNumber(formData.get("parent_task_id"));
   const dueDate = optionalString(formData.get("due_date"));
   const dueTime = optionalString(formData.get("due_time"));
   const notes = optionalString(formData.get("notes"));
@@ -645,6 +646,7 @@ function taskPayload(formData: FormData): TodoTaskPayload {
 
   return {
     project_id: projectID ?? null,
+    parent_task_id: parentTaskID ?? null,
     title: String(formData.get("title") ?? ""),
     notes,
     url: taskURL,
@@ -660,6 +662,7 @@ function taskPayload(formData: FormData): TodoTaskPayload {
 
 function projectPayload(formData: FormData) {
   return {
+    parent_project_id: optionalNumber(formData.get("parent_project_id")) ?? null,
     name: String(formData.get("name") ?? ""),
     start_date: optionalString(formData.get("start_date")),
     end_date: optionalString(formData.get("end_date"))
@@ -731,6 +734,8 @@ function optionalNumber(value: FormDataEntryValue | null): number | undefined {
 function repeatFrequencyValue(value: FormDataEntryValue | null): TodoTaskPayload["repeat_frequency"] {
   switch (String(value ?? "none")) {
     case "daily":
+    case "weekdays":
+    case "weekends":
     case "weekly":
     case "monthly":
     case "yearly":

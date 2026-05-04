@@ -57,9 +57,10 @@ func NewService(deps Dependencies) *Service {
 }
 
 type CreateProjectInput struct {
-	Name      string
-	StartDate *time.Time
-	EndDate   *time.Time
+	ParentProjectID *int64
+	Name            string
+	StartDate       *time.Time
+	EndDate         *time.Time
 }
 
 type ListProjectsInput struct {
@@ -73,9 +74,10 @@ type ProjectListFilter struct {
 }
 
 type UpdateProjectInput struct {
-	Name      string
-	StartDate *time.Time
-	EndDate   *time.Time
+	ParentProjectID *int64
+	Name            string
+	StartDate       *time.Time
+	EndDate         *time.Time
 }
 
 func (service *Service) ListProjects(ctx context.Context, input ListProjectsInput) ([]domain.Project, error) {
@@ -86,7 +88,11 @@ func (service *Service) ListProjects(ctx context.Context, input ListProjectsInpu
 }
 
 func (service *Service) CreateProject(ctx context.Context, input CreateProjectInput) (domain.Project, error) {
-	project, err := domain.NewProject(input.Name, input.StartDate, input.EndDate, service.now())
+	if err := service.ensureProjectParent(ctx, 0, input.ParentProjectID); err != nil {
+		return domain.Project{}, err
+	}
+
+	project, err := domain.NewProject(input.ParentProjectID, input.Name, input.StartDate, input.EndDate, service.now())
 	if err != nil {
 		return domain.Project{}, err
 	}
@@ -99,7 +105,11 @@ func (service *Service) UpdateProject(ctx context.Context, id int64, input Updat
 		return domain.Project{}, err
 	}
 
-	project, err = domain.UpdateProject(project, input.Name, input.StartDate, input.EndDate, service.now())
+	if err := service.ensureProjectParent(ctx, id, input.ParentProjectID); err != nil {
+		return domain.Project{}, err
+	}
+
+	project, err = domain.UpdateProject(project, input.ParentProjectID, input.Name, input.StartDate, input.EndDate, service.now())
 	if err != nil {
 		return domain.Project{}, err
 	}
@@ -129,6 +139,7 @@ func (service *Service) DeleteProject(ctx context.Context, id int64) error {
 
 type CreateTaskInput struct {
 	ProjectID       *int64
+	ParentTaskID    *int64
 	Title           string
 	Notes           *string
 	URL             *string
@@ -184,6 +195,7 @@ type OptionalTaskPriority struct {
 
 type UpdateTaskInput struct {
 	ProjectID       OptionalInt64
+	ParentTaskID    OptionalInt64
 	Title           OptionalString
 	Notes           OptionalString
 	URL             OptionalString
@@ -209,9 +221,13 @@ func (service *Service) CreateTask(ctx context.Context, input CreateTaskInput) (
 	if err := service.ensureProjectExists(ctx, input.ProjectID); err != nil {
 		return domain.Task{}, err
 	}
+	if err := service.ensureTaskParent(ctx, 0, input.ParentTaskID); err != nil {
+		return domain.Task{}, err
+	}
 
 	task, err := domain.NewTask(domain.NewTaskInput{
 		ProjectID:       input.ProjectID,
+		ParentTaskID:    input.ParentTaskID,
 		Title:           input.Title,
 		Notes:           input.Notes,
 		URL:             input.URL,
@@ -243,6 +259,14 @@ func (service *Service) UpdateTask(ctx context.Context, id int64, input UpdateTa
 			return domain.Task{}, err
 		}
 		task.SetProject(input.ProjectID.Value, now)
+	}
+	if input.ParentTaskID.Set {
+		if err := service.ensureTaskParent(ctx, id, input.ParentTaskID.Value); err != nil {
+			return domain.Task{}, err
+		}
+		if err := task.SetParentTask(input.ParentTaskID.Value, now); err != nil {
+			return domain.Task{}, err
+		}
 	}
 	if input.Title.Set {
 		if input.Title.Value == nil {
@@ -323,6 +347,70 @@ func (service *Service) ensureProjectExists(ctx context.Context, projectID *int6
 
 	_, err := service.projects.GetProject(ctx, *projectID)
 	return err
+}
+
+func (service *Service) ensureProjectParent(ctx context.Context, projectID int64, parentProjectID *int64) error {
+	if parentProjectID == nil {
+		return nil
+	}
+	if *parentProjectID <= 0 {
+		return ErrInvalidHierarchy
+	}
+	if projectID > 0 && *parentProjectID == projectID {
+		return ErrInvalidHierarchy
+	}
+
+	parent, err := service.projects.GetProject(ctx, *parentProjectID)
+	if err != nil {
+		return err
+	}
+	visited := map[int64]bool{parent.ID: true}
+	for parent.ParentProjectID != nil {
+		if projectID > 0 && *parent.ParentProjectID == projectID {
+			return ErrInvalidHierarchy
+		}
+		if visited[*parent.ParentProjectID] {
+			return ErrInvalidHierarchy
+		}
+		parent, err = service.projects.GetProject(ctx, *parent.ParentProjectID)
+		if err != nil {
+			return err
+		}
+		visited[parent.ID] = true
+	}
+	return nil
+}
+
+func (service *Service) ensureTaskParent(ctx context.Context, taskID int64, parentTaskID *int64) error {
+	if parentTaskID == nil {
+		return nil
+	}
+	if *parentTaskID <= 0 {
+		return ErrInvalidHierarchy
+	}
+	if taskID > 0 && *parentTaskID == taskID {
+		return ErrInvalidHierarchy
+	}
+
+	parent, err := service.tasks.GetTask(ctx, *parentTaskID)
+	if err != nil {
+		return err
+	}
+	visited := map[int64]bool{parent.ID: true}
+	for parent.ParentTaskID != nil {
+		if taskID > 0 && *parent.ParentTaskID == taskID {
+			return ErrInvalidHierarchy
+		}
+		if visited[*parent.ParentTaskID] {
+			return ErrInvalidHierarchy
+		}
+		parent, err = service.tasks.GetTask(ctx, *parent.ParentTaskID)
+		if err != nil {
+			return err
+		}
+		visited[parent.ID] = true
+	}
+	return nil
 }
 
 func (service *Service) taskListFilter(input ListTasksInput) (TaskListFilter, error) {

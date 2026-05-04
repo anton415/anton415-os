@@ -146,6 +146,45 @@ func TestTaskListAllCompletedAndProjectFilters(t *testing.T) {
 	}
 }
 
+func TestTodoHierarchyFields(t *testing.T) {
+	router := newTestRouter()
+
+	parentProjectResponse := performRequest(router, http.MethodPost, "/projects", `{"name":"Parent"}`)
+	if parentProjectResponse.Code != http.StatusCreated {
+		t.Fatalf("create parent project status = %d, want %d", parentProjectResponse.Code, http.StatusCreated)
+	}
+	parentProject := decodeData[projectResponse](t, parentProjectResponse)
+
+	childProjectResponse := performRequest(router, http.MethodPost, "/projects", fmt.Sprintf(`{"name":"Child","parent_project_id":%d}`, parentProject.ID))
+	if childProjectResponse.Code != http.StatusCreated {
+		t.Fatalf("create child project status = %d, want %d; body=%s", childProjectResponse.Code, http.StatusCreated, childProjectResponse.Body.String())
+	}
+	childProject := decodeData[projectResponse](t, childProjectResponse)
+	if childProject.ParentProjectID == nil || *childProject.ParentProjectID != parentProject.ID {
+		t.Fatalf("child project parent = %v, want %d", childProject.ParentProjectID, parentProject.ID)
+	}
+
+	parentTaskResponse := performRequest(router, http.MethodPost, "/tasks", `{"title":"Parent task"}`)
+	if parentTaskResponse.Code != http.StatusCreated {
+		t.Fatalf("create parent task status = %d, want %d", parentTaskResponse.Code, http.StatusCreated)
+	}
+	parentTask := decodeData[taskResponse](t, parentTaskResponse)
+
+	childTaskResponse := performRequest(router, http.MethodPost, "/tasks", fmt.Sprintf(`{"title":"Child task","parent_task_id":%d}`, parentTask.ID))
+	if childTaskResponse.Code != http.StatusCreated {
+		t.Fatalf("create child task status = %d, want %d; body=%s", childTaskResponse.Code, http.StatusCreated, childTaskResponse.Body.String())
+	}
+	childTask := decodeData[taskResponse](t, childTaskResponse)
+	if childTask.ParentTaskID == nil || *childTask.ParentTaskID != parentTask.ID {
+		t.Fatalf("child task parent = %v, want %d", childTask.ParentTaskID, parentTask.ID)
+	}
+
+	cycleResponse := performRequest(router, http.MethodPatch, fmt.Sprintf("/tasks/%d", parentTask.ID), fmt.Sprintf(`{"parent_task_id":%d}`, childTask.ID))
+	if cycleResponse.Code != http.StatusBadRequest {
+		t.Fatalf("cycle status = %d, want %d; body=%s", cycleResponse.Code, http.StatusBadRequest, cycleResponse.Body.String())
+	}
+}
+
 func TestTaskUpdateClearsNullableFieldsAndRejectsBadInput(t *testing.T) {
 	router := newTestRouter()
 
@@ -201,6 +240,7 @@ func TestTaskUpdateClearsNullableFieldsAndRejectsBadInput(t *testing.T) {
 		"invalid repeat":     `{"repeat_frequency":"daily","repeat_interval":0}`,
 		"invalid status":     `{"status":"blocked"}`,
 		"invalid project id": `{"project_id":0}`,
+		"invalid parent id":  `{"parent_task_id":0}`,
 		"invalid url":        `{"url":"javascript:alert(1)"}`,
 	}
 	for label, body := range invalidRequests {
@@ -448,6 +488,12 @@ func (store *memoryStore) DeleteProject(_ context.Context, id int64) error {
 	if _, ok := store.projects[id]; !ok {
 		return application.ErrNotFound
 	}
+	for projectID, project := range store.projects {
+		if project.ParentProjectID != nil && *project.ParentProjectID == id {
+			project.ParentProjectID = nil
+			store.projects[projectID] = project
+		}
+	}
 	for taskID, task := range store.tasks {
 		if task.ProjectID != nil && *task.ProjectID == id {
 			delete(store.tasks, taskID)
@@ -506,6 +552,12 @@ func (store *memoryStore) UpdateTask(_ context.Context, task domain.Task) (domai
 func (store *memoryStore) DeleteTask(_ context.Context, id int64) error {
 	if _, ok := store.tasks[id]; !ok {
 		return application.ErrNotFound
+	}
+	for taskID, task := range store.tasks {
+		if task.ParentTaskID != nil && *task.ParentTaskID == id {
+			task.ParentTaskID = nil
+			store.tasks[taskID] = task
+		}
 	}
 	delete(store.tasks, id)
 	return nil

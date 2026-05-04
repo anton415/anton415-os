@@ -53,7 +53,7 @@ func (repo *Repository) ListProjects(ctx context.Context, filter application.Pro
 
 func (repo *Repository) GetProject(ctx context.Context, id int64) (domain.Project, error) {
 	project, err := scanProject(repo.pool.QueryRow(ctx, `
-		SELECT id, name, start_date, end_date, archived, created_at, updated_at
+		SELECT id, parent_project_id, name, start_date, end_date, archived, created_at, updated_at
 		FROM todo_projects
 		WHERE id = $1
 	`, id))
@@ -68,10 +68,13 @@ func (repo *Repository) GetProject(ctx context.Context, id int64) (domain.Projec
 
 func (repo *Repository) CreateProject(ctx context.Context, project domain.Project) (domain.Project, error) {
 	created, err := scanProject(repo.pool.QueryRow(ctx, `
-		INSERT INTO todo_projects (name, start_date, end_date, archived, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING id, name, start_date, end_date, archived, created_at, updated_at
-	`, project.Name, nullableDate(project.StartDate), nullableDate(project.EndDate), project.Archived, project.CreatedAt, project.UpdatedAt))
+		INSERT INTO todo_projects (parent_project_id, name, start_date, end_date, archived, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, parent_project_id, name, start_date, end_date, archived, created_at, updated_at
+	`, nullableInt64(project.ParentProjectID), project.Name, nullableDate(project.StartDate), nullableDate(project.EndDate), project.Archived, project.CreatedAt, project.UpdatedAt))
+	if isPostgresCode(err, foreignKeyViolation) {
+		return domain.Project{}, application.ErrNotFound
+	}
 	if err != nil {
 		return domain.Project{}, fmt.Errorf("create todo project: %w", err)
 	}
@@ -81,14 +84,18 @@ func (repo *Repository) CreateProject(ctx context.Context, project domain.Projec
 func (repo *Repository) UpdateProject(ctx context.Context, project domain.Project) (domain.Project, error) {
 	updated, err := scanProject(repo.pool.QueryRow(ctx, `
 		UPDATE todo_projects
-		SET name = $2,
-		    start_date = $3,
-		    end_date = $4,
-		    archived = $5,
-		    updated_at = $6
+		SET parent_project_id = $2,
+		    name = $3,
+		    start_date = $4,
+		    end_date = $5,
+		    archived = $6,
+		    updated_at = $7
 		WHERE id = $1
-		RETURNING id, name, start_date, end_date, archived, created_at, updated_at
-	`, project.ID, project.Name, nullableDate(project.StartDate), nullableDate(project.EndDate), project.Archived, project.UpdatedAt))
+		RETURNING id, parent_project_id, name, start_date, end_date, archived, created_at, updated_at
+	`, project.ID, nullableInt64(project.ParentProjectID), project.Name, nullableDate(project.StartDate), nullableDate(project.EndDate), project.Archived, project.UpdatedAt))
+	if isPostgresCode(err, foreignKeyViolation) {
+		return domain.Project{}, application.ErrNotFound
+	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Project{}, application.ErrNotFound
 	}
@@ -155,7 +162,7 @@ func (repo *Repository) ListTasks(ctx context.Context, filter application.TaskLi
 
 func (repo *Repository) GetTask(ctx context.Context, id int64) (domain.Task, error) {
 	task, err := scanTask(repo.pool.QueryRow(ctx, `
-		SELECT id, project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+		SELECT id, project_id, parent_task_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 		FROM todo_tasks
 		WHERE id = $1
 	`, id))
@@ -171,12 +178,13 @@ func (repo *Repository) GetTask(ctx context.Context, id int64) (domain.Task, err
 func (repo *Repository) CreateTask(ctx context.Context, task domain.Task) (domain.Task, error) {
 	created, err := scanTask(repo.pool.QueryRow(ctx, `
 		INSERT INTO todo_tasks (
-			project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+			project_id, parent_task_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-		RETURNING id, project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		RETURNING id, project_id, parent_task_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 	`,
 		nullableInt64(task.ProjectID),
+		nullableInt64(task.ParentTaskID),
 		task.Title,
 		nullableString(task.Notes),
 		nullableString(task.URL),
@@ -205,24 +213,26 @@ func (repo *Repository) UpdateTask(ctx context.Context, task domain.Task) (domai
 	updated, err := scanTask(repo.pool.QueryRow(ctx, `
 		UPDATE todo_tasks
 		SET project_id = $2,
-		    title = $3,
-		    notes = $4,
-		    url = $5,
-		    status = $6,
-		    due_date = $7,
-		    due_time = $8,
-		    repeat_frequency = $9,
-		    repeat_interval = $10,
-		    repeat_until = $11,
-		    flagged = $12,
-		    priority = $13,
-		    updated_at = $14,
-		    completed_at = $15
+		    parent_task_id = $3,
+		    title = $4,
+		    notes = $5,
+		    url = $6,
+		    status = $7,
+		    due_date = $8,
+		    due_time = $9,
+		    repeat_frequency = $10,
+		    repeat_interval = $11,
+		    repeat_until = $12,
+		    flagged = $13,
+		    priority = $14,
+		    updated_at = $15,
+		    completed_at = $16
 		WHERE id = $1
-		RETURNING id, project_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
+		RETURNING id, project_id, parent_task_id, title, notes, url, status, due_date, due_time, repeat_frequency, repeat_interval, repeat_until, flagged, priority, created_at, updated_at, completed_at
 	`,
 		task.ID,
 		nullableInt64(task.ProjectID),
+		nullableInt64(task.ParentTaskID),
 		task.Title,
 		nullableString(task.Notes),
 		nullableString(task.URL),
@@ -266,7 +276,7 @@ func (repo *Repository) DeleteTask(ctx context.Context, id int64) error {
 func listProjectsQuery(filter application.ProjectListFilter) (string, []any) {
 	query := strings.Builder{}
 	query.WriteString(`
-		SELECT id, name, start_date, end_date, archived, created_at, updated_at
+		SELECT id, parent_project_id, name, start_date, end_date, archived, created_at, updated_at
 		FROM todo_projects
 	`)
 
@@ -292,7 +302,7 @@ func listProjectsQuery(filter application.ProjectListFilter) (string, []any) {
 func listTasksQuery(filter application.TaskListFilter) (string, []any) {
 	query := strings.Builder{}
 	query.WriteString(`
-		SELECT t.id, t.project_id, t.title, t.notes, t.url, t.status, t.due_date, t.due_time, t.repeat_frequency, t.repeat_interval, t.repeat_until, t.flagged, t.priority, t.created_at, t.updated_at, t.completed_at
+		SELECT t.id, t.project_id, t.parent_task_id, t.title, t.notes, t.url, t.status, t.due_date, t.due_time, t.repeat_frequency, t.repeat_interval, t.repeat_until, t.flagged, t.priority, t.created_at, t.updated_at, t.completed_at
 		FROM todo_tasks t
 		LEFT JOIN todo_projects p ON p.id = t.project_id
 	`)
@@ -388,13 +398,15 @@ type rowScanner interface {
 
 func scanProject(row rowScanner) (domain.Project, error) {
 	var (
-		project   domain.Project
-		startDate pgtype.Date
-		endDate   pgtype.Date
+		project         domain.Project
+		parentProjectID pgtype.Int8
+		startDate       pgtype.Date
+		endDate         pgtype.Date
 	)
-	if err := row.Scan(&project.ID, &project.Name, &startDate, &endDate, &project.Archived, &project.CreatedAt, &project.UpdatedAt); err != nil {
+	if err := row.Scan(&project.ID, &parentProjectID, &project.Name, &startDate, &endDate, &project.Archived, &project.CreatedAt, &project.UpdatedAt); err != nil {
 		return domain.Project{}, err
 	}
+	project.ParentProjectID = int64Ptr(parentProjectID)
 	project.StartDate = datePtr(startDate)
 	project.EndDate = datePtr(endDate)
 	return project, nil
@@ -402,22 +414,24 @@ func scanProject(row rowScanner) (domain.Project, error) {
 
 func scanTask(row rowScanner) (domain.Task, error) {
 	var (
-		task        domain.Task
-		projectID   pgtype.Int8
-		notes       pgtype.Text
-		taskURL     pgtype.Text
-		status      string
-		dueDate     pgtype.Date
-		dueTime     pgtype.Time
-		repeat      string
-		repeatUntil pgtype.Date
-		priority    string
-		completedAt pgtype.Timestamptz
+		task         domain.Task
+		projectID    pgtype.Int8
+		parentTaskID pgtype.Int8
+		notes        pgtype.Text
+		taskURL      pgtype.Text
+		status       string
+		dueDate      pgtype.Date
+		dueTime      pgtype.Time
+		repeat       string
+		repeatUntil  pgtype.Date
+		priority     string
+		completedAt  pgtype.Timestamptz
 	)
 
 	if err := row.Scan(
 		&task.ID,
 		&projectID,
+		&parentTaskID,
 		&task.Title,
 		&notes,
 		&taskURL,
@@ -450,6 +464,7 @@ func scanTask(row rowScanner) (domain.Task, error) {
 	}
 
 	task.ProjectID = int64Ptr(projectID)
+	task.ParentTaskID = int64Ptr(parentTaskID)
 	task.Notes = stringPtr(notes)
 	task.URL = stringPtr(taskURL)
 	task.Status = taskStatus
