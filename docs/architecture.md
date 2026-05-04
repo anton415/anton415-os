@@ -93,7 +93,7 @@ Todo v1 is implemented under `internal/todo` with separate domain, application, 
 - Domain rules validate names and titles, own task statuses, and set or clear `completed_at` during status transitions.
 - Application use cases own project/task CRUD and list filter semantics.
 - HTTP and PostgreSQL adapters translate transport/database details without owning business rules.
-- Project deletion is restricted while tasks still reference the project.
+- Project archival hides a project from active workflows without changing its tasks; project deletion removes the selected project and its tasks together.
 - Todo v1 treats the API server's local timezone as the source for `today` and `upcoming` views.
 
 ## Finance v1 boundary

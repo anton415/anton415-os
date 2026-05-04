@@ -6,6 +6,8 @@ All notable changes to anton415 Hub are summarized here. Releases follow the sha
 
 ### Todo
 
+- Added project archive/restore flows with archived projects hidden from active project and task lists by default.
+- Added irreversible project deletion that removes the selected project's tasks while preserving project-less tasks.
 - Added an optional URL field for tasks across the API, persistence layer, and Todo UI.
 - Added safe external task links and kept long URLs constrained in task rows.
 

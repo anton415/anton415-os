@@ -8,7 +8,7 @@ import (
 )
 
 type ProjectRepository interface {
-	ListProjects(ctx context.Context) ([]domain.Project, error)
+	ListProjects(ctx context.Context, filter ProjectListFilter) ([]domain.Project, error)
 	GetProject(ctx context.Context, id int64) (domain.Project, error)
 	CreateProject(ctx context.Context, project domain.Project) (domain.Project, error)
 	UpdateProject(ctx context.Context, project domain.Project) (domain.Project, error)
@@ -62,14 +62,27 @@ type CreateProjectInput struct {
 	EndDate   *time.Time
 }
 
+type ListProjectsInput struct {
+	IncludeArchived bool
+	Archived        *bool
+}
+
+type ProjectListFilter struct {
+	IncludeArchived bool
+	Archived        *bool
+}
+
 type UpdateProjectInput struct {
 	Name      string
 	StartDate *time.Time
 	EndDate   *time.Time
 }
 
-func (service *Service) ListProjects(ctx context.Context) ([]domain.Project, error) {
-	return service.projects.ListProjects(ctx)
+func (service *Service) ListProjects(ctx context.Context, input ListProjectsInput) ([]domain.Project, error) {
+	return service.projects.ListProjects(ctx, ProjectListFilter{
+		IncludeArchived: input.IncludeArchived,
+		Archived:        input.Archived,
+	})
 }
 
 func (service *Service) CreateProject(ctx context.Context, input CreateProjectInput) (domain.Project, error) {
@@ -92,6 +105,22 @@ func (service *Service) UpdateProject(ctx context.Context, id int64, input Updat
 	}
 
 	return service.projects.UpdateProject(ctx, project)
+}
+
+func (service *Service) ArchiveProject(ctx context.Context, id int64) (domain.Project, error) {
+	project, err := service.projects.GetProject(ctx, id)
+	if err != nil {
+		return domain.Project{}, err
+	}
+	return service.projects.UpdateProject(ctx, domain.ArchiveProject(project, service.now()))
+}
+
+func (service *Service) RestoreProject(ctx context.Context, id int64) (domain.Project, error) {
+	project, err := service.projects.GetProject(ctx, id)
+	if err != nil {
+		return domain.Project{}, err
+	}
+	return service.projects.UpdateProject(ctx, domain.RestoreProject(project, service.now()))
 }
 
 func (service *Service) DeleteProject(ctx context.Context, id int64) error {

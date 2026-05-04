@@ -13,8 +13,8 @@ import (
 func TestListTasksQueryAllTasksUsesStableSort(t *testing.T) {
 	query, args := listTasksQuery(application.TaskListFilter{})
 
-	if strings.Contains(query, " WHERE ") {
-		t.Fatalf("query = %q, did not expect WHERE for all tasks", query)
+	if !strings.Contains(query, "(project_id IS NULL OR p.archived = false)") {
+		t.Fatalf("query = %q, expected archived project tasks to be hidden", query)
 	}
 	if !strings.Contains(query, "CASE WHEN status = 'done' THEN 1 ELSE 0 END") {
 		t.Fatalf("query = %q, expected done tasks to sort last", query)
@@ -27,6 +27,33 @@ func TestListTasksQueryAllTasksUsesStableSort(t *testing.T) {
 	}
 	if len(args) != 0 {
 		t.Fatalf("args = %v, want none", args)
+	}
+}
+
+func TestListProjectsQueryDefaultAndArchivedFilters(t *testing.T) {
+	activeQuery, activeArgs := listProjectsQuery(application.ProjectListFilter{})
+	if !strings.Contains(activeQuery, "archived = false") {
+		t.Fatalf("active query = %q, expected active project filter", activeQuery)
+	}
+	if len(activeArgs) != 0 {
+		t.Fatalf("active args = %#v, want none", activeArgs)
+	}
+
+	allQuery, allArgs := listProjectsQuery(application.ProjectListFilter{IncludeArchived: true})
+	if strings.Contains(allQuery, " WHERE ") {
+		t.Fatalf("all query = %q, did not expect archived filter", allQuery)
+	}
+	if len(allArgs) != 0 {
+		t.Fatalf("all args = %#v, want none", allArgs)
+	}
+
+	archived := true
+	archivedQuery, archivedArgs := listProjectsQuery(application.ProjectListFilter{Archived: &archived})
+	if !strings.Contains(archivedQuery, "archived = $1") {
+		t.Fatalf("archived query = %q, expected archived parameter filter", archivedQuery)
+	}
+	if !reflect.DeepEqual(archivedArgs, []any{true}) {
+		t.Fatalf("archived args = %#v, want true arg", archivedArgs)
 	}
 }
 

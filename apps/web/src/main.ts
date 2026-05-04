@@ -54,6 +54,7 @@ let todoState: TodoState = {
   scope: { kind: "view", view: "inbox" },
   todoPanelCollapsed: compactTodoPanelQuery.matches,
   searchPanelCollapsed: true,
+  showArchivedProjects: false,
   sort: "smart",
   direction: "asc",
   search: ""
@@ -118,6 +119,10 @@ function render() {
       todoState = { ...todoState, searchPanelCollapsed: !todoState.searchPanelCollapsed };
       render();
     },
+    onToggleArchivedProjects: () => {
+      todoState = { ...todoState, showArchivedProjects: !todoState.showArchivedProjects };
+      render();
+    },
     onSelectTodoScope: (scope) => {
       todoState = {
         ...todoState,
@@ -158,6 +163,12 @@ function render() {
     },
     onSaveProject: (form) => {
       void saveProject(form);
+    },
+    onArchiveProject: (projectId) => {
+      void archiveProject(projectId);
+    },
+    onRestoreProject: (projectId) => {
+      void restoreProject(projectId);
     },
     onDeleteProject: (projectId) => {
       void deleteProject(projectId);
@@ -209,7 +220,7 @@ async function refreshTodo() {
 
   try {
     const [projects, tasks] = await Promise.all([
-      todoApi.listProjects(),
+      todoApi.listProjects({ include_archived: true }),
       todoApi.listTasks(taskQuery(todoState))
     ]);
     todoState = { ...todoState, loading: false, projects, tasks, error: undefined };
@@ -385,7 +396,7 @@ async function saveProject(form: HTMLFormElement) {
 }
 
 async function deleteProject(projectId: number) {
-  if (!window.confirm("Удалить этот проект? Сначала перенесите или удалите его задачи.")) {
+  if (!window.confirm("Удалить этот проект и все его задачи? Это действие нельзя отменить.")) {
     return;
   }
 
@@ -394,10 +405,49 @@ async function deleteProject(projectId: number) {
   try {
     await todoApi.deleteProject(projectId);
     if (todoState.scope.kind === "project" && todoState.scope.projectId === projectId) {
-      todoState = { ...todoState, saving: false, scope: { kind: "view", view: "inbox" } };
+      todoState = { ...todoState, saving: false, editingProjectId: undefined, scope: { kind: "view", view: "inbox" } };
     } else {
-      todoState = { ...todoState, saving: false };
+      todoState = {
+        ...todoState,
+        saving: false,
+        editingProjectId: todoState.editingProjectId === projectId ? undefined : todoState.editingProjectId
+      };
     }
+    await refreshTodo();
+  } catch (error) {
+    todoState = { ...todoState, saving: false, error: errorMessage(error) };
+    render();
+  }
+}
+
+async function archiveProject(projectId: number) {
+  todoState = { ...todoState, saving: true, error: undefined };
+  render();
+  try {
+    await todoApi.archiveProject(projectId);
+    todoState = {
+      ...todoState,
+      saving: false,
+      editingProjectId: undefined,
+      showArchivedProjects: true
+    };
+    await refreshTodo();
+  } catch (error) {
+    todoState = { ...todoState, saving: false, error: errorMessage(error) };
+    render();
+  }
+}
+
+async function restoreProject(projectId: number) {
+  todoState = { ...todoState, saving: true, error: undefined };
+  render();
+  try {
+    await todoApi.restoreProject(projectId);
+    todoState = {
+      ...todoState,
+      saving: false,
+      editingProjectId: undefined
+    };
     await refreshTodo();
   } catch (error) {
     todoState = { ...todoState, saving: false, error: errorMessage(error) };

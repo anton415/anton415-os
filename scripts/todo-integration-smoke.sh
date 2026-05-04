@@ -46,8 +46,26 @@ SQL
 
 create_response="$(mktemp)"
 list_response="$(mktemp)"
+project_response="$(mktemp)"
+project_task_response="$(mktemp)"
+archive_response="$(mktemp)"
+restore_response="$(mktemp)"
+active_projects_response="$(mktemp)"
+archived_projects_response="$(mktemp)"
+project_tasks_response="$(mktemp)"
+all_tasks_response="$(mktemp)"
 cleanup() {
-  rm -f "${create_response}" "${list_response}"
+  rm -f \
+    "${create_response}" \
+    "${list_response}" \
+    "${project_response}" \
+    "${project_task_response}" \
+    "${archive_response}" \
+    "${restore_response}" \
+    "${active_projects_response}" \
+    "${archived_projects_response}" \
+    "${project_tasks_response}" \
+    "${all_tasks_response}"
 }
 trap cleanup EXIT
 
@@ -65,6 +83,79 @@ curl -fsS \
   "${API_BASE_URL}/api/v1/todo/tasks?view=inbox" > "${list_response}"
 
 node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(!body.data.some((task)=>task.id===Number(process.argv[1]) && task.url === 'https://example.com/integration-smoke')) process.exit(1)})" "${task_id}" < "${list_response}"
+
+curl -fsS \
+  -H "Content-Type: application/json" \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  -d '{"name":"Integration smoke project"}' \
+  "${API_BASE_URL}/api/v1/todo/projects" > "${project_response}"
+
+project_id="$(node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).data.id))" < "${project_response}")"
+
+curl -fsS \
+  -H "Content-Type: application/json" \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  -d "{\"title\":\"Integration smoke project task\",\"project_id\":${project_id},\"due_date\":null}" \
+  "${API_BASE_URL}/api/v1/todo/tasks" > "${project_task_response}"
+
+project_task_id="$(node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).data.id))" < "${project_task_response}")"
+
+curl -fsS \
+  -X PATCH \
+  -H "Content-Type: application/json" \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/projects/${project_id}/archive" > "${archive_response}"
+
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{if(JSON.parse(d).data.archived !== true) process.exit(1)})" < "${archive_response}"
+
+curl -fsS \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/projects" > "${active_projects_response}"
+
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(body.data.some((project)=>project.id===Number(process.argv[1]))) process.exit(1)})" "${project_id}" < "${active_projects_response}"
+
+curl -fsS \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/projects?archived=true" > "${archived_projects_response}"
+
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(!body.data.some((project)=>project.id===Number(process.argv[1]) && project.archived === true)) process.exit(1)})" "${project_id}" < "${archived_projects_response}"
+
+curl -fsS \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/tasks" > "${all_tasks_response}"
+
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(body.data.some((task)=>task.id===Number(process.argv[1]))) process.exit(1)})" "${project_task_id}" < "${all_tasks_response}"
+
+curl -fsS \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/tasks?project_id=${project_id}" > "${project_tasks_response}"
+
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(!body.data.some((task)=>task.id===Number(process.argv[1]))) process.exit(1)})" "${project_task_id}" < "${project_tasks_response}"
+
+curl -fsS \
+  -X PATCH \
+  -H "Content-Type: application/json" \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/projects/${project_id}/restore" > "${restore_response}"
+
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{if(JSON.parse(d).data.archived !== false) process.exit(1)})" < "${restore_response}"
+
+curl -fsS \
+  -X DELETE \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/projects/${project_id}" > /dev/null
+
+curl -fsS \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/tasks?project_id=${project_id}" > "${project_tasks_response}"
+
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(body.data.some((task)=>task.id===Number(process.argv[1]))) process.exit(1)})" "${project_task_id}" < "${project_tasks_response}"
+
+curl -fsS \
+  -H "Cookie: ${SESSION_COOKIE}=${SESSION_TOKEN}" \
+  "${API_BASE_URL}/api/v1/todo/tasks?view=inbox" > "${list_response}"
+
+node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{const body=JSON.parse(d); if(!body.data.some((task)=>task.id===Number(process.argv[1]))) process.exit(1)})" "${task_id}" < "${list_response}"
 
 curl -fsS \
   -X DELETE \

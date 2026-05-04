@@ -29,6 +29,44 @@ describe("TodoApi", () => {
     });
   });
 
+  it("builds project lifecycle requests", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ data: [] }))
+      .mockResolvedValueOnce(jsonResponse({ data: { id: 7 } }))
+      .mockResolvedValueOnce(jsonResponse({ data: { id: 7 } }));
+
+    const api = new TodoApi("http://api.test");
+    await api.listProjects({ include_archived: true });
+    await api.archiveProject(7);
+    await api.restoreProject(7);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "http://api.test/api/v1/todo/projects?include_archived=true", {
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      }
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "http://api.test/api/v1/todo/projects/7/archive", {
+      method: "PATCH",
+      body: "{}",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      }
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "http://api.test/api/v1/todo/projects/7/restore", {
+      method: "PATCH",
+      body: "{}",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json"
+      }
+    });
+  });
+
   it("builds task query parameters in API order", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: [] }));
 

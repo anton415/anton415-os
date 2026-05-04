@@ -126,6 +126,7 @@ export type TodoProject = {
   name: string;
   start_date: string | null;
   end_date: string | null;
+  archived: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -164,6 +165,7 @@ export type TodoState = {
   editingProjectId?: number;
   todoPanelCollapsed?: boolean;
   searchPanelCollapsed?: boolean;
+  showArchivedProjects?: boolean;
   sort: TodoSort;
   direction: TodoSortDirection;
   search: string;
@@ -190,6 +192,11 @@ export type TodoProjectPayload = {
   name: string;
   start_date: string | null;
   end_date: string | null;
+};
+
+export type TodoProjectQuery = {
+  include_archived?: boolean;
+  archived?: boolean;
 };
 
 export type TodoTaskQuery = {

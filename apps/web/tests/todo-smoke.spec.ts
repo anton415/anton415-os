@@ -5,6 +5,7 @@ type Project = {
   name: string;
   start_date: string | null;
   end_date: string | null;
+  archived: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -128,6 +129,19 @@ test("todo supports smart lists and completion flow with mocked API", async ({ p
   await page.getByRole("button", { name: "Сегодня", exact: true }).click();
   await expect(page.locator('#task-settings-panel input[name="due_date"]')).toHaveValue(localDateInputValue(new Date()));
 
+  await page.getByRole("button", { name: "Архивировать проект Home" }).click();
+  await expect(page.getByRole("button", { name: "Вернуть проект Home" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Архивировать проект Home" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Вернуть проект Home" }).click();
+  await expect(page.getByRole("button", { name: "Архивировать проект Home" })).toBeVisible();
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toContain("все его задачи");
+    await dialog.accept();
+  });
+  await page.getByRole("button", { name: "Удалить Home" }).click();
+  await expect(page.getByText("Активных проектов нет.")).toBeVisible();
+
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto("/todo");
   await expect(page.locator(".app-shell")).toHaveClass(/sidebar-collapsed/);
@@ -167,7 +181,7 @@ async function mockTodoApi(page: Page) {
   const now = "2026-04-23T10:00:00Z";
   const today = localDateInputValue(new Date());
   const yesterday = localDateInputValue(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const projects: Project[] = [{ id: 1, name: "Home", start_date: today, end_date: null, created_at: now, updated_at: now }];
+  const projects: Project[] = [{ id: 1, name: "Home", start_date: today, end_date: null, archived: false, created_at: now, updated_at: now }];
   const tasks: Task[] = [
     {
       id: 1,
@@ -239,12 +253,62 @@ async function mockTodoApi(page: Page) {
     });
   });
 
-  await page.route("http://localhost:8080/api/v1/todo/projects", async (route) => {
-    if (route.request().method() !== "GET") {
-      await route.fulfill({ status: 405 });
+  await page.route("http://localhost:8080/api/v1/todo/projects**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (request.method() === "GET") {
+      const includeArchived = url.searchParams.get("include_archived") === "true";
+      const archived = url.searchParams.get("archived");
+      const filteredProjects = projects.filter((project) => {
+        if (archived !== null) {
+          return project.archived === (archived === "true");
+        }
+        return includeArchived || !project.archived;
+      });
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ data: filteredProjects }) });
       return;
     }
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ data: projects }) });
+
+    const pathParts = url.pathname.split("/");
+    const lastPathPart = pathParts.at(-1);
+    const projectID = Number(lastPathPart === "archive" || lastPathPart === "restore" ? pathParts.at(-2) : lastPathPart);
+    const project = projects.find((item) => item.id === projectID);
+    if (!project) {
+      await route.fulfill({
+        status: 404,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { code: "not_found", message: "todo resource was not found" } })
+      });
+      return;
+    }
+
+    if (request.method() === "PATCH" && url.pathname.endsWith("/archive")) {
+      project.archived = true;
+      project.updated_at = now;
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ data: project }) });
+      return;
+    }
+
+    if (request.method() === "PATCH" && url.pathname.endsWith("/restore")) {
+      project.archived = false;
+      project.updated_at = now;
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify({ data: project }) });
+      return;
+    }
+
+    if (request.method() === "DELETE") {
+      projects.splice(projects.indexOf(project), 1);
+      for (let index = tasks.length - 1; index >= 0; index -= 1) {
+        if (tasks[index].project_id === project.id) {
+          tasks.splice(index, 1);
+        }
+      }
+      await route.fulfill({ status: 204 });
+      return;
+    }
+
+    await route.fulfill({ status: 405 });
   });
 
   await page.route("http://localhost:8080/api/v1/todo/tasks**", async (route) => {
@@ -254,7 +318,7 @@ async function mockTodoApi(page: Page) {
     if (request.method() === "GET") {
       await route.fulfill({
         contentType: "application/json",
-        body: JSON.stringify({ data: filterTasks(tasks, url.searchParams) })
+        body: JSON.stringify({ data: filterTasks(tasks, projects, url.searchParams) })
       });
       return;
     }
@@ -333,7 +397,7 @@ async function mockTodoApi(page: Page) {
   });
 }
 
-function filterTasks(tasks: Task[], params: URLSearchParams): Task[] {
+function filterTasks(tasks: Task[], projects: Project[], params: URLSearchParams): Task[] {
   const today = localDateInputValue(new Date());
   const view = params.get("view");
   const status = params.get("status");
@@ -365,6 +429,9 @@ function filterTasks(tasks: Task[], params: URLSearchParams): Task[] {
       return false;
     }
     if (projectID && task.project_id !== Number(projectID)) {
+      return false;
+    }
+    if (!projectID && task.project_id !== null && projects.find((project) => project.id === task.project_id)?.archived) {
       return false;
     }
     if (query && !`${task.title} ${task.notes ?? ""} ${task.url ?? ""}`.toLowerCase().includes(query)) {

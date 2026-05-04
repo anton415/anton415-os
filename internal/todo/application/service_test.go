@@ -321,8 +321,16 @@ func TestServiceSortsCompletedTasksLastForExplicitSorts(t *testing.T) {
 	}
 }
 
-func TestServiceProjectCRUDAndDeleteConflict(t *testing.T) {
-	service := newTestService()
+func TestServiceProjectLifecycleArchiveRestoreAndCascadeDelete(t *testing.T) {
+	store := newMemoryStore()
+	service := NewService(Dependencies{
+		Projects: store,
+		Tasks:    store,
+		Now: func() time.Time {
+			return time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
+		},
+		Location: time.UTC,
+	})
 	ctx := context.Background()
 
 	project, err := service.CreateProject(ctx, CreateProjectInput{Name: "  Home  "})
@@ -341,14 +349,86 @@ func TestServiceProjectCRUDAndDeleteConflict(t *testing.T) {
 		t.Fatalf("Name = %q, want Personal", project.Name)
 	}
 
-	_, err = service.CreateTask(ctx, CreateTaskInput{Title: "Bound task", ProjectID: &project.ID})
+	projectTask, err := service.CreateTask(ctx, CreateTaskInput{Title: "Bound task", ProjectID: &project.ID})
 	if err != nil {
 		t.Fatalf("CreateTask() error = %v", err)
 	}
+	inboxTask, err := service.CreateTask(ctx, CreateTaskInput{Title: "Inbox"})
+	if err != nil {
+		t.Fatalf("CreateTask(inbox) error = %v", err)
+	}
+
+	project, err = service.ArchiveProject(ctx, project.ID)
+	if err != nil {
+		t.Fatalf("ArchiveProject() error = %v", err)
+	}
+	if !project.Archived {
+		t.Fatalf("Archived = false, want true")
+	}
+
+	activeProjects, err := service.ListProjects(ctx, ListProjectsInput{})
+	if err != nil {
+		t.Fatalf("ListProjects(active) error = %v", err)
+	}
+	if len(activeProjects) != 0 {
+		t.Fatalf("active projects = %+v, want none", activeProjects)
+	}
+
+	archivedOnly := true
+	archivedProjects, err := service.ListProjects(ctx, ListProjectsInput{Archived: &archivedOnly})
+	if err != nil {
+		t.Fatalf("ListProjects(archived) error = %v", err)
+	}
+	if len(archivedProjects) != 1 || archivedProjects[0].ID != project.ID {
+		t.Fatalf("archived projects = %+v, want archived project", archivedProjects)
+	}
+
+	allTasks, err := service.ListTasks(ctx, ListTasksInput{})
+	if err != nil {
+		t.Fatalf("ListTasks(all with archived project) error = %v", err)
+	}
+	if slices.Contains(taskIDs(allTasks), projectTask.ID) {
+		t.Fatalf("all tasks include archived project task %d, want hidden", projectTask.ID)
+	}
+
+	projectTasks, err := service.ListTasks(ctx, ListTasksInput{ProjectID: &project.ID})
+	if err != nil {
+		t.Fatalf("ListTasks(archived project) error = %v", err)
+	}
+	if got := taskIDs(projectTasks); !slices.Equal(got, []int64{projectTask.ID}) {
+		t.Fatalf("archived project ids = %v, want [%d]", got, projectTask.ID)
+	}
+
+	project, err = service.RestoreProject(ctx, project.ID)
+	if err != nil {
+		t.Fatalf("RestoreProject() error = %v", err)
+	}
+	if project.Archived {
+		t.Fatalf("Archived = true, want false")
+	}
+
+	allTasks, err = service.ListTasks(ctx, ListTasksInput{})
+	if err != nil {
+		t.Fatalf("ListTasks(all restored) error = %v", err)
+	}
+	if !slices.Contains(taskIDs(allTasks), projectTask.ID) {
+		t.Fatalf("all tasks = %v, want restored project task %d", taskIDs(allTasks), projectTask.ID)
+	}
 
 	err = service.DeleteProject(ctx, project.ID)
-	if !errors.Is(err, ErrProjectHasTasks) {
-		t.Fatalf("DeleteProject() error = %v, want ErrProjectHasTasks", err)
+	if err != nil {
+		t.Fatalf("DeleteProject() error = %v", err)
+	}
+
+	allTasks, err = service.ListTasks(ctx, ListTasksInput{})
+	if err != nil {
+		t.Fatalf("ListTasks(after delete) error = %v", err)
+	}
+	if slices.Contains(taskIDs(allTasks), projectTask.ID) {
+		t.Fatalf("all tasks include deleted project task %d, want removed", projectTask.ID)
+	}
+	if !slices.Contains(taskIDs(allTasks), inboxTask.ID) {
+		t.Fatalf("all tasks = %v, want inbox task %d untouched", taskIDs(allTasks), inboxTask.ID)
 	}
 }
 
@@ -380,9 +460,16 @@ func newMemoryStore() *memoryStore {
 	}
 }
 
-func (store *memoryStore) ListProjects(context.Context) ([]domain.Project, error) {
+func (store *memoryStore) ListProjects(_ context.Context, filter ProjectListFilter) ([]domain.Project, error) {
 	projects := make([]domain.Project, 0, len(store.projects))
 	for _, project := range store.projects {
+		if filter.Archived != nil {
+			if project.Archived != *filter.Archived {
+				continue
+			}
+		} else if !filter.IncludeArchived && project.Archived {
+			continue
+		}
 		projects = append(projects, project)
 	}
 	slices.SortFunc(projects, func(left, right domain.Project) int {
@@ -424,9 +511,9 @@ func (store *memoryStore) DeleteProject(_ context.Context, id int64) error {
 	if _, ok := store.projects[id]; !ok {
 		return ErrNotFound
 	}
-	for _, task := range store.tasks {
+	for taskID, task := range store.tasks {
 		if task.ProjectID != nil && *task.ProjectID == id {
-			return ErrProjectHasTasks
+			delete(store.tasks, taskID)
 		}
 	}
 	delete(store.projects, id)
@@ -436,6 +523,12 @@ func (store *memoryStore) DeleteProject(_ context.Context, id int64) error {
 func (store *memoryStore) ListTasks(_ context.Context, filter TaskListFilter) ([]domain.Task, error) {
 	tasks := make([]domain.Task, 0, len(store.tasks))
 	for _, task := range store.tasks {
+		if filter.ProjectID == nil && task.ProjectID != nil {
+			project, ok := store.projects[*task.ProjectID]
+			if ok && project.Archived {
+				continue
+			}
+		}
 		tasks = append(tasks, task)
 	}
 	slices.SortFunc(tasks, func(left, right domain.Task) int {

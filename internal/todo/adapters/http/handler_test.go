@@ -231,7 +231,7 @@ func TestTaskDeleteStatusCodes(t *testing.T) {
 	}
 }
 
-func TestProjectCRUDAndDeleteConflict(t *testing.T) {
+func TestProjectLifecycleArchiveRestoreAndCascadeDelete(t *testing.T) {
 	router := newTestRouter()
 
 	createProjectResponse := httptest.NewRecorder()
@@ -249,6 +249,9 @@ func TestProjectCRUDAndDeleteConflict(t *testing.T) {
 	if createdProject.Data.StartDate == nil || *createdProject.Data.StartDate != "2026-04-01" || createdProject.Data.EndDate == nil || *createdProject.Data.EndDate != "2026-04-30" {
 		t.Fatalf("project period = %+v, want start and end dates", createdProject.Data)
 	}
+	if createdProject.Data.Archived {
+		t.Fatalf("created project archived = true, want false")
+	}
 
 	updateProjectResponse := httptest.NewRecorder()
 	router.ServeHTTP(updateProjectResponse, httptest.NewRequest(http.MethodPatch, "/projects/1", bytes.NewBufferString(`{"name":"Personal"}`)))
@@ -261,14 +264,72 @@ func TestProjectCRUDAndDeleteConflict(t *testing.T) {
 	if createTaskResponse.Code != http.StatusCreated {
 		t.Fatalf("create task status = %d, want %d", createTaskResponse.Code, http.StatusCreated)
 	}
+	task := decodeData[taskResponse](t, createTaskResponse)
 
-	deleteProjectResponse := httptest.NewRecorder()
-	router.ServeHTTP(deleteProjectResponse, httptest.NewRequest(http.MethodDelete, "/projects/1", nil))
-	if deleteProjectResponse.Code != http.StatusConflict {
-		t.Fatalf("delete project status = %d, want %d", deleteProjectResponse.Code, http.StatusConflict)
+	archiveProjectResponse := performRequest(router, http.MethodPatch, "/projects/1/archive", "")
+	if archiveProjectResponse.Code != http.StatusOK {
+		t.Fatalf("archive project status = %d, want %d; body=%s", archiveProjectResponse.Code, http.StatusOK, archiveProjectResponse.Body.String())
+	}
+	archivedProject := decodeData[projectResponse](t, archiveProjectResponse)
+	if !archivedProject.Archived {
+		t.Fatalf("archived project archived = false, want true")
 	}
 
-	_ = createdProject
+	activeProjectsResponse := performRequest(router, http.MethodGet, "/projects", "")
+	if activeProjectsResponse.Code != http.StatusOK {
+		t.Fatalf("active projects status = %d, want %d", activeProjectsResponse.Code, http.StatusOK)
+	}
+	if activeProjects := decodeData[[]projectResponse](t, activeProjectsResponse); len(activeProjects) != 0 {
+		t.Fatalf("active projects = %+v, want none", activeProjects)
+	}
+
+	archivedProjectsResponse := performRequest(router, http.MethodGet, "/projects?archived=true", "")
+	if archivedProjectsResponse.Code != http.StatusOK {
+		t.Fatalf("archived projects status = %d, want %d", archivedProjectsResponse.Code, http.StatusOK)
+	}
+	archivedProjects := decodeData[[]projectResponse](t, archivedProjectsResponse)
+	if len(archivedProjects) != 1 || archivedProjects[0].ID != archivedProject.ID {
+		t.Fatalf("archived projects = %+v, want archived project", archivedProjects)
+	}
+
+	allTasksResponse := performRequest(router, http.MethodGet, "/tasks", "")
+	if allTasksResponse.Code != http.StatusOK {
+		t.Fatalf("all tasks status = %d, want %d", allTasksResponse.Code, http.StatusOK)
+	}
+	if allTasks := decodeData[[]taskResponse](t, allTasksResponse); len(allTasks) != 0 {
+		t.Fatalf("all tasks = %+v, want archived project task hidden", allTasks)
+	}
+
+	projectTasksResponse := performRequest(router, http.MethodGet, "/tasks?project_id=1", "")
+	if projectTasksResponse.Code != http.StatusOK {
+		t.Fatalf("project tasks status = %d, want %d", projectTasksResponse.Code, http.StatusOK)
+	}
+	projectTasks := decodeData[[]taskResponse](t, projectTasksResponse)
+	if got := responseTaskIDs(projectTasks); !slices.Equal(got, []int64{task.ID}) {
+		t.Fatalf("project task ids = %v, want [%d]", got, task.ID)
+	}
+
+	restoreProjectResponse := performRequest(router, http.MethodPatch, "/projects/1/restore", "")
+	if restoreProjectResponse.Code != http.StatusOK {
+		t.Fatalf("restore project status = %d, want %d; body=%s", restoreProjectResponse.Code, http.StatusOK, restoreProjectResponse.Body.String())
+	}
+	restoredProject := decodeData[projectResponse](t, restoreProjectResponse)
+	if restoredProject.Archived {
+		t.Fatalf("restored project archived = true, want false")
+	}
+
+	deleteProjectResponse := performRequest(router, http.MethodDelete, "/projects/1", "")
+	if deleteProjectResponse.Code != http.StatusNoContent {
+		t.Fatalf("delete project status = %d, want %d; body=%s", deleteProjectResponse.Code, http.StatusNoContent, deleteProjectResponse.Body.String())
+	}
+
+	allTasksResponse = performRequest(router, http.MethodGet, "/tasks", "")
+	if allTasksResponse.Code != http.StatusOK {
+		t.Fatalf("all tasks after delete status = %d, want %d", allTasksResponse.Code, http.StatusOK)
+	}
+	if allTasks := decodeData[[]taskResponse](t, allTasksResponse); len(allTasks) != 0 {
+		t.Fatalf("all tasks after delete = %+v, want none", allTasks)
+	}
 }
 
 func performRequest(router http.Handler, method string, target string, body string) *httptest.ResponseRecorder {
@@ -336,9 +397,16 @@ func newMemoryStore() *memoryStore {
 	}
 }
 
-func (store *memoryStore) ListProjects(context.Context) ([]domain.Project, error) {
+func (store *memoryStore) ListProjects(_ context.Context, filter application.ProjectListFilter) ([]domain.Project, error) {
 	projects := make([]domain.Project, 0, len(store.projects))
 	for _, project := range store.projects {
+		if filter.Archived != nil {
+			if project.Archived != *filter.Archived {
+				continue
+			}
+		} else if !filter.IncludeArchived && project.Archived {
+			continue
+		}
 		projects = append(projects, project)
 	}
 	slices.SortFunc(projects, func(left, right domain.Project) int {
@@ -380,9 +448,9 @@ func (store *memoryStore) DeleteProject(_ context.Context, id int64) error {
 	if _, ok := store.projects[id]; !ok {
 		return application.ErrNotFound
 	}
-	for _, task := range store.tasks {
+	for taskID, task := range store.tasks {
 		if task.ProjectID != nil && *task.ProjectID == id {
-			return application.ErrProjectHasTasks
+			delete(store.tasks, taskID)
 		}
 	}
 	delete(store.projects, id)
@@ -392,6 +460,12 @@ func (store *memoryStore) DeleteProject(_ context.Context, id int64) error {
 func (store *memoryStore) ListTasks(_ context.Context, filter application.TaskListFilter) ([]domain.Task, error) {
 	tasks := make([]domain.Task, 0, len(store.tasks))
 	for _, task := range store.tasks {
+		if filter.ProjectID == nil && task.ProjectID != nil {
+			project, ok := store.projects[*task.ProjectID]
+			if ok && project.Archived {
+				continue
+			}
+		}
 		tasks = append(tasks, task)
 	}
 	slices.SortFunc(tasks, func(left, right domain.Task) int {

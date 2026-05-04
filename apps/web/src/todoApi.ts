@@ -1,6 +1,7 @@
 import type {
   TodoProject,
   TodoProjectPayload,
+  TodoProjectQuery,
   TodoTask,
   TodoTaskPayload,
   TodoTaskQuery
@@ -34,8 +35,17 @@ export class TodoApi {
     this.baseUrl = apiBaseUrl.replace(/\/$/, "");
   }
 
-  listProjects(): Promise<TodoProject[]> {
-    return this.request<TodoProject[]>("/api/v1/todo/projects");
+  listProjects(query: TodoProjectQuery = {}): Promise<TodoProject[]> {
+    const params = new URLSearchParams();
+    if (query.include_archived !== undefined) {
+      params.set("include_archived", String(query.include_archived));
+    }
+    if (query.archived !== undefined) {
+      params.set("archived", String(query.archived));
+    }
+
+    const suffix = params.size > 0 ? `?${params.toString()}` : "";
+    return this.request<TodoProject[]>(`/api/v1/todo/projects${suffix}`);
   }
 
   createProject(payload: TodoProjectPayload): Promise<TodoProject> {
@@ -49,6 +59,20 @@ export class TodoApi {
     return this.request<TodoProject>(`/api/v1/todo/projects/${id}`, {
       method: "PATCH",
       body: JSON.stringify(payload)
+    });
+  }
+
+  archiveProject(id: number): Promise<TodoProject> {
+    return this.request<TodoProject>(`/api/v1/todo/projects/${id}/archive`, {
+      method: "PATCH",
+      body: JSON.stringify({})
+    });
+  }
+
+  restoreProject(id: number): Promise<TodoProject> {
+    return this.request<TodoProject>(`/api/v1/todo/projects/${id}/restore`, {
+      method: "PATCH",
+      body: JSON.stringify({})
     });
   }
 

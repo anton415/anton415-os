@@ -85,7 +85,7 @@ Migrations create `platform_metadata` plus Todo v1 tables:
 - `todo_projects`
 - `todo_tasks`
 
-Todo v1 stores task status as text with a database check constraint. Deleting a project with tasks is blocked; move or delete the tasks first. The Todo `today` and `upcoming` views use the API server's local timezone.
+Todo v1 stores task status as text with a database check constraint. Projects can be archived without changing their tasks; archived project tasks are hidden from active task lists unless the project is selected directly. Deleting a project cascades to its tasks and leaves project-less tasks untouched. The Todo `today` and `upcoming` views use the API server's local timezone.
 
 Auth sessions, OAuth state, and email magic-link tokens are also stored in PostgreSQL. Todo and Finance data remain single-owner and do not include `user_id`; `APP_ENV=production` rejects zero or multiple `AUTH_ALLOWED_EMAILS` entries until per-user isolation is added.
 

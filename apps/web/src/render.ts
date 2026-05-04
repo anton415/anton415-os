@@ -65,6 +65,7 @@ type RenderOptions = {
   onSaveFinanceIncomeMonth: (month: number, form: HTMLFormElement) => void;
   onToggleTodoPanel: () => void;
   onToggleTodoSearchPanel: () => void;
+  onToggleArchivedProjects: () => void;
   onChangeTodoQuery: (search: string, sort: TodoSort, direction: TodoSortDirection) => void;
   onSelectTodoScope: (scope: TodoScope) => void;
   onEditTask: (taskId: number) => void;
@@ -75,6 +76,8 @@ type RenderOptions = {
   onEditProject: (projectId: number) => void;
   onCancelProjectEdit: () => void;
   onSaveProject: (form: HTMLFormElement) => void;
+  onArchiveProject: (projectId: number) => void;
+  onRestoreProject: (projectId: number) => void;
   onDeleteProject: (projectId: number) => void;
 };
 
@@ -852,23 +855,9 @@ function renderProjectForm(state: TodoState): string {
 }
 
 function renderProjectList(state: TodoState): string {
-  const projects = state.projects
-    .map((project) => {
-      const active = state.scope.kind === "project" && state.scope.projectId === project.id;
-      return `
-        <li class="project-row ${active ? "active" : ""}">
-          <button type="button" data-project-id="${project.id}">
-            <span class="project-title">${escapeHTML(project.name)}</span>
-            ${projectPeriod(project)}
-          </button>
-          <span>
-            <button class="icon-button small" type="button" data-edit-project-id="${project.id}" aria-label="Настройки проекта ${escapeAttr(project.name)}" title="Настройки проекта">&#9881;</button>
-            <button class="icon-button small danger" type="button" data-delete-project-id="${project.id}" aria-label="Удалить ${escapeAttr(project.name)}" title="Удалить проект">&#8722;</button>
-          </span>
-        </li>
-      `;
-    })
-    .join("");
+  const activeProjects = state.projects.filter((project) => !project.archived);
+  const archivedProjects = state.projects.filter((project) => project.archived);
+  const archivedOpen = state.showArchivedProjects ?? false;
 
   return `
     <section class="project-list" aria-label="Проекты">
@@ -876,13 +865,57 @@ function renderProjectList(state: TodoState): string {
         <h2>Проекты</h2>
       </div>
       ${
-        state.projects.length === 0
-          ? `<p class="empty-state">Проектов пока нет.</p>`
-          : `<ul>${projects}</ul>`
+        activeProjects.length === 0
+          ? `<p class="empty-state">Активных проектов нет.</p>`
+          : `<ul>${renderProjectRows(activeProjects, state)}</ul>`
       }
       ${renderProjectForm(state)}
+      <div class="panel-header project-archive-header">
+        <h2>Архив</h2>
+        <button
+          class="secondary-button project-archive-toggle"
+          type="button"
+          data-toggle-archived-projects
+          aria-expanded="${archivedOpen ? "true" : "false"}"
+        >
+          ${archivedOpen ? "Скрыть" : "Показать"} (${archivedProjects.length})
+        </button>
+      </div>
+      ${
+        archivedOpen
+          ? archivedProjects.length === 0
+            ? `<p class="empty-state">Архив пуст.</p>`
+            : `<ul class="archived-project-list">${renderProjectRows(archivedProjects, state)}</ul>`
+          : ""
+      }
     </section>
   `;
+}
+
+function renderProjectRows(projects: TodoProject[], state: TodoState): string {
+  return projects
+    .map((project) => {
+      const active = state.scope.kind === "project" && state.scope.projectId === project.id;
+      return `
+        <li class="project-row ${active ? "active" : ""} ${project.archived ? "archived-project" : ""}">
+          <button type="button" data-project-id="${project.id}">
+            <span class="project-title">${escapeHTML(project.name)}</span>
+            ${projectPeriod(project)}
+            ${project.archived ? `<small>Архив</small>` : ""}
+          </button>
+          <span>
+            <button class="icon-button small" type="button" data-edit-project-id="${project.id}" aria-label="Настройки проекта ${escapeAttr(project.name)}" title="Настройки проекта">&#9881;</button>
+            ${
+              project.archived
+                ? `<button class="icon-button small" type="button" data-restore-project-id="${project.id}" aria-label="Вернуть проект ${escapeAttr(project.name)}" title="Вернуть проект">&#8634;</button>`
+                : `<button class="icon-button small" type="button" data-archive-project-id="${project.id}" aria-label="Архивировать проект ${escapeAttr(project.name)}" title="Архивировать проект">&#8681;</button>`
+            }
+            <button class="icon-button small danger" type="button" data-delete-project-id="${project.id}" aria-label="Удалить ${escapeAttr(project.name)}" title="Удалить проект">&#8722;</button>
+          </span>
+        </li>
+      `;
+    })
+    .join("");
 }
 
 function renderProjectSettingsPanel(state: TodoState): string {
@@ -919,6 +952,12 @@ function renderProjectSettingsPanel(state: TodoState): string {
         </div>
         ${state.projectFormError ? `<p class="form-error">${escapeHTML(state.projectFormError)}</p>` : ""}
         <div class="settings-form-actions">
+          <button class="secondary-button danger" type="button" data-delete-project-id="${project.id}">Удалить</button>
+          ${
+            project.archived
+              ? `<button class="secondary-button" type="button" data-restore-project-id="${project.id}">Вернуть</button>`
+              : `<button class="secondary-button" type="button" data-archive-project-id="${project.id}">В архив</button>`
+          }
           <button class="secondary-button" type="button" id="cancel-project-edit-secondary">Отмена</button>
           <button class="primary-button" type="submit" ${state.saving ? "disabled" : ""}>Сохранить</button>
         </div>
@@ -1099,7 +1138,7 @@ function renderNewTaskSettingsPanel(values: {
             <span>Проект</span>
             <select form="task-form" name="project_id">
               <option value="" ${values.selectedProjectID === null ? "selected" : ""}>Входящие</option>
-              ${values.projects.map((project) => renderProjectOption(project, values.selectedProjectID)).join("")}
+              ${renderProjectOptions(values.projects, values.selectedProjectID)}
             </select>
           </label>
           <label>
@@ -1191,7 +1230,7 @@ function renderExistingTaskSettingsPanel(state: TodoState): string {
             <span>Проект</span>
             <select name="project_id">
               <option value="" ${task.project_id === null ? "selected" : ""}>Входящие</option>
-              ${state.projects.map((project) => renderProjectOption(project, task.project_id)).join("")}
+              ${renderProjectOptions(state.projects, task.project_id)}
             </select>
           </label>
           <label>
@@ -1247,6 +1286,13 @@ function renderExistingTaskSettingsPanel(state: TodoState): string {
 
 function renderProjectOption(project: TodoProject, selectedProjectID: number | null): string {
   return `<option value="${project.id}" ${selectedProjectID === project.id ? "selected" : ""}>${escapeHTML(project.name)}</option>`;
+}
+
+function renderProjectOptions(projects: TodoProject[], selectedProjectID: number | null): string {
+  return projects
+    .filter((project) => !project.archived || project.id === selectedProjectID)
+    .map((project) => renderProjectOption(project, selectedProjectID))
+    .join("");
 }
 
 function renderRepeatOption(value: TodoRepeatFrequency, label: string, selected: TodoRepeatFrequency): string {
@@ -1494,6 +1540,7 @@ function bindTodoEvents(root: HTMLElement, options: RenderOptions) {
     button.addEventListener("click", options.onToggleTodoPanel);
   });
   root.querySelector("[data-toggle-todo-search-panel]")?.addEventListener("click", options.onToggleTodoSearchPanel);
+  root.querySelector("[data-toggle-archived-projects]")?.addEventListener("click", options.onToggleArchivedProjects);
   root.querySelector<HTMLFormElement>("#todo-query-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const form = event.currentTarget as HTMLFormElement;
@@ -1597,6 +1644,24 @@ function bindTodoEvents(root: HTMLElement, options: RenderOptions) {
       const projectId = numberFromDataset(button.dataset.deleteProjectId);
       if (projectId) {
         options.onDeleteProject(projectId);
+      }
+    });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-archive-project-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const projectId = numberFromDataset(button.dataset.archiveProjectId);
+      if (projectId) {
+        options.onArchiveProject(projectId);
+      }
+    });
+  });
+
+  root.querySelectorAll<HTMLButtonElement>("[data-restore-project-id]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const projectId = numberFromDataset(button.dataset.restoreProjectId);
+      if (projectId) {
+        options.onRestoreProject(projectId);
       }
     });
   });
