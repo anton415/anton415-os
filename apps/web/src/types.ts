@@ -117,12 +117,13 @@ export type TodoTaskStatus = "todo" | "in_progress" | "done";
 export type TodoView = "inbox" | "today" | "overdue" | "upcoming" | "scheduled" | "flagged" | "all" | "completed";
 export type TodoServerView = Exclude<TodoView, "all" | "completed">;
 export type TodoTaskPriority = "none" | "low" | "medium" | "high";
-export type TodoRepeatFrequency = "none" | "daily" | "weekly" | "monthly" | "yearly";
+export type TodoRepeatFrequency = "none" | "daily" | "weekdays" | "weekends" | "weekly" | "monthly" | "yearly";
 export type TodoSort = "smart" | "due" | "created" | "title" | "priority";
 export type TodoSortDirection = "asc" | "desc";
 
 export type TodoProject = {
   id: number;
+  parent_project_id: number | null;
   name: string;
   start_date: string | null;
   end_date: string | null;
@@ -134,6 +135,7 @@ export type TodoProject = {
 export type TodoTask = {
   id: number;
   project_id: number | null;
+  parent_task_id: number | null;
   title: string;
   notes: string | null;
   url: string | null;
@@ -175,6 +177,7 @@ export type TodoState = {
 
 export type TodoTaskPayload = {
   project_id: number | null;
+  parent_task_id: number | null;
   title: string;
   notes: string | null;
   url: string | null;
@@ -189,6 +192,7 @@ export type TodoTaskPayload = {
 };
 
 export type TodoProjectPayload = {
+  parent_project_id: number | null;
   name: string;
   start_date: string | null;
   end_date: string | null;

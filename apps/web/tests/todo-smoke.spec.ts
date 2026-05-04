@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 type Project = {
   id: number;
+  parent_project_id: number | null;
   name: string;
   start_date: string | null;
   end_date: string | null;
@@ -13,13 +14,14 @@ type Project = {
 type Task = {
   id: number;
   project_id: number | null;
+  parent_task_id: number | null;
   title: string;
   notes: string | null;
   url: string | null;
   status: "todo" | "in_progress" | "done";
   due_date: string | null;
   due_time: string | null;
-  repeat_frequency: "none" | "daily" | "weekly" | "monthly" | "yearly";
+  repeat_frequency: "none" | "daily" | "weekdays" | "weekends" | "weekly" | "monthly" | "yearly";
   repeat_interval: number;
   repeat_until: string | null;
   flagged: boolean;
@@ -181,11 +183,12 @@ async function mockTodoApi(page: Page) {
   const now = "2026-04-23T10:00:00Z";
   const today = localDateInputValue(new Date());
   const yesterday = localDateInputValue(new Date(Date.now() - 24 * 60 * 60 * 1000));
-  const projects: Project[] = [{ id: 1, name: "Home", start_date: today, end_date: null, archived: false, created_at: now, updated_at: now }];
+  const projects: Project[] = [{ id: 1, parent_project_id: null, name: "Home", start_date: today, end_date: null, archived: false, created_at: now, updated_at: now }];
   const tasks: Task[] = [
     {
       id: 1,
       project_id: null,
+      parent_task_id: null,
       title: "Existing task",
       notes: null,
       url: null,
@@ -204,6 +207,7 @@ async function mockTodoApi(page: Page) {
     {
       id: 2,
       project_id: null,
+      parent_task_id: null,
       title: "Overdue task",
       notes: null,
       url: null,
@@ -336,6 +340,7 @@ async function mockTodoApi(page: Page) {
       const created: Task = {
         id: nextTaskID,
         project_id: payload.project_id ?? null,
+        parent_task_id: payload.parent_task_id ?? null,
         title: String(payload.title ?? ""),
         notes: payload.notes ?? null,
         url: normalizeTaskURL(payload.url),

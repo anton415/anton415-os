@@ -113,6 +113,7 @@ describe("renderApp todo", () => {
     expect(form?.querySelector<HTMLInputElement>('input[name="project_id"]')).toBeNull();
     expect(form?.querySelector<HTMLInputElement>('input[name="start_date"]')).toBeNull();
     expect(form?.querySelector<HTMLInputElement>('input[name="end_date"]')).toBeNull();
+    expect(form?.querySelector<HTMLSelectElement>('select[name="parent_project_id"]')).not.toBeNull();
     expect(form?.querySelector<HTMLButtonElement>('button[type="submit"]')?.textContent?.trim()).toBe("+");
   });
 
@@ -130,6 +131,7 @@ describe("renderApp todo", () => {
     expect(root.querySelector(".settings-backdrop")).not.toBeNull();
     expect(root.querySelector(".project-settings-panel")?.getAttribute("role")).toBe("dialog");
     expect(root.querySelector<HTMLInputElement>("#project-settings-form input[name='project_id']")?.value).toBe("2");
+    expect(root.querySelector<HTMLSelectElement>("#project-settings-form select[name='parent_project_id']")?.value).toBe("");
     expect(root.querySelector<HTMLInputElement>("#project-settings-form input[name='name']")?.value).toBe("Work");
     expect(root.querySelector<HTMLInputElement>("#project-settings-form input[name='start_date']")?.value).toBe("2026-04-01");
     expect(root.querySelector<HTMLInputElement>("#project-settings-form input[name='end_date']")?.value).toBe("2026-04-30");
@@ -233,6 +235,7 @@ describe("renderApp todo", () => {
     expect(panel?.querySelector<HTMLTextAreaElement>('textarea[name="notes"]')?.getAttribute("form")).toBe("task-form");
     expect(panel?.querySelector<HTMLInputElement>('input[name="url"]')?.getAttribute("form")).toBe("task-form");
     expect(panel?.querySelector<HTMLSelectElement>('select[name="project_id"]')?.getAttribute("form")).toBe("task-form");
+    expect(panel?.querySelector<HTMLSelectElement>('select[name="parent_task_id"]')?.getAttribute("form")).toBe("task-form");
     expect(panel?.querySelector<HTMLInputElement>('input[name="due_date"]')?.getAttribute("form")).toBe("task-form");
     expect(panel?.querySelector<HTMLInputElement>('input[name="due_time"]')?.getAttribute("form")).toBe("task-form");
     expect(panel?.querySelector<HTMLSelectElement>('select[name="repeat_frequency"]')).not.toBeNull();
@@ -256,6 +259,7 @@ describe("renderApp todo", () => {
     expect(formData.get("notes")).toBe("Details live here");
     expect(formData.get("url")).toBe("example.com/details");
     expect(formData.get("project_id")).toBe("");
+    expect(formData.get("parent_task_id")).toBe("");
     expect(formData.get("due_date")).toBe("2026-04-28");
     expect(formData.get("due_time")).toBe("09:30");
     expect(formData.get("priority")).toBe("high");
@@ -410,6 +414,31 @@ describe("renderApp todo", () => {
     expect(looseTask?.textContent).not.toContain("Без даты");
     expect(scheduledTask?.querySelector(".task-meta")?.textContent).toContain("Work");
     expect(scheduledTask?.querySelector(".task-meta")?.textContent).toContain("2026-04-28");
+  });
+
+  it("renders nested projects and tasks as trees", () => {
+    renderApp(
+      root,
+      optionsForTodo({
+        todoState: todoState({
+          projects: [
+            project({ id: 1, name: "Parent" }),
+            project({ id: 2, parent_project_id: 1, name: "Child" })
+          ],
+          tasks: [
+            task({ id: 10, title: "Parent task" }),
+            task({ id: 11, parent_task_id: 10, title: "Child task" })
+          ]
+        })
+      })
+    );
+
+    const childProject = root.querySelector('[data-project-id="2"]')?.closest(".project-row");
+    const childTask = root.querySelector('[data-edit-task-id="11"]')?.closest(".task-item");
+
+    expect(childProject?.classList.contains("project-depth-1")).toBe(true);
+    expect(childTask?.classList.contains("task-depth-1")).toBe(true);
+    expect(root.querySelector<HTMLSelectElement>('#task-settings-panel select[name="parent_task_id"]')?.textContent).toContain("Parent task");
   });
 
   it("opens task settings from a single gear action", () => {
@@ -750,6 +779,7 @@ function financeIncomeYear(overrides: Partial<FinanceIncomeYear> = {}): FinanceI
 function project(overrides: Partial<TodoProject> = {}): TodoProject {
   return {
     id: 1,
+    parent_project_id: null,
     name: "Home",
     start_date: null,
     end_date: null,
@@ -764,6 +794,7 @@ function task(overrides: Partial<TodoTask> = {}): TodoTask {
   return {
     id: 1,
     project_id: null,
+    parent_task_id: null,
     title: "Task",
     notes: null,
     url: null,

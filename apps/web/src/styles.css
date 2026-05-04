@@ -741,6 +741,17 @@ p {
   list-style: none;
 }
 
+.project-tree-item {
+  display: grid;
+  gap: 8px;
+}
+
+.project-tree-children {
+  margin-left: 18px;
+  padding-left: 12px;
+  border-left: 1px solid #d0d5dd;
+}
+
 .project-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -749,12 +760,13 @@ p {
 }
 
 .project-form.project-row {
-  grid-template-columns: minmax(9rem, 1fr) auto;
+  grid-template-columns: minmax(9rem, 1fr) minmax(8rem, 0.8fr) auto;
 }
 
 .project-row > button,
 .project-name-field input,
-.project-date-field input {
+.project-date-field input,
+.project-parent-field select {
   min-height: 36px;
   overflow: hidden;
   border: 1px solid transparent;
@@ -773,8 +785,14 @@ p {
   min-width: 0;
 }
 
+.project-parent-field {
+  display: block;
+  min-width: 0;
+}
+
 .project-name-field input,
-.project-date-field input {
+.project-date-field input,
+.project-parent-field select {
   width: 100%;
   font: inherit;
 }
@@ -784,7 +802,8 @@ p {
 }
 
 .project-name-field input:focus,
-.project-date-field input:focus {
+.project-date-field input:focus,
+.project-parent-field select:focus {
   border-color: #2563eb;
   background: #ffffff;
   outline: 2px solid rgb(37 99 235 / 0.16);
@@ -952,6 +971,13 @@ p {
   background: rgb(255 255 255 / 0.38);
 }
 
+.project-depth-1 > button,
+.project-depth-2 > button,
+.project-depth-3 > button,
+.project-depth-4 > button {
+  background: rgb(255 255 255 / 0.46);
+}
+
 .project-row > span {
   display: flex;
   gap: 6px;
@@ -1056,6 +1082,22 @@ p {
 .task-item.done h2 {
   color: #667085;
   text-decoration: line-through;
+}
+
+.task-depth-1 {
+  padding-left: 24px;
+}
+
+.task-depth-2 {
+  padding-left: 48px;
+}
+
+.task-depth-3 {
+  padding-left: 72px;
+}
+
+.task-depth-4 {
+  padding-left: 96px;
 }
 
 .task-main {
@@ -1763,6 +1805,16 @@ p {
 
   .task-form .task-actions {
     grid-column: auto;
+  }
+
+  .task-depth-1 {
+    padding-left: 12px;
+  }
+
+  .task-depth-2,
+  .task-depth-3,
+  .task-depth-4 {
+    padding-left: 24px;
   }
 
   .compact-field {

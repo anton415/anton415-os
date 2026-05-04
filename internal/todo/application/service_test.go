@@ -147,6 +147,52 @@ func TestServiceRejectsInvalidTaskReferencesAndFilters(t *testing.T) {
 	}
 }
 
+func TestServiceCreatesNestedProjectsAndRejectsCycles(t *testing.T) {
+	service := newTestService()
+	ctx := context.Background()
+
+	parent, err := service.CreateProject(ctx, CreateProjectInput{Name: "Parent"})
+	if err != nil {
+		t.Fatalf("CreateProject(parent) error = %v", err)
+	}
+	child, err := service.CreateProject(ctx, CreateProjectInput{Name: "Child", ParentProjectID: &parent.ID})
+	if err != nil {
+		t.Fatalf("CreateProject(child) error = %v", err)
+	}
+	if child.ParentProjectID == nil || *child.ParentProjectID != parent.ID {
+		t.Fatalf("child parent = %v, want %d", child.ParentProjectID, parent.ID)
+	}
+
+	_, err = service.UpdateProject(ctx, parent.ID, UpdateProjectInput{Name: "Parent", ParentProjectID: &child.ID})
+	if !errors.Is(err, ErrInvalidHierarchy) {
+		t.Fatalf("UpdateProject(cycle) error = %v, want ErrInvalidHierarchy", err)
+	}
+}
+
+func TestServiceCreatesSubtasksAndRejectsCycles(t *testing.T) {
+	service := newTestService()
+	ctx := context.Background()
+
+	parent, err := service.CreateTask(ctx, CreateTaskInput{Title: "Parent"})
+	if err != nil {
+		t.Fatalf("CreateTask(parent) error = %v", err)
+	}
+	child, err := service.CreateTask(ctx, CreateTaskInput{Title: "Child", ParentTaskID: &parent.ID})
+	if err != nil {
+		t.Fatalf("CreateTask(child) error = %v", err)
+	}
+	if child.ParentTaskID == nil || *child.ParentTaskID != parent.ID {
+		t.Fatalf("child parent = %v, want %d", child.ParentTaskID, parent.ID)
+	}
+
+	_, err = service.UpdateTask(ctx, parent.ID, UpdateTaskInput{
+		ParentTaskID: OptionalInt64{Set: true, Value: &child.ID},
+	})
+	if !errors.Is(err, ErrInvalidHierarchy) {
+		t.Fatalf("UpdateTask(cycle) error = %v, want ErrInvalidHierarchy", err)
+	}
+}
+
 func TestServiceFiltersInboxAndToday(t *testing.T) {
 	store := newMemoryStore()
 	now := time.Date(2026, 4, 23, 10, 0, 0, 0, time.UTC)
@@ -511,6 +557,12 @@ func (store *memoryStore) DeleteProject(_ context.Context, id int64) error {
 	if _, ok := store.projects[id]; !ok {
 		return ErrNotFound
 	}
+	for projectID, project := range store.projects {
+		if project.ParentProjectID != nil && *project.ParentProjectID == id {
+			project.ParentProjectID = nil
+			store.projects[projectID] = project
+		}
+	}
 	for taskID, task := range store.tasks {
 		if task.ProjectID != nil && *task.ProjectID == id {
 			delete(store.tasks, taskID)
@@ -569,6 +621,12 @@ func (store *memoryStore) UpdateTask(_ context.Context, task domain.Task) (domai
 func (store *memoryStore) DeleteTask(_ context.Context, id int64) error {
 	if _, ok := store.tasks[id]; !ok {
 		return ErrNotFound
+	}
+	for taskID, task := range store.tasks {
+		if task.ParentTaskID != nil && *task.ParentTaskID == id {
+			task.ParentTaskID = nil
+			store.tasks[taskID] = task
+		}
 	}
 	delete(store.tasks, id)
 	return nil

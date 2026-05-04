@@ -87,9 +87,10 @@ func (handler Handler) createProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	project, err := handler.service.CreateProject(r.Context(), application.CreateProjectInput{
-		Name:      request.Name,
-		StartDate: startDate,
-		EndDate:   endDate,
+		ParentProjectID: request.ParentProjectID,
+		Name:            request.Name,
+		StartDate:       startDate,
+		EndDate:         endDate,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -117,9 +118,10 @@ func (handler Handler) updateProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	project, err := handler.service.UpdateProject(r.Context(), id, application.UpdateProjectInput{
-		Name:      request.Name,
-		StartDate: startDate,
-		EndDate:   endDate,
+		ParentProjectID: request.ParentProjectID,
+		Name:            request.Name,
+		StartDate:       startDate,
+		EndDate:         endDate,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -212,6 +214,7 @@ func (handler Handler) createTask(w http.ResponseWriter, r *http.Request) {
 
 	task, err := handler.service.CreateTask(r.Context(), application.CreateTaskInput{
 		ProjectID:       request.ProjectID,
+		ParentTaskID:    request.ParentTaskID,
 		Title:           request.Title,
 		Notes:           request.Notes,
 		URL:             request.URL,
@@ -273,13 +276,15 @@ func (handler Handler) deleteTask(w http.ResponseWriter, r *http.Request) {
 }
 
 type projectRequest struct {
-	Name      string  `json:"name"`
-	StartDate *string `json:"start_date"`
-	EndDate   *string `json:"end_date"`
+	ParentProjectID *int64  `json:"parent_project_id"`
+	Name            string  `json:"name"`
+	StartDate       *string `json:"start_date"`
+	EndDate         *string `json:"end_date"`
 }
 
 type createTaskRequest struct {
 	ProjectID       *int64  `json:"project_id"`
+	ParentTaskID    *int64  `json:"parent_task_id"`
 	Title           string  `json:"title"`
 	Notes           *string `json:"notes"`
 	URL             *string `json:"url"`
@@ -307,18 +312,20 @@ type apiError struct {
 }
 
 type projectResponse struct {
-	ID        int64   `json:"id"`
-	Name      string  `json:"name"`
-	StartDate *string `json:"start_date"`
-	EndDate   *string `json:"end_date"`
-	Archived  bool    `json:"archived"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID              int64   `json:"id"`
+	ParentProjectID *int64  `json:"parent_project_id"`
+	Name            string  `json:"name"`
+	StartDate       *string `json:"start_date"`
+	EndDate         *string `json:"end_date"`
+	Archived        bool    `json:"archived"`
+	CreatedAt       string  `json:"created_at"`
+	UpdatedAt       string  `json:"updated_at"`
 }
 
 type taskResponse struct {
 	ID              int64   `json:"id"`
 	ProjectID       *int64  `json:"project_id"`
+	ParentTaskID    *int64  `json:"parent_task_id"`
 	Title           string  `json:"title"`
 	Notes           *string `json:"notes"`
 	URL             *string `json:"url"`
@@ -387,17 +394,24 @@ func listTasksInput(r *http.Request) (application.ListTasksInput, error) {
 }
 
 func updateTaskInput(raw map[string]json.RawMessage) (application.UpdateTaskInput, error) {
-	if field, ok := unknownField(raw, "project_id", "title", "notes", "url", "status", "due_date", "due_time", "repeat_frequency", "repeat_interval", "repeat_until", "flagged", "priority"); ok {
+	if field, ok := unknownField(raw, "project_id", "parent_task_id", "title", "notes", "url", "status", "due_date", "due_time", "repeat_frequency", "repeat_interval", "repeat_until", "flagged", "priority"); ok {
 		return application.UpdateTaskInput{}, fmt.Errorf("%w: unknown field %q", application.ErrInvalidFilter, field)
 	}
 
 	var input application.UpdateTaskInput
 	if value, ok := raw["project_id"]; ok {
-		projectID, err := nullableInt64(value)
+		projectID, err := nullableInt64(value, "project_id")
 		if err != nil {
 			return application.UpdateTaskInput{}, err
 		}
 		input.ProjectID = application.OptionalInt64{Set: true, Value: projectID}
+	}
+	if value, ok := raw["parent_task_id"]; ok {
+		parentTaskID, err := nullableInt64(value, "parent_task_id")
+		if err != nil {
+			return application.UpdateTaskInput{}, err
+		}
+		input.ParentTaskID = application.OptionalInt64{Set: true, Value: parentTaskID}
 	}
 	if value, ok := raw["title"]; ok {
 		title, err := nullableString(value)
@@ -511,13 +525,14 @@ func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
 
 func projectDTO(project domain.Project) projectResponse {
 	return projectResponse{
-		ID:        project.ID,
-		Name:      project.Name,
-		StartDate: formatDatePtr(project.StartDate),
-		EndDate:   formatDatePtr(project.EndDate),
-		Archived:  project.Archived,
-		CreatedAt: formatTimestamp(project.CreatedAt),
-		UpdatedAt: formatTimestamp(project.UpdatedAt),
+		ID:              project.ID,
+		ParentProjectID: project.ParentProjectID,
+		Name:            project.Name,
+		StartDate:       formatDatePtr(project.StartDate),
+		EndDate:         formatDatePtr(project.EndDate),
+		Archived:        project.Archived,
+		CreatedAt:       formatTimestamp(project.CreatedAt),
+		UpdatedAt:       formatTimestamp(project.UpdatedAt),
 	}
 }
 
@@ -525,6 +540,7 @@ func taskDTO(task domain.Task) taskResponse {
 	return taskResponse{
 		ID:              task.ID,
 		ProjectID:       task.ProjectID,
+		ParentTaskID:    task.ParentTaskID,
 		Title:           task.Title,
 		Notes:           task.Notes,
 		URL:             task.URL,
@@ -556,6 +572,8 @@ func writeError(w http.ResponseWriter, err error) {
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "project name is required")
 	case errors.Is(err, domain.ErrInvalidProjectPeriod):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "project start date must be before end date")
+	case errors.Is(err, domain.ErrInvalidProjectParent):
+		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "project parent is invalid")
 	case errors.Is(err, domain.ErrInvalidTaskTitle):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task title is required")
 	case errors.Is(err, domain.ErrInvalidTaskStatus):
@@ -564,12 +582,16 @@ func writeError(w http.ResponseWriter, err error) {
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task schedule is invalid")
 	case errors.Is(err, domain.ErrInvalidTaskRepeat):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task repeat is invalid")
+	case errors.Is(err, domain.ErrInvalidTaskParent):
+		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task parent is invalid")
 	case errors.Is(err, domain.ErrInvalidTaskPriority):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task priority must be none, low, medium, or high")
 	case errors.Is(err, domain.ErrInvalidTaskURL):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "task url must be an http or https URL")
 	case errors.Is(err, application.ErrInvalidFilter):
 		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "todo filter is invalid")
+	case errors.Is(err, application.ErrInvalidHierarchy):
+		writeErrorResponse(w, http.StatusBadRequest, "validation_error", "todo hierarchy is invalid")
 	case errors.Is(err, application.ErrNotFound):
 		writeErrorResponse(w, http.StatusNotFound, "not_found", "todo resource was not found")
 	case errors.Is(err, application.ErrProjectHasTasks):
@@ -612,17 +634,17 @@ func parseOptionalDate(value *string) (*time.Time, error) {
 	return domain.NormalizeDate(&parsed), nil
 }
 
-func nullableInt64(raw json.RawMessage) (*int64, error) {
+func nullableInt64(raw json.RawMessage, field string) (*int64, error) {
 	if isJSONNull(raw) {
 		return nil, nil
 	}
 
 	var value int64
 	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, fmt.Errorf("%w: project_id must be an integer or null", application.ErrInvalidFilter)
+		return nil, fmt.Errorf("%w: %s must be an integer or null", application.ErrInvalidFilter, field)
 	}
 	if value <= 0 {
-		return nil, fmt.Errorf("%w: project_id must be positive", application.ErrInvalidFilter)
+		return nil, fmt.Errorf("%w: %s must be positive", application.ErrInvalidFilter, field)
 	}
 	return &value, nil
 }

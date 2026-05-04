@@ -41,6 +41,16 @@ type SmartList = {
   label: string;
 };
 
+type ProjectTreeNode = {
+  project: TodoProject;
+  children: ProjectTreeNode[];
+};
+
+type TaskTreeNode = {
+  task: TodoTask;
+  children: TaskTreeNode[];
+};
+
 type RenderOptions = {
   apiBaseUrl: string;
   currentPath: AppPath;
@@ -844,6 +854,13 @@ function renderProjectForm(state: TodoState): string {
         <span class="visually-hidden">Название</span>
         <input name="name" type="text" value="" placeholder="Новый проект" autocomplete="off" required>
       </label>
+      <label class="project-parent-field">
+        <span class="visually-hidden">Родительский проект</span>
+        <select name="parent_project_id" aria-label="Родительский проект">
+          <option value="">Без родителя</option>
+          ${renderProjectOptions(state.projects, null, { includeArchived: false })}
+        </select>
+      </label>
       <span class="project-form-actions">
         <button class="icon-button small project-save-button" type="submit" ${state.saving ? "disabled" : ""} aria-label="Создать проект" title="Создать проект">
           +
@@ -893,29 +910,35 @@ function renderProjectList(state: TodoState): string {
 }
 
 function renderProjectRows(projects: TodoProject[], state: TodoState): string {
-  return projects
-    .map((project) => {
-      const active = state.scope.kind === "project" && state.scope.projectId === project.id;
-      return `
-        <li class="project-row ${active ? "active" : ""} ${project.archived ? "archived-project" : ""}">
-          <button type="button" data-project-id="${project.id}">
-            <span class="project-title">${escapeHTML(project.name)}</span>
-            ${projectPeriod(project)}
-            ${project.archived ? `<small>Архив</small>` : ""}
-          </button>
-          <span>
-            <button class="icon-button small" type="button" data-edit-project-id="${project.id}" aria-label="Настройки проекта ${escapeAttr(project.name)}" title="Настройки проекта">&#9881;</button>
-            ${
-              project.archived
-                ? `<button class="icon-button small" type="button" data-restore-project-id="${project.id}" aria-label="Вернуть проект ${escapeAttr(project.name)}" title="Вернуть проект">&#8634;</button>`
-                : `<button class="icon-button small" type="button" data-archive-project-id="${project.id}" aria-label="Архивировать проект ${escapeAttr(project.name)}" title="Архивировать проект">&#8681;</button>`
-            }
-            <button class="icon-button small danger" type="button" data-delete-project-id="${project.id}" aria-label="Удалить ${escapeAttr(project.name)}" title="Удалить проект">&#8722;</button>
-          </span>
-        </li>
-      `;
-    })
+  return projectTree(projects)
+    .map((node) => renderProjectTreeNode(node, state, 0))
     .join("");
+}
+
+function renderProjectTreeNode(node: ProjectTreeNode, state: TodoState, depth: number): string {
+  const project = node.project;
+  const active = state.scope.kind === "project" && state.scope.projectId === project.id;
+  return `
+    <li class="project-tree-item">
+      <div class="project-row project-depth-${treeDepthClass(depth)} ${active ? "active" : ""} ${project.archived ? "archived-project" : ""}">
+        <button type="button" data-project-id="${project.id}">
+          <span class="project-title">${escapeHTML(project.name)}</span>
+          ${projectPeriod(project)}
+          ${project.archived ? `<small>Архив</small>` : ""}
+        </button>
+        <span>
+          <button class="icon-button small" type="button" data-edit-project-id="${project.id}" aria-label="Настройки проекта ${escapeAttr(project.name)}" title="Настройки проекта">&#9881;</button>
+          ${
+            project.archived
+              ? `<button class="icon-button small" type="button" data-restore-project-id="${project.id}" aria-label="Вернуть проект ${escapeAttr(project.name)}" title="Вернуть проект">&#8634;</button>`
+              : `<button class="icon-button small" type="button" data-archive-project-id="${project.id}" aria-label="Архивировать проект ${escapeAttr(project.name)}" title="Архивировать проект">&#8681;</button>`
+          }
+          <button class="icon-button small danger" type="button" data-delete-project-id="${project.id}" aria-label="Удалить ${escapeAttr(project.name)}" title="Удалить проект">&#8722;</button>
+        </span>
+      </div>
+      ${node.children.length > 0 ? `<ul class="project-tree-children">${node.children.map((child) => renderProjectTreeNode(child, state, depth + 1)).join("")}</ul>` : ""}
+    </li>
+  `;
 }
 
 function renderProjectSettingsPanel(state: TodoState): string {
@@ -939,6 +962,16 @@ function renderProjectSettingsPanel(state: TodoState): string {
         <label>
           <span>Название</span>
           <input name="name" type="text" value="${escapeAttr(project.name)}" autocomplete="off" required>
+        </label>
+        <label>
+          <span>Родитель</span>
+          <select name="parent_project_id">
+            <option value="" ${project.parent_project_id === null ? "selected" : ""}>Без родителя</option>
+            ${renderProjectOptions(state.projects, project.parent_project_id, {
+              excludeIDs: projectBlockedParentIDs(project, state.projects),
+              includeArchived: project.archived
+            })}
+          </select>
         </label>
         <div class="settings-form-grid">
           <label>
@@ -1034,6 +1067,86 @@ function renderDirectionOption(value: TodoSortDirection, label: string, selected
   return `<option value="${value}" ${selected === value ? "selected" : ""}>${label}</option>`;
 }
 
+function projectTree(projects: TodoProject[]): ProjectTreeNode[] {
+  const nodes = new Map<number, ProjectTreeNode>();
+  for (const project of projects) {
+    nodes.set(project.id, { project, children: [] });
+  }
+
+  const roots: ProjectTreeNode[] = [];
+  for (const project of projects) {
+    const node = nodes.get(project.id);
+    if (!node) {
+      continue;
+    }
+    const parent = project.parent_project_id ? nodes.get(project.parent_project_id) : undefined;
+    if (parent && parent.project.id !== project.id) {
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
+}
+
+function taskTree(tasks: TodoTask[]): TaskTreeNode[] {
+  const nodes = new Map<number, TaskTreeNode>();
+  for (const task of tasks) {
+    nodes.set(task.id, { task, children: [] });
+  }
+
+  const roots: TaskTreeNode[] = [];
+  for (const task of tasks) {
+    const node = nodes.get(task.id);
+    if (!node) {
+      continue;
+    }
+    const parent = task.parent_task_id ? nodes.get(task.parent_task_id) : undefined;
+    if (parent && parent.task.id !== task.id) {
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return roots;
+}
+
+function projectBlockedParentIDs(project: TodoProject, projects: TodoProject[]): Set<number> {
+  const blocked = new Set<number>([project.id]);
+  collectProjectDescendantIDs(project.id, projects, blocked);
+  return blocked;
+}
+
+function collectProjectDescendantIDs(projectID: number, projects: TodoProject[], blocked: Set<number>) {
+  for (const project of projects) {
+    if (project.parent_project_id !== projectID || blocked.has(project.id)) {
+      continue;
+    }
+    blocked.add(project.id);
+    collectProjectDescendantIDs(project.id, projects, blocked);
+  }
+}
+
+function taskBlockedParentIDs(task: TodoTask, tasks: TodoTask[]): Set<number> {
+  const blocked = new Set<number>([task.id]);
+  collectTaskDescendantIDs(task.id, tasks, blocked);
+  return blocked;
+}
+
+function collectTaskDescendantIDs(taskID: number, tasks: TodoTask[], blocked: Set<number>) {
+  for (const task of tasks) {
+    if (task.parent_task_id !== taskID || blocked.has(task.id)) {
+      continue;
+    }
+    blocked.add(task.id);
+    collectTaskDescendantIDs(task.id, tasks, blocked);
+  }
+}
+
+function treeDepthClass(depth: number): number {
+  return Math.min(depth, 4);
+}
+
 function renderTaskForm(state: TodoState): string {
   const selectedProjectID = state.scope.kind === "project" ? state.scope.projectId : null;
   const dueDate = defaultDueDateForScope(state.scope);
@@ -1078,7 +1191,9 @@ function renderTaskForm(state: TodoState): string {
       renderSettingsButton
         ? renderNewTaskSettingsPanel({
             projects: state.projects,
+            tasks: state.tasks,
             selectedProjectID,
+            selectedParentTaskID: null,
             notes: "",
             url: "",
             dueDate,
@@ -1096,7 +1211,9 @@ function renderTaskForm(state: TodoState): string {
 
 function renderNewTaskSettingsPanel(values: {
   projects: TodoProject[];
+  tasks: TodoTask[];
   selectedProjectID: number | null;
+  selectedParentTaskID: number | null;
   notes: string;
   url: string;
   dueDate: string;
@@ -1142,6 +1259,13 @@ function renderNewTaskSettingsPanel(values: {
             </select>
           </label>
           <label>
+            <span>Родитель</span>
+            <select form="task-form" name="parent_task_id">
+              <option value="" ${values.selectedParentTaskID === null ? "selected" : ""}>Без родителя</option>
+              ${renderTaskOptions(values.tasks, values.selectedParentTaskID)}
+            </select>
+          </label>
+          <label>
             <span>Дата</span>
             <input form="task-form" name="due_date" type="date" value="${escapeAttr(values.dueDate)}">
           </label>
@@ -1154,6 +1278,8 @@ function renderNewTaskSettingsPanel(values: {
             <select form="task-form" name="repeat_frequency">
               ${renderRepeatOption("none", "Не повторять", values.repeatFrequency)}
               ${renderRepeatOption("daily", "Ежедневно", values.repeatFrequency)}
+              ${renderRepeatOption("weekdays", "По рабочим дням", values.repeatFrequency)}
+              ${renderRepeatOption("weekends", "По выходным", values.repeatFrequency)}
               ${renderRepeatOption("weekly", "Еженедельно", values.repeatFrequency)}
               ${renderRepeatOption("monthly", "Ежемесячно", values.repeatFrequency)}
               ${renderRepeatOption("yearly", "Ежегодно", values.repeatFrequency)}
@@ -1234,6 +1360,13 @@ function renderExistingTaskSettingsPanel(state: TodoState): string {
             </select>
           </label>
           <label>
+            <span>Родитель</span>
+            <select name="parent_task_id">
+              <option value="" ${task.parent_task_id === null ? "selected" : ""}>Без родителя</option>
+              ${renderTaskOptions(state.tasks, task.parent_task_id, taskBlockedParentIDs(task, state.tasks))}
+            </select>
+          </label>
+          <label>
             <span>Дата</span>
             <input name="due_date" type="date" value="${escapeAttr(task.due_date ?? "")}">
           </label>
@@ -1246,6 +1379,8 @@ function renderExistingTaskSettingsPanel(state: TodoState): string {
             <select name="repeat_frequency">
               ${renderRepeatOption("none", "Не повторять", task.repeat_frequency)}
               ${renderRepeatOption("daily", "Ежедневно", task.repeat_frequency)}
+              ${renderRepeatOption("weekdays", "По рабочим дням", task.repeat_frequency)}
+              ${renderRepeatOption("weekends", "По выходным", task.repeat_frequency)}
               ${renderRepeatOption("weekly", "Еженедельно", task.repeat_frequency)}
               ${renderRepeatOption("monthly", "Ежемесячно", task.repeat_frequency)}
               ${renderRepeatOption("yearly", "Ежегодно", task.repeat_frequency)}
@@ -1284,15 +1419,61 @@ function renderExistingTaskSettingsPanel(state: TodoState): string {
   `;
 }
 
-function renderProjectOption(project: TodoProject, selectedProjectID: number | null): string {
-  return `<option value="${project.id}" ${selectedProjectID === project.id ? "selected" : ""}>${escapeHTML(project.name)}</option>`;
+function renderProjectOption(project: TodoProject, selectedProjectID: number | null, depth: number): string {
+  const prefix = depth > 0 ? `${"--".repeat(depth)} ` : "";
+  return `<option value="${project.id}" ${selectedProjectID === project.id ? "selected" : ""}>${escapeHTML(`${prefix}${project.name}`)}</option>`;
 }
 
-function renderProjectOptions(projects: TodoProject[], selectedProjectID: number | null): string {
-  return projects
-    .filter((project) => !project.archived || project.id === selectedProjectID)
-    .map((project) => renderProjectOption(project, selectedProjectID))
+function renderProjectOptions(
+  projects: TodoProject[],
+  selectedProjectID: number | null,
+  options: { excludeIDs?: Set<number>; includeArchived?: boolean } = {}
+): string {
+  const includeArchived = options.includeArchived ?? false;
+  const excluded = options.excludeIDs ?? new Set<number>();
+  return projectTree(projects)
+    .map((node) => renderProjectOptionTree(node, selectedProjectID, excluded, includeArchived, 0))
     .join("");
+}
+
+function renderProjectOptionTree(
+  node: ProjectTreeNode,
+  selectedProjectID: number | null,
+  excluded: Set<number>,
+  includeArchived: boolean,
+  depth: number
+): string {
+  const project = node.project;
+  const renderCurrent = !excluded.has(project.id) && (includeArchived || !project.archived || project.id === selectedProjectID);
+  const current = renderCurrent ? renderProjectOption(project, selectedProjectID, depth) : "";
+  const children = node.children
+    .map((child) => renderProjectOptionTree(child, selectedProjectID, excluded, includeArchived, depth + 1))
+    .join("");
+  return `${current}${children}`;
+}
+
+function renderTaskOptions(
+  tasks: TodoTask[],
+  selectedTaskID: number | null,
+  excluded: Set<number> = new Set<number>()
+): string {
+  return taskTree(tasks)
+    .map((node) => renderTaskOptionTree(node, selectedTaskID, excluded, 0))
+    .join("");
+}
+
+function renderTaskOptionTree(
+  node: TaskTreeNode,
+  selectedTaskID: number | null,
+  excluded: Set<number>,
+  depth: number
+): string {
+  const task = node.task;
+  const prefix = depth > 0 ? `${"--".repeat(depth)} ` : "";
+  const current = excluded.has(task.id)
+    ? ""
+    : `<option value="${task.id}" ${selectedTaskID === task.id ? "selected" : ""}>${escapeHTML(`${prefix}${task.title}`)}</option>`;
+  return `${current}${node.children.map((child) => renderTaskOptionTree(child, selectedTaskID, excluded, depth + 1)).join("")}`;
 }
 
 function renderRepeatOption(value: TodoRepeatFrequency, label: string, selected: TodoRepeatFrequency): string {
@@ -1344,13 +1525,17 @@ function renderTaskList(state: TodoState): string {
   return `
     <section class="task-list" aria-label="Задачи">
       ${taskForm}
-      ${state.tasks.map((task) => renderTaskItem(task, state.projects, state.saving)).join("")}
+      ${taskTree(state.tasks).map((node) => renderTaskTreeNode(node, state.projects, state.saving, 0)).join("")}
       ${taskSettingsPanel}
     </section>
   `;
 }
 
-function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean): string {
+function renderTaskTreeNode(node: TaskTreeNode, projects: TodoProject[], saving: boolean, depth: number): string {
+  return `${renderTaskItem(node.task, projects, saving, depth)}${node.children.map((child) => renderTaskTreeNode(child, projects, saving, depth + 1)).join("")}`;
+}
+
+function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean, depth: number): string {
   const project = projects.find((item) => item.id === task.project_id);
   const done = task.status === "done";
   const nextStatus: TodoTaskStatus = done ? "todo" : "done";
@@ -1366,7 +1551,7 @@ function renderTaskItem(task: TodoTask, projects: TodoProject[], saving: boolean
     .join("");
 
   return `
-    <article class="task-item ${done ? "done" : ""}">
+    <article class="task-item task-depth-${treeDepthClass(depth)} ${done ? "done" : ""}">
       <button
         class="complete-button"
         type="button"
@@ -1438,6 +1623,10 @@ function repeatName(frequency: TodoRepeatFrequency): string {
   switch (frequency) {
     case "daily":
       return "Ежедневно";
+    case "weekdays":
+      return "По рабочим дням";
+    case "weekends":
+      return "По выходным";
     case "weekly":
       return "Еженедельно";
     case "monthly":

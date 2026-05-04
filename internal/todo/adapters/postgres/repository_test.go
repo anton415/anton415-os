@@ -13,6 +13,9 @@ import (
 func TestListTasksQueryAllTasksUsesStableSort(t *testing.T) {
 	query, args := listTasksQuery(application.TaskListFilter{})
 
+	if !strings.Contains(query, "t.parent_task_id") {
+		t.Fatalf("query = %q, expected parent task field", query)
+	}
 	if !strings.Contains(query, "(project_id IS NULL OR p.archived = false)") {
 		t.Fatalf("query = %q, expected archived project tasks to be hidden", query)
 	}
@@ -32,6 +35,9 @@ func TestListTasksQueryAllTasksUsesStableSort(t *testing.T) {
 
 func TestListProjectsQueryDefaultAndArchivedFilters(t *testing.T) {
 	activeQuery, activeArgs := listProjectsQuery(application.ProjectListFilter{})
+	if !strings.Contains(activeQuery, "parent_project_id") {
+		t.Fatalf("active query = %q, expected parent project field", activeQuery)
+	}
 	if !strings.Contains(activeQuery, "archived = false") {
 		t.Fatalf("active query = %q, expected active project filter", activeQuery)
 	}
