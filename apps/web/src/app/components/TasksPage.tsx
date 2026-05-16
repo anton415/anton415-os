@@ -42,40 +42,44 @@ import type {
   TodoProject,
   TodoProjectPayload,
   TodoRepeatFrequency,
-  TodoServerView,
   TodoTask,
   TodoTaskPayload,
   TodoTaskPriority,
-  TodoTaskStatus
+  TodoTaskQuery,
+  TodoTaskStatus,
+  TodoView
 } from "../api/types";
 import { useAuthGate, logoutAndRedirect } from "../hooks/useAuthGate";
 
 type Scope =
-  | { kind: "view"; view: TodoServerView }
+  | { kind: "view"; view: TodoView }
   | { kind: "project"; projectId: number };
 
 type ProjectNode = TodoProject & { children: ProjectNode[] };
 type TaskNode = TodoTask & { children: TaskNode[] };
 
-const viewMeta: { id: TodoServerView; name: string; icon: typeof Inbox; color: string }[] = [
+const allViews: { id: TodoView; name: string; icon: typeof Inbox; color: string }[] = [
   { id: "inbox", name: "Входящие", icon: Inbox, color: "text-chart-1" },
   { id: "today", name: "Сегодня", icon: CalendarIcon, color: "text-success" },
   { id: "overdue", name: "Просроченные", icon: AlertCircle, color: "text-danger" },
   { id: "upcoming", name: "Скоро", icon: Clock, color: "text-warning" },
   { id: "scheduled", name: "Запланированные", icon: CalendarCheck, color: "text-chart-3" },
-  { id: "flagged", name: "С флажком", icon: Flag, color: "text-chart-4" }
-];
-
-const allViews: {
-  id: TodoServerView | "all" | "completed";
-  name: string;
-  icon: typeof Inbox;
-  color: string;
-}[] = [
-  ...viewMeta,
+  { id: "flagged", name: "С флажком", icon: Flag, color: "text-chart-4" },
   { id: "all", name: "Всё", icon: CircleDot, color: "text-muted-foreground" },
   { id: "completed", name: "Готово", icon: CheckCircle2, color: "text-chart-2" }
 ];
+
+function buildTaskQuery(scope: Scope): TodoTaskQuery {
+  if (scope.kind === "project") return { project_id: scope.projectId };
+  switch (scope.view) {
+    case "all":
+      return {};
+    case "completed":
+      return { status: "done" };
+    default:
+      return { view: scope.view };
+  }
+}
 
 const priorityLabels: Record<TodoTaskPriority, string> = {
   none: "Без приоритета",
@@ -184,11 +188,7 @@ export function TasksPage() {
     setLoading(true);
     setError(undefined);
     try {
-      const query =
-        current.kind === "view"
-          ? { view: current.view }
-          : { project_id: current.projectId };
-      const list = await todoApi.listTasks(query);
+      const list = await todoApi.listTasks(buildTaskQuery(current));
       setTasks(list);
     } catch (err) {
       setError(describeError(err));
@@ -534,11 +534,7 @@ export function TasksPage() {
                   isActive ? "bg-accent" : "hover:bg-accent"
                 }`}
                 onClick={() => {
-                  if (view.id === "all" || view.id === "completed") {
-                    setScope({ kind: "view", view: view.id === "all" ? "inbox" : "inbox" });
-                  } else {
-                    setScope({ kind: "view", view: view.id as TodoServerView });
-                  }
+                  setScope({ kind: "view", view: view.id });
                   setIsMobileSidebarOpen(false);
                 }}
               >

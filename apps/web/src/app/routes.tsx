@@ -19,6 +19,11 @@ export const router = createBrowserRouter([
     Component: TasksPage,
   },
   {
+    // Backend auth flows default to /todo (internal/auth/adapters/http/handler.go).
+    path: "/todo",
+    Component: TasksPage,
+  },
+  {
     path: "/finances",
     Component: FinancesPage,
   },
