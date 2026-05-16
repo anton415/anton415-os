@@ -66,6 +66,9 @@ internal/{module}/
 - Graceful shutdown по SIGTERM / SIGINT
 - Внедряет `config + pool + logger` в chi-router
 
+API смонтирован под `/api/v1` ([`internal/platform/http/router.go:64`](../internal/platform/http/router.go));
+включены middleware `RequestID`, `RealIP`, `Recoverer`.
+
 Отдельных воркеров, CLI-команд и других бинарей нет — всё через один
 HTTP-процесс.
 
@@ -81,8 +84,7 @@ HTTP-процесс.
 | 3 | **DI вручную в `main.go`** | На 5 модулях идеально. На 8–10 — composition root начнёт пухнуть. Заранее договориться о пороге для суб-конструкторов. |
 | 4 | **Один Postgres, бэкап через `pg_dump`** | Для single-owner допустимо, но **RPO / RTO нигде не зафиксированы** — это место, где «привычка» легко превращается в потерю данных. |
 | 5 | **Auth = allowlist по одному email** | По `README.md` это «temporary». Классический временный костыль; нужен явный пункт в roadmap с дедлайном. |
-| 6 | **Нет версионирования API** (`/v1/`) | При первом breaking change для web-клиента станет болью. Префикс лучше заложить сейчас, пока клиент один. |
-| 7 | **SPOF на уровне процесса** | Auth, todo, finance и будущие fire/investments — один бинарь. Любая паника кладёт всё. Нужен `recoverer`-middleware в `internal/platform/http`. |
+| 6 | **SPOF на уровне процесса** | Auth, todo, finance и будущие fire/investments — один бинарь. `middleware.Recoverer` уже включён ([router.go:60](../internal/platform/http/router.go)), панику он погасит, но любой `os.Exit`, `runtime.Goexit` или OOM кладут весь хаб. Health-check уровня модуля + перезапуск процесса по systemd — следующий шаг. |
 
 ## 6. Вердикт
 
