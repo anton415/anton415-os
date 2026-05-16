@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "vite",
     "check": "tsc --noEmit",
+    "test:run": "echo 'No unit tests yet — to be rewritten against the React tree'",
+    "test:e2e": "echo 'No e2e tests yet — to be rewritten against the React tree'",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
   },
